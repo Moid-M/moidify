@@ -2,6 +2,7 @@ import hashlib
 import os
 import secrets
 import shutil
+import subprocess
 import tempfile
 import unicodedata
 import zipfile
@@ -12,7 +13,7 @@ from typing import Optional
 import uvicorn
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -163,6 +164,38 @@ def me(token: Optional[str] = Header(None)):
 
 
 # ---------------------------------------------------------------------------
+# Transcoding helpers
+# ---------------------------------------------------------------------------
+
+FFMPEG_PATH = shutil.which("ffmpeg")
+
+TRANSCODE_MAP = {
+    "high":  {"codec": None, "bitrate": None},         # original
+    "medium": {"codec": "libmp3lame", "bitrate": "256k"},
+    "low":   {"codec": "libmp3lame", "bitrate": "128k"},
+    "voice": {"codec": "libopus", "bitrate": "64k"},
+}
+
+
+def _transcode_stream(file_path: str, quality: str):
+    if not FFMPEG_PATH or quality == "high" or quality not in TRANSCODE_MAP:
+        return None
+    cfg = TRANSCODE_MAP[quality]
+    args = [
+        FFMPEG_PATH, "-i", file_path, "-f", "mp3",
+        "-acodec", cfg["codec"], "-ab", cfg["bitrate"],
+        "-vn", "-nostdin", "-loglevel", "error", "-",
+    ]
+    if cfg["codec"] == "libopus":
+        args[args.index("-f") + 1] = "ogg"
+        args[args.index("-acodec") + 1] = "libopus"
+    process = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    return process
+
+
+# ---------------------------------------------------------------------------
 # Track endpoints
 # ---------------------------------------------------------------------------
 
@@ -206,7 +239,7 @@ def get_track(track_id: int):
 
 
 @app.get("/api/stream/{track_id}")
-def stream_track(track_id: int):
+def stream_track(track_id: int, quality: Optional[str] = Query("high")):
     conn = get_connection()
     row = conn.execute("SELECT file_path FROM tracks WHERE id = ?", (track_id,)).fetchone()
     conn.close()
@@ -216,6 +249,19 @@ def stream_track(track_id: int):
     path = Path(row["file_path"])
     if not path.exists():
         raise HTTPException(404, "File not found on disk")
+
+    proc = _transcode_stream(str(path), quality)
+    if proc:
+        media_type = "audio/ogg" if quality == "voice" else "audio/mpeg"
+        return StreamingResponse(
+            proc.stdout,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": "inline",
+                "Cache-Control": "no-cache",
+                "X-Transcoded": quality,
+            },
+        )
 
     ext = path.suffix.lower()
     media_type = {
@@ -499,6 +545,108 @@ def reorder_playlist_tracks(
     conn.commit()
     conn.close()
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Shareable playlist endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/playlists/{playlist_id}/share")
+def share_playlist(playlist_id: int, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+    conn = get_connection()
+    pl = conn.execute(
+        "SELECT * FROM playlists WHERE id = ? AND user_id = ?",
+        (playlist_id, user["id"]),
+    ).fetchone()
+    if pl is None:
+        conn.close()
+        raise HTTPException(404, "Playlist not found")
+    existing = conn.execute(
+        "SELECT token FROM shared_playlists WHERE playlist_id = ?", (playlist_id,)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return {"token": existing["token"]}
+    share_token = secrets.token_urlsafe(16)
+    conn.execute(
+        "INSERT INTO shared_playlists (token, playlist_id) VALUES (?, ?)",
+        (share_token, playlist_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"token": share_token}
+
+
+@app.get("/api/playlists/{playlist_id}/share")
+def get_share_status(playlist_id: int, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+    conn = get_connection()
+    pl = conn.execute(
+        "SELECT * FROM playlists WHERE id = ? AND user_id = ?",
+        (playlist_id, user["id"]),
+    ).fetchone()
+    if pl is None:
+        conn.close()
+        raise HTTPException(404, "Playlist not found")
+    row = conn.execute(
+        "SELECT token FROM shared_playlists WHERE playlist_id = ?", (playlist_id,)
+    ).fetchone()
+    conn.close()
+    return {"shared": row is not None, "token": row["token"] if row else None}
+
+
+@app.delete("/api/playlists/{playlist_id}/share")
+def unshare_playlist(playlist_id: int, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+    conn = get_connection()
+    pl = conn.execute(
+        "SELECT * FROM playlists WHERE id = ? AND user_id = ?",
+        (playlist_id, user["id"]),
+    ).fetchone()
+    if pl is None:
+        conn.close()
+        raise HTTPException(404, "Playlist not found")
+    conn.execute("DELETE FROM shared_playlists WHERE playlist_id = ?", (playlist_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/shared/{token}")
+def get_shared_playlist(token: str):
+    conn = get_connection()
+    row = conn.execute(
+        """SELECT p.id, p.name, p.user_id, u.username
+           FROM shared_playlists sp
+           JOIN playlists p ON sp.playlist_id = p.id
+           JOIN users u ON p.user_id = u.id
+           WHERE sp.token = ?""",
+        (token,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Shared playlist not found")
+    tracks = conn.execute(
+        """SELECT t.*, pt.position
+           FROM playlist_tracks pt
+           JOIN tracks t ON pt.track_id = t.id
+           WHERE pt.playlist_id = ?
+           ORDER BY pt.position""",
+        (row["id"],),
+    ).fetchall()
+    conn.close()
+    return {
+        "name": row["name"],
+        "username": row["username"],
+        "tracks": [dict(r) for r in tracks],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -952,6 +1100,26 @@ def admin_page():
 @app.get("/")
 def index():
     return FileResponse(str(STATIC_DIR / "index.html"))
+
+
+@app.get("/s/{token}")
+def shared_playlist_page(token: str):
+    return FileResponse(str(STATIC_DIR / "shared.html"))
+
+
+@app.get("/api/player/now-playing")
+def now_playing():
+    conn = get_connection()
+    row = conn.execute(
+        """SELECT t.id, t.title, t.artist, t.album, t.duration
+           FROM play_history ph
+           JOIN tracks t ON ph.track_id = t.id
+           ORDER BY ph.played_at DESC LIMIT 1"""
+    ).fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return {"id": None, "title": None, "artist": None, "album": None, "duration": None}
 
 
 if __name__ == "__main__":

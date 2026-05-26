@@ -158,7 +158,9 @@ async function renderPlaylistDetail(playlistId) {
   try {
     var tracks = await apiJson('/api/playlists/'+playlistId+'/tracks');
     var playlistName = state.playlists.find(function(p){return p.id===playlistId;});
-    content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(playlistName?playlistName.name:'Playlist')+'</div></div>';
+    content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(playlistName?playlistName.name:'Playlist')+'</div>'+
+      '<div style="display:flex;gap:8px"><button id="share-pl-btn" class="icon-btn" title="Share playlist">'+iconShare()+'</button></div></div>'+
+      '<div id="share-pl-status" style="display:none;padding:10px 14px;background:var(--bg-el);border-radius:var(--radius);margin-bottom:12px;font-size:13px;align-items:center;gap:10px"></div>';
     if (tracks.length===0) { content.innerHTML += '<div class="fav-empty">This playlist is empty.</div>'; return; }
     var list = document.createElement('div'); list.className='track-list';
     list.innerHTML = trackHeaderHTML();
@@ -167,7 +169,42 @@ async function renderPlaylistDetail(playlistId) {
     state.currentTracks = tracks; state.currentQueue = tracks; state._favedFlag = false;
     setupTrackSorting(list, tracks);
     setupPlaylistDragDrop(list, tracks, playlistId);
+    setupPlaylistShare(playlistId);
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+}
+
+function setupPlaylistShare(playlistId) {
+  var btn = document.getElementById('share-pl-btn');
+  var status = document.getElementById('share-pl-status');
+  if (!btn) return;
+
+  apiJson('/api/playlists/'+playlistId+'/share').then(function(d) {
+    if (d.shared) { btn.classList.add('active'); }
+  }).catch(function(){});
+
+  btn.addEventListener('click', function() {
+    apiJson('/api/playlists/'+playlistId+'/share', {method:'POST'}).then(function(d) {
+      var link = window.location.origin + '/s/' + d.token;
+      btn.classList.add('active');
+      status.style.display = 'flex';
+      status.innerHTML =
+        '<span style="flex:1;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+link+'</span>'+
+        '<button class="icon-btn" id="copy-share-link" style="flex-shrink:0" title="Copy link">'+iconCopy()+'</button>'+
+        '<button class="icon-btn" id="unshare-pl-btn" style="flex-shrink:0;color:var(--danger)" title="Revoke">'+iconClose()+'</button>';
+      document.getElementById('copy-share-link').addEventListener('click', function() {
+        navigator.clipboard.writeText(link).then(function() {
+          this.innerHTML = iconCheck();
+          setTimeout(function() { this.innerHTML = iconCopy(); }.bind(this), 2000);
+        }.bind(this)).catch(function() {});
+      });
+      document.getElementById('unshare-pl-btn').addEventListener('click', function() {
+        api('/api/playlists/'+playlistId+'/share', {method:'DELETE'}).then(function() {
+          status.style.display = 'none';
+          btn.classList.remove('active');
+        }).catch(function() {});
+      });
+    }).catch(function(e) { console.error(e); });
+  });
 }
 
 function createTrackRow(track, index, queue, isFaved) {

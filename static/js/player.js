@@ -15,7 +15,7 @@ function playFromQueue(queue, index) {
   var track = queue[index];
   if (!track) return;
 
-  audio.src = '/api/stream/' + track.id;
+  audio.src = '/api/stream/' + track.id + '?quality=' + (state.streamQuality || 'high');
   audio.play();
   fetch('/api/play/' + track.id, {method:'POST'});
 

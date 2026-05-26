@@ -79,6 +79,13 @@ def init_db():
             played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS shared_playlists (
+            token TEXT PRIMARY KEY,
+            playlist_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE
+        );
     """)
 
     # migrate existing tables — add columns if missing (safe to run on fresh DB too)

@@ -182,8 +182,16 @@ function renderPlaybackTab() {
     presetHtml += '<button class="eq-preset-btn'+(state.eqPreset===name?' active':'')+'" data-preset="'+name+'">'+name+'</button>';
   });
 
+  var qualityLabels = {high:'Original', medium:'Medium (256k)', low:'Low (128k)', voice:'Voice (64k Opus)'};
+  var qualityBtns = Object.keys(qualityLabels).map(function(k) {
+    return '<button class="eq-preset-btn'+(state.streamQuality===k?' active':'')+'" data-quality="'+k+'">'+qualityLabels[k]+'</button>';
+  }).join('');
+
   container.innerHTML =
     '<div class="settings-section"><h3>Equalizer</h3><div class="eq-presets">'+presetHtml+'</div><div class="eq-grid">'+bands+'</div></div>'+
+    '<div class="settings-section"><h3>Stream Quality</h3>'+
+    '<div class="eq-presets">'+qualityBtns+'</div>'+
+    '<p style="font-size:12px;color:var(--text-muted);margin-top:4px">Requires ffmpeg on the server for transcoding. Otherwise plays original.</p></div>'+
     '<div class="settings-section"><h3>Crossfade</h3>'+
     '<div class="crossfade-wrap"><span style="font-size:12px;color:var(--text-muted);min-width:30px;">'+state.crossfade+'s</span>'+
     '<input type="range" id="crossfade-slider" min="0" max="12" step="1" value="'+state.crossfade+'"><span style="font-size:12px;color:var(--text-muted);">12s</span></div></div>'+
@@ -211,6 +219,15 @@ function renderPlaybackTab() {
       var i = parseInt(this.dataset.band);
       setEQBand(i, parseFloat(this.value));
       qsa('.eq-preset-btn', container).forEach(function(s){s.classList.remove('active');});
+    });
+  });
+
+  qsa('[data-quality]', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      qsa('[data-quality]', container).forEach(function(s){s.classList.remove('active');});
+      this.classList.add('active');
+      state.streamQuality = this.dataset.quality;
+      localStorage.setItem('moidify_stream_quality', state.streamQuality);
     });
   });
 

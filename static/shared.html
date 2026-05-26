@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Shared Playlist — Moidify</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0d0d;--bg-el:#131313;--bg-hover:#1f1f1f;--card:#1a1a1a;--text:#fff;--text2:#b3b3b3;--text3:#6a6a6a;--accent:#a855f7;--accent-dim:rgba(168,85,247,.15);--radius:8px}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
+.wrap{max-width:700px;margin:0 auto;padding:40px 20px}
+.header{margin-bottom:32px;text-align:center}
+.header h1{font-size:24px;color:var(--accent);margin-bottom:4px}
+.header .by{font-size:14px;color:var(--text3)}
+.header .by span{color:var(--text2)}
+.track-list{display:flex;flex-direction:column;gap:2px}
+.track-row{display:grid;grid-template-columns:32px 1fr 1fr 60px;gap:12px;align-items:center;padding:10px 14px;border-radius:var(--radius);background:var(--bg-el);transition:.15s;cursor:pointer}
+.track-row:hover{background:var(--bg-hover)}
+.track-row .num{color:var(--text3);font-size:13px;text-align:center}
+.track-row .title{color:var(--text);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track-row .artist{color:var(--text2);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track-row .dur{color:var(--text3);font-size:13px;text-align:right}
+.empty{padding:40px;text-align:center;color:var(--text3);font-size:15px}
+.loading{text-align:center;padding:40px;color:var(--text3)}
+.error{text-align:center;padding:40px;color:#e74c3c}
+.footer{text-align:center;margin-top:32px;font-size:13px;color:var(--text3)}
+.footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header" id="header">
+    <h1 id="pl-name">Loading...</h1>
+    <div class="by">Shared by <span id="pl-user"></span></div>
+  </div>
+  <div id="track-container">
+    <div class="loading" id="loading">Loading playlist...</div>
+  </div>
+  <div class="footer">
+    Streamed with <a href="https://github.com/Moid-M/moidify">Moidify</a>
+  </div>
+</div>
+
+<script>
+var token = window.location.pathname.split('/').pop();
+
+fetch('/api/shared/' + token).then(function(r) {
+  if (!r.ok) throw new Error('Playlist not found');
+  return r.json();
+}).then(function(data) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('pl-name').textContent = data.name;
+  document.getElementById('pl-user').textContent = data.username;
+
+  var container = document.getElementById('track-container');
+  if (!data.tracks || !data.tracks.length) {
+    container.innerHTML = '<div class="empty">This playlist is empty.</div>';
+    return;
+  }
+
+  var list = document.createElement('div');
+  list.className = 'track-list';
+  data.tracks.forEach(function(t, i) {
+    var dur = t.duration ? Math.floor(t.duration/60)+':'+String(Math.floor(t.duration%60)).padStart(2,'0') : '?';
+    var row = document.createElement('div');
+    row.className = 'track-row';
+    row.innerHTML =
+      '<span class="num">'+(i+1)+'</span>'+
+      '<span class="title">'+esc(t.title||'Unknown')+'</span>'+
+      '<span class="artist">'+esc(t.artist||'Unknown')+'</span>'+
+      '<span class="dur">'+dur+'</span>';
+    row.addEventListener('click', function() {
+      var a = new Audio('/api/stream/'+t.id+'?quality=low');
+      a.play();
+    });
+    list.appendChild(row);
+  });
+  container.appendChild(list);
+}).catch(function(e) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('header').style.display = 'none';
+  document.getElementById('track-container').innerHTML = '<div class="error">'+e.message+'</div>';
+});
+
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>

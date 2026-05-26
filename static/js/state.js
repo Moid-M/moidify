@@ -29,6 +29,7 @@ var state = {
   currentTracks: [],
   currentQueue: [],
   _favedFlag: false,
+  streamQuality: localStorage.getItem('moidify_stream_quality') || 'high',
 };
 
 var audio = document.getElementById('audio');

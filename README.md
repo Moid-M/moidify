@@ -63,6 +63,12 @@
 
 **🐳 Docker Support** — Dockerfile + docker-compose.yml for containerized deployment
 
+**🔗 Shareable Playlists** — generate a public link anyone can open and listen to (no account needed)
+
+**📻 On-the-fly Transcoding** — serve medium (256k), low (128k), or voice (64k Opus) streams via ffmpeg
+
+**🎮 Discord Rich Presence** — companion script shows your currently playing track on Discord
+
 **📱 Responsive** — works on desktop and mobile browsers
 
 </td>
@@ -185,6 +191,19 @@ When installed, settings live in `/etc/moidify/config.json`:
 
 ---
 
+## 🎮 Discord Rich Presence
+
+Show what you're listening to on your Discord profile:
+
+```bash
+pip install pypresence
+python3 contrib/discord-presence.py --url http://your-server:8000
+```
+
+The script polls Moidify's `/api/player/now-playing` endpoint and updates your Discord status via RPC. Requires the Discord desktop app running and a Discord Application ID (create one at the [Discord Developer Portal](https://discord.com/developers/applications)).
+
+---
+
 ## 🛠️ Development
 
 ```bash
@@ -203,6 +222,8 @@ python3 server.py
 
 ```
 moidify/
+├── contrib/
+│   └── discord-presence.py  # Discord RPC companion script
 ├── Dockerfile         # Container image
 ├── docker-compose.yml # Docker orchestration
 ├── server.py          # FastAPI app (API + streaming)
@@ -217,19 +238,20 @@ moidify/
 ├── static/
 │   ├── index.html     # Main frontend
 │   ├── setup.html     # First-run setup wizard
+│   ├── shared.html    # Public shared playlist page
 │   ├── admin.html     # Admin dashboard
 │   ├── style.css      # All styles
 │   ├── placeholder-cover.svg
 │   └── js/
 │       ├── state.js   # App state + utility functions
-│       ├── icons.js   # SVG icon library
+│       ├── icons.js   # SVG icon library (share, copy, check icons)
 │       ├── api.js     # API client + auth
-│       ├── player.js  # Audio engine + EQ
+│       ├── player.js  # Audio engine + EQ + transcoding quality
 │       ├── queue.js   # Queue management + shuffle
 │       ├── lyrics.js  # Lyrics fetching + synced display
 │       ├── animations.js  # Visual effects
 │       ├── ui.js      # Modals, settings, context menu
-│       ├── views.js   # All page renderers
+│       ├── views.js   # All page renderers (share button in playlists)
 │       └── app.js     # Event binding + init
 └── music/             # Your music goes here (local dev)
 ```
