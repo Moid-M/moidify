@@ -1,40 +1,106 @@
-# Moidify
+<div align="center">
+  <br>
+  <img src="https://raw.githubusercontent.com/Moid-M/moidify/main/static/placeholder-cover.svg" width="80" alt="Moidify">
+  <h1 align="center">🎵 Moidify</h1>
+  <p align="center">
+    <strong>Your music. Anywhere. No strings attached.</strong>
+    <br>
+    A self-hosted music server that streams your collection to any browser.
+    <br>
+    Drop files. Listen instantly. No accounts required. No algorithms. No ads.
+  </p>
+  <p align="center">
+    <a href="#-quick-install">🚀 Quick Install</a>
+    ·
+    <a href="#-features">✨ Features</a>
+    ·
+    <a href="#-commands">⚙️ Commands</a>
+    ·
+    <a href="#-configuration">🔧 Configuration</a>
+    ·
+    <a href="#-development">🛠️ Development</a>
+  </p>
+  <p align="center">
+    <img src="https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python">
+    <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
+    <img src="https://img.shields.io/badge/status-stable-brightgreen?style=flat-square">
+  </p>
+  <br>
+</div>
 
-A self-hosted music server that streams your music collection to any browser. Drop your files in, listen instantly — no accounts required, no algorithms, no ads.
+---
 
-## Features
+## ✨ Features
 
-- **Zero-config streaming** — drop MP3/FLAC/OGG/M4A/WAV into your music folder, it appears instantly
-- **Free Spotify model** — anyone on your network can listen without logging in
-- **Accounts + playlists** — optional user accounts for playlists, favorites, and session persistence
-- **Album/artist browsing** — grid or list view, cover art, metadata from your files
-- **Full-text search** — search tracks, albums, and artists with diacritics normalization (type `Beyonce` and find `Beyoncé`)
-- **Smart queue** — crossfade, repeat modes, shuffle, sleep timer
-- **Drag-and-drop playlists** — reorder tracks by dragging
-- **Sortable columns** — click any track column header to sort A-Z, Z-A, or by duration
-- **Equalizer** — 10-band EQ with presets
-- **Lyrics** — fetches lyrics automatically
-- **Admin dashboard** — rescan library, manage users, view stats
-- **Responsive** — works on desktop and mobile browsers
+<table>
+<tr>
+<td width="50%">
 
-## Quick Install
+**🎧 Streaming** — MP3, FLAC, OGG, M4A, WAV — everything just works
+
+**🔍 Full-text Search** — search tracks, albums, artists with diacritics support (`Beyonce` → `Beyoncé`)
+
+**📂 Browse by Album / Artist / Genre** — grid or list view with cover art
+
+**📋 Sortable Columns** — click any column header to sort A–Z, Z–A, or by duration
+
+**📝 Playlists** — create, pin, reorder by drag-and-drop
+
+</td>
+<td width="50%">
+
+**🎛️ 10-Band Equalizer** — presets included (Rock, Jazz, Dance, Classical…)
+
+**📜 Lyrics** — auto-fetched from LRCLIB, synced scrolling
+
+**⏱️ Sleep Timer** — stop after this track, end of queue, or in X minutes
+
+**🔀 Smart Queue** — crossfade, shuffle, repeat (all/one/off)
+
+**🛡️ Admin Dashboard** — rescan library, manage users, view play stats
+
+**📱 Responsive** — works on desktop and mobile browsers
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🚀 Quick Install
+
+One line, works on any Linux distro with systemd:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sudo bash
 ```
 
-The installer will:
-1. Detect your distro and install dependencies (Python, pip, sqlite3)
-2. Create a `moidify` system user
-3. Install the app to `/opt/moidify`
-4. Set up a Python virtual environment
-5. Ask for your music folder location
-6. Install a systemd service on port 8000
-7. Start the server immediately
+<details>
+<summary><b>📦 What the installer does (click to expand)</b></summary>
+<br>
 
-After installation, open **http://your-server-ip:8000** in your browser and drop music into the configured folder.
+| Step | What happens |
+|---|---|
+| 1 | Detects your distro (`apt`/`dnf`/`pacman`/`zypper`) and installs Python, pip, sqlite3 |
+| 2 | Creates a `moidify` system user |
+| 3 | Copies the app to `/opt/moidify` |
+| 4 | Sets up a Python virtual environment |
+| 5 | Installs Python dependencies (FastAPI, uvicorn, mutagen, watchdog) |
+| 6 | **Asks for your music folder location** |
+| 7 | Writes config to `/etc/moidify/config.json` |
+| 8 | Installs a systemd service on port **8000** |
+| 9 | Starts the server immediately |
+</details>
+<br>
 
-## Manual Install
+> [!TIP]
+> After installation, drop your music files into the configured folder and open **http://your-server-ip:8000** in any browser. No refresh needed — files appear automatically.
+
+---
+
+## 🖥️ Manual Install
+
+For development or non-systemd systems:
 
 ```bash
 git clone https://github.com/Moid-M/moidify.git
@@ -45,21 +111,45 @@ pip install -r requirements.txt
 python3 server.py
 ```
 
-Then open http://localhost:8000.
+Then open **http://localhost:8000**.
 
-## Configuration
+---
+
+## ⚙️ Commands
+
+### Service management (installed mode)
+
+| Action | Command |
+|---|---|
+| ▶️ Start | `sudo systemctl start moidify` |
+| ⏹️ Stop | `sudo systemctl stop moidify` |
+| 🔄 Restart | `sudo systemctl restart moidify` |
+| 📊 Status | `sudo systemctl status moidify` |
+| 📜 Logs | `journalctl -u moidify.service -f` |
+| 🔄 Update | `sudo /opt/moidify/update.sh` |
+| 🗑️ Uninstall | `sudo /opt/moidify/uninstall.sh` |
+
+---
+
+## 🔧 Configuration
+
+Moidify checks three places for settings, in order of priority:
+
+1. **Environment variables** (highest priority)
+2. **Config file** at `/etc/moidify/config.json` (installed mode)
+3. **Local defaults** (development mode)
 
 ### Environment variables
 
-| Variable | Default | Description |
+| Variable | Default (dev) | Description |
 |---|---|---|
 | `MOIDIFY_MUSIC_DIR` | `./music` | Path to your music folder |
-| `MOIDIFY_COVERS_DIR` | `./covers` | Path for extracted cover art cache |
-| `MOIDIFY_DB_PATH` | `./data/music.db` | Path to the SQLite database |
+| `MOIDIFY_COVERS_DIR` | `./covers` | Cover art cache location |
+| `MOIDIFY_DB_PATH` | `./data/music.db` | SQLite database path |
 
-### Config file (installed mode)
+### Config file
 
-When installed via the script, settings live in `/etc/moidify/config.json`:
+When installed, settings live in `/etc/moidify/config.json`:
 
 ```json
 {
@@ -69,33 +159,12 @@ When installed via the script, settings live in `/etc/moidify/config.json`:
 }
 ```
 
-Change a path and restart: `sudo systemctl restart moidify`
+> [!NOTE]
+> Change a path and restart with `sudo systemctl restart moidify` — your music collection is re-scanned automatically.
 
-## Updating
+---
 
-```bash
-sudo /opt/moidify/update.sh
-```
-
-This pulls the latest code from GitHub, installs any new Python dependencies, and restarts the service.
-
-## Uninstalling
-
-```bash
-sudo /opt/moidify/uninstall.sh
-```
-
-## Commands
-
-| Action | Command |
-|---|---|
-| Start | `sudo systemctl start moidify` |
-| Stop | `sudo systemctl stop moidify` |
-| Restart | `sudo systemctl restart moidify` |
-| Status | `sudo systemctl status moidify` |
-| Logs | `journalctl -u moidify.service -f` |
-
-## Development
+## 🛠️ Development
 
 ```bash
 git clone https://github.com/Moid-M/moidify.git
@@ -106,15 +175,78 @@ pip install -r requirements.txt
 python3 server.py
 ```
 
-The server watches your music folder for changes and picks up new files automatically. No rebuild step needed — the frontend is vanilla JS.
+> [!TIP]
+> The server uses **watchdog** to monitor your music folder for changes. Drop new files in and they appear instantly — no rescan button needed.
 
-## Tech Stack
+### Project structure
 
-- **Backend:** Python + FastAPI + uvicorn
-- **Frontend:** Vanilla JavaScript (no framework)
-- **Database:** SQLite
-- **Metadata:** Mutagen
+```
+moidify/
+├── server.py          # FastAPI app (API + streaming)
+├── scanner.py         # File scanner + metadata extractor
+├── database.py        # SQLite schema + migrations
+├── config.py          # Configuration loader
+├── install.sh         # System installer script
+├── uninstall.sh       # Cleanup script
+├── update.sh          # Git-pull updater
+├── moidify.service    # Systemd unit file
+├── requirements.txt   # Python dependencies
+├── static/
+│   ├── index.html     # Main frontend
+│   ├── admin.html     # Admin dashboard
+│   ├── style.css      # All styles
+│   ├── placeholder-cover.svg
+│   └── js/
+│       ├── state.js   # App state + utility functions
+│       ├── icons.js   # SVG icon library
+│       ├── api.js     # API client + auth
+│       ├── player.js  # Audio engine + EQ
+│       ├── queue.js   # Queue management + shuffle
+│       ├── lyrics.js  # Lyrics fetching + synced display
+│       ├── animations.js  # Visual effects
+│       ├── ui.js      # Modals, settings, context menu
+│       ├── views.js   # All page renderers
+│       └── app.js     # Event binding + init
+└── music/             # Your music goes here (local dev)
+```
 
-## License
+---
 
-MIT
+## 📸 Screenshots
+
+<details>
+<summary><b>Click to expand</b></summary>
+<br>
+
+> *Screenshots coming soon. The project is actively developed — expect visual polish in future releases.*
+
+</details>
+
+---
+
+## 🧩 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Backend** | Python + [FastAPI](https://fastapi.tiangolo.com/) + uvicorn |
+| **Frontend** | Vanilla JavaScript (no framework, no build step) |
+| **Database** | SQLite (via `sqlite3`) |
+| **Metadata** | [Mutagen](https://mutagen.readthedocs.io/) |
+| **File watching** | [watchdog](https://github.com/gorakhargosh/watchdog) |
+
+---
+
+## 📄 License
+
+[MIT](LICENSE) — Do whatever you want with it.
+
+---
+
+<div align="center">
+  <p>Made with ❤️ for people who love their music collection.</p>
+  <p>
+    <a href="https://github.com/Moid-M/moidify/issues">🐛 Report a bug</a>
+    ·
+    <a href="https://github.com/Moid-M/moidify/issues">💡 Request a feature</a>
+  </p>
+</div>
