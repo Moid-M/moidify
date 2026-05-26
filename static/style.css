@@ -138,6 +138,17 @@ body.resizing .drag-handle { background: var(--accent); }
 
 .search-box { position: relative; }
 
+/* Genre grid */
+.genre-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 0; }
+.genre-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 32px 16px; border-radius: var(--radius); background: var(--bg-card);
+  cursor: pointer; transition: 0.15s; text-align: center; gap: 8px;
+}
+.genre-card:hover { background: var(--bg-hover); transform: translateY(-2px); }
+.genre-card-name { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.genre-card-meta { font-size: 12px; color: var(--text-muted); }
+
 /* Full-page search results */
 .sr-full-loading { padding: 48px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .sr-full-empty { padding: 64px 24px; text-align: center; }

@@ -305,6 +305,31 @@ def list_artist_tracks(artist: str = Query(...)):
     return [dict(r) for r in rows]
 
 
+@app.get("/api/genres")
+def list_genres():
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT genre, COUNT(*) as track_count,
+                  COUNT(DISTINCT album) as album_count
+           FROM tracks
+           WHERE genre IS NOT NULL AND genre != ''
+           GROUP BY genre
+           ORDER BY genre""",
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/genres/tracks")
+def list_genre_tracks(genre: str = Query(...)):
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM tracks WHERE genre = ? ORDER BY album, track_number", (genre,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 # ---------------------------------------------------------------------------
 # Playlist endpoints
 # ---------------------------------------------------------------------------
