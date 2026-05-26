@@ -20,7 +20,7 @@ A self-hosted music server that streams your music collection to any browser. Dr
 ## Quick Install
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/anomalyco/moidify/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sudo bash
 ```
 
 The installer will:
@@ -37,7 +37,7 @@ After installation, open **http://your-server-ip:8000** in your browser and drop
 ## Manual Install
 
 ```bash
-git clone https://github.com/anomalyco/moidify.git
+git clone https://github.com/Moid-M/moidify.git
 cd moidify
 python3 -m venv venv
 source venv/bin/activate
@@ -98,7 +98,7 @@ sudo /opt/moidify/uninstall.sh
 ## Development
 
 ```bash
-git clone https://github.com/anomalyco/moidify.git
+git clone https://github.com/Moid-M/moidify.git
 cd moidify
 python3 -m venv venv
 source venv/bin/activate
