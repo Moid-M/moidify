@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from config import BASE_DIR, MUSIC_DIR, COVERS_DIR
+from config import BASE_DIR, MUSIC_DIR, COVERS_DIR, PORT
 from database import get_connection, init_db
 from scanner import scan_existing, start_watcher, process_file, get_scan_status
 
@@ -621,6 +621,57 @@ def download_album(album: str = Query(...), artist: Optional[str] = Query(None),
 # ---------------------------------------------------------------------------
 # Startup & static serving
 
+# ---------------------------------------------------------------------------
+# Setup wizard endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/setup/status")
+def setup_status():
+    conn = get_connection()
+    admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
+    track_count = conn.execute("SELECT COUNT(*) FROM tracks").fetchone()[0]
+    conn.close()
+    return {
+        "setup_needed": admin_count == 0 or track_count == 0,
+        "has_admin": admin_count > 0,
+        "has_tracks": track_count > 0,
+    }
+
+
+class SetupInitBody(BaseModel):
+    username: str
+    password: str
+    music_dir: Optional[str] = None
+
+
+@app.post("/api/setup/init")
+def setup_init(body: SetupInitBody):
+    conn = get_connection()
+    admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
+    if admin_count > 0:
+        conn.close()
+        raise HTTPException(400, "Setup already completed")
+    existing = conn.execute("SELECT id FROM users WHERE username = ?", (body.username,)).fetchone()
+    if existing:
+        conn.close()
+        raise HTTPException(400, "Username already taken")
+    pwd_hash, salt = _hash_password(body.password)
+    cursor = conn.execute(
+        "INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, 1)",
+        (body.username, pwd_hash, salt),
+    )
+    user_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    token = _create_session(user_id)
+    return {"token": token, "user": {"id": user_id, "username": body.username}}
+
+
+@app.get("/setup")
+def setup_page():
+    return FileResponse(str(STATIC_DIR / "setup.html"))
+
+
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # ---------------------------------------------------------------------------
 
@@ -904,4 +955,4 @@ def index():
 
 
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("server:app", host="0.0.0.0", port=PORT, reload=False)

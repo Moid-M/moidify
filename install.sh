@@ -27,9 +27,14 @@ fi
 
 echo ""
 echo -e "${CYAN}╔══════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║       ${APP_NAME} Installer v1.0          ║${NC}"
+echo -e "${CYAN}║       ${APP_NAME} Installer v1.1          ║${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
 echo ""
+
+# ─── Port prompt ─────────────────────────────────────────────────────────────
+read -r -p "Server port [8000]: " PORT
+PORT="${PORT:-8000}"
+ok "Port: $PORT"
 
 # ─── Detect distro ──────────────────────────────────────────────────────────
 PKG_MANAGER=""
@@ -123,12 +128,36 @@ else
 fi
 ok "Music directory: $MUSIC_DIR_INPUT"
 
+# ─── Admin account prompt ────────────────────────────────────────────────────
+echo ""
+info "Create an admin account (recommended for setup)."
+read -r -p "Admin username [admin]: " ADMIN_USER
+ADMIN_USER="${ADMIN_USER:-admin}"
+read -r -s -p "Admin password (leave blank to skip): " ADMIN_PASS
+echo ""
+if [[ -z "$ADMIN_PASS" ]]; then
+  warn "No password set — admin account will not be created. Use the setup wizard at http://<ip>:$PORT/setup"
+  ADMIN_SALT=""
+  ADMIN_HASH=""
+else
+  ADMIN_SALT="$(python3 -c "import secrets; print(secrets.token_hex(16))")"
+  ADMIN_HASH="$(python3 -c "
+import hashlib, sys
+salt = '$ADMIN_SALT'
+pwd = sys.stdin.readline().strip()
+h = hashlib.pbkdf2_hmac('sha256', pwd.encode(), salt.encode(), 100000)
+print(h.hex())
+" <<< "$ADMIN_PASS")"
+  ok "Admin user '$ADMIN_USER' will be created."
+fi
+
 # ─── Config ─────────────────────────────────────────────────────────────────
 cat > "$CONFIG_DIR/config.json" <<CONF
 {
   "music_dir": "$MUSIC_DIR_INPUT",
   "covers_dir": "$DATA_DIR/covers",
-  "db_path": "$DATA_DIR/music.db"
+  "db_path": "$DATA_DIR/music.db",
+  "port": $PORT
 }
 CONF
 ok "Config written to $CONFIG_DIR/config.json"
@@ -142,10 +171,30 @@ from database import init_db; init_db()
 chown "$SERVICE_USER":"$SERVICE_USER" "$DATA_DIR/music.db" 2>/dev/null || true
 ok "Database initialized."
 
+# ─── Create admin user in DB ────────────────────────────────────────────────
+if [[ -n "$ADMIN_SALT" && -n "$ADMIN_HASH" ]]; then
+  info "Creating admin user '$ADMIN_USER'..."
+  "$APP_DIR/venv/bin/python" << PYEOF 2>&1 || warn "Failed to create admin user (you can use setup wizard)"
+import sys; sys.path.insert(0, '$APP_DIR')
+from database import get_connection
+conn = get_connection()
+existing = conn.execute("SELECT id FROM users WHERE username = ?", ("$ADMIN_USER",)).fetchone()
+if not existing:
+    conn.execute("INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, 1)",
+                 ("$ADMIN_USER", "$ADMIN_HASH", "$ADMIN_SALT"))
+    conn.commit()
+    print("Admin user created.")
+else:
+    print("Admin user already exists, skipping.")
+conn.close()
+PYEOF
+  ok "Admin user '$ADMIN_USER' created."
+fi
+
 # ─── Systemd ────────────────────────────────────────────────────────────────
-cp "$SRC_DIR/moidify.service" "$SERVICE_FILE"
+sed "s/--port 8000/--port $PORT/" "$SRC_DIR/moidify.service" > "$SERVICE_FILE"
 systemctl daemon-reload
-ok "Systemd service installed."
+ok "Systemd service installed on port $PORT."
 
 # ─── Start ──────────────────────────────────────────────────────────────────
 info "Starting ${APP_NAME}..."
@@ -167,7 +216,7 @@ echo -e "${CYAN}║          Installation Complete           ║${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${GREEN}${APP_NAME}${NC} is now running at:"
-echo -e "  ${CYAN}http://${IP}:8000${NC}"
+echo -e "  ${CYAN}http://${IP}:${PORT}${NC}"
 echo ""
 echo -e "  ${YELLOW}Music folder:${NC}  $MUSIC_DIR_INPUT"
 echo -e "  ${YELLOW}Config:${NC}       $CONFIG_DIR/config.json"
@@ -181,4 +230,5 @@ echo -e "    status:   systemctl status moidify"
 echo -e "    uninstall: $APP_DIR/uninstall.sh"
 echo ""
 echo -e "  Drop music into your music folder and it will appear automatically."
+echo -e "  Open the setup wizard at ${CYAN}http://${IP}:${PORT}/setup${NC}"
 echo ""

@@ -4,6 +4,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
 
+PORT = int(os.environ.get("MOIDIFY_PORT", 8000))
+
 INSTALLED_CONFIG = Path("/etc/moidify/config.json")
 if INSTALLED_CONFIG.exists():
     try:
@@ -12,6 +14,7 @@ if INSTALLED_CONFIG.exists():
         MUSIC_DIR = Path(_cfg.get("music_dir", "/var/lib/moidify/music"))
         COVERS_DIR = Path(_cfg.get("covers_dir", "/var/lib/moidify/covers"))
         DB_PATH = Path(_cfg.get("db_path", "/var/lib/moidify/music.db"))
+        PORT = int(_cfg.get("port", PORT))
     except (json.JSONDecodeError, OSError):
         MUSIC_DIR = BASE_DIR / "music"
         COVERS_DIR = BASE_DIR / "covers"
@@ -24,6 +27,7 @@ else:
 MUSIC_DIR = Path(os.environ.get("MOIDIFY_MUSIC_DIR", str(MUSIC_DIR)))
 COVERS_DIR = Path(os.environ.get("MOIDIFY_COVERS_DIR", str(COVERS_DIR)))
 DB_PATH = Path(os.environ.get("MOIDIFY_DB_PATH", str(DB_PATH)))
+PORT = int(os.environ.get("MOIDIFY_PORT", PORT))
 
 os.makedirs(MUSIC_DIR, exist_ok=True)
 os.makedirs(COVERS_DIR, exist_ok=True)

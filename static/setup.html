@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Set Up Moidify</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0d0d;--bg-el:#131313;--bg-hover:#1f1f1f;--card:#1a1a1a;--text:#fff;--text2:#b3b3b3;--text3:#6a6a6a;--accent:#a855f7;--accent-dim:rgba(168,85,247,.15);--radius:8px;--danger:#e74c3c}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.setup-wrap{width:520px;max-width:94vw}
+.steps{display:flex;gap:8px;margin-bottom:32px;justify-content:center}
+.step{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;background:var(--bg-hover);color:var(--text3);transition:.25s}
+.step.active{background:var(--accent);color:#fff}
+.step.done{background:var(--accent-dim);color:var(--accent)}
+.card{background:var(--card);border-radius:var(--radius);padding:36px 32px;border:1px solid var(--bg-hover)}
+.card h1{font-size:22px;margin-bottom:6px;color:var(--accent)}
+.card p{font-size:14px;color:var(--text2);margin-bottom:20px;line-height:1.5}
+.card label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;margin-top:14px}
+.card input[type="text"],.card input[type="password"]{width:100%;padding:10px 14px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg-el);color:var(--text);font-size:14px;outline:none}
+.card input:focus{border-color:var(--accent)}
+.card .hint{font-size:12px;color:var(--text3);margin-top:4px}
+.step-content{display:none}
+.step-content.visible{display:block}
+.btn-row{display:flex;gap:10px;margin-top:22px;justify-content:flex-end}
+.btn{background:var(--bg-hover);color:var(--text);border:none;border-radius:var(--radius);padding:10px 22px;font-size:14px;cursor:pointer;transition:.15s}
+.btn:hover{background:var(--text3)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{opacity:.85}
+.btn-primary:disabled{opacity:.4;cursor:default}
+.upload-zone{border:2px dashed var(--text3);border-radius:var(--radius);padding:30px;text-align:center;cursor:pointer;transition:.2s;margin:16px 0}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:var(--accent-dim)}
+.upload-zone p{color:var(--text2);font-size:14px}
+.upload-zone .hint{font-size:12px;color:var(--text3);margin-top:8px}
+.upload-progress{display:none;margin-top:10px}
+.upload-progress.visible{display:block}
+.upload-progress progress{width:100%;height:6px;border-radius:3px;accent-color:var(--accent)}
+.upload-msg{font-size:13px;color:var(--text2);margin-top:6px}
+.done-icon{text-align:center;padding:20px 0}
+.done-icon svg{width:64px;height:64px;color:var(--accent)}
+.done-icon p{font-size:15px;color:var(--text);margin-top:12px}
+.error-msg{font-size:13px;color:var(--danger);margin-top:8px;display:none}
+</style>
+</head>
+<body>
+<div class="setup-wrap">
+  <div class="steps" id="steps">
+    <div class="step active" data-step="1">1</div>
+    <div class="step" data-step="2">2</div>
+    <div class="step" data-step="3">3</div>
+  </div>
+
+  <div class="card">
+    <!-- Step 1: Welcome -->
+    <div class="step-content visible" id="step-1">
+      <h1>Welcome to Moidify</h1>
+      <p>Your self-hosted music server is almost ready. Let's get you set up in a few quick steps.</p>
+      <p style="margin-bottom:12px">You'll create an admin account and configure your music library.</p>
+      <div id="status-info" style="font-size:13px;color:var(--text3);margin-bottom:16px;padding:12px;background:var(--bg-el);border-radius:var(--radius)"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="goStep(2)">Get Started</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Create admin account -->
+    <div class="step-content" id="step-2">
+      <h1>Create Admin Account</h1>
+      <p>This account will have full access to the admin panel and settings.</p>
+      <label>Username</label>
+      <input type="text" id="setup-username" value="admin" autocomplete="off">
+      <label>Password</label>
+      <input type="password" id="setup-password" placeholder="At least 3 characters">
+      <label>Confirm Password</label>
+      <input type="password" id="setup-password-confirm" placeholder="Repeat password">
+      <div class="error-msg" id="step2-error"></div>
+      <div class="btn-row">
+        <button class="btn" onclick="goStep(1)">Back</button>
+        <button class="btn btn-primary" onclick="createAdmin()">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Music / Done -->
+    <div class="step-content" id="step-3">
+      <h1>All Set!</h1>
+      <div class="done-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        <p>Your admin account has been created.</p>
+      </div>
+      <div id="upload-section">
+        <p style="margin-bottom:8px">You can upload music now or add files to your music folder later.</p>
+        <div class="upload-zone" id="drop-zone">
+          <p>Drop audio files here or click to browse</p>
+          <div class="hint">Supports MP3, FLAC, OGG, M4A, WAV, AAC, WMA</div>
+          <div class="upload-progress" id="upload-progress">
+            <progress id="upload-bar" max="1" value="0"></progress>
+            <div class="upload-msg" id="upload-msg"></div>
+          </div>
+        </div>
+        <input type="file" id="file-input" multiple accept=".mp3,.flac,.ogg,.m4a,.wav,.aac,.wma" style="display:none">
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn btn-primary" onclick="finishSetup()">Go to Player</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var TOKEN = null;
+
+function qs(s) { return document.querySelector(s); }
+function qsa(s) { return document.querySelectorAll(s); }
+
+function goStep(n) {
+  qsa('.step-content').forEach(function(el) { el.classList.remove('visible'); });
+  qsa('.step').forEach(function(el) { el.classList.remove('active'); });
+  document.getElementById('step-' + n).classList.add('visible');
+  qs('.step[data-step="' + n + '"]').classList.add('active');
+  // mark previous steps as done
+  for (var i = 1; i < n; i++) {
+    var s = qs('.step[data-step="' + i + '"]');
+    s.classList.add('done');
+    s.classList.remove('active');
+  }
+}
+
+// --- Status check ---
+async function checkStatus() {
+  try {
+    var r = await fetch('/api/setup/status');
+    if (!r.ok) { window.location.href = '/'; return; }
+    var d = await r.json();
+    if (!d.setup_needed) { window.location.href = '/'; return; }
+    var info = [];
+    if (!d.has_admin) info.push('No admin account exists');
+    if (!d.has_tracks) info.push('No music library found');
+    document.getElementById('status-info').textContent = info.join(' — ');
+  } catch(e) {
+    document.getElementById('status-info').textContent = 'Could not check setup status: ' + e.message;
+  }
+}
+checkStatus();
+
+// --- Create admin ---
+async function createAdmin() {
+  var username = document.getElementById('setup-username').value.trim();
+  var password = document.getElementById('setup-password').value;
+  var confirm = document.getElementById('setup-password-confirm').value;
+  var errEl = document.getElementById('step2-error');
+  errEl.style.display = 'none';
+
+  if (!username) { errEl.textContent = 'Username is required'; errEl.style.display = 'block'; return; }
+  if (!password || password.length < 3) { errEl.textContent = 'Password must be at least 3 characters'; errEl.style.display = 'block'; return; }
+  if (password !== confirm) { errEl.textContent = 'Passwords do not match'; errEl.style.display = 'block'; return; }
+
+  try {
+    var r = await fetch('/api/setup/init', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ username: username, password: password }),
+    });
+    if (!r.ok) { var e = await r.json(); errEl.textContent = e.detail || 'Error'; errEl.style.display = 'block'; return; }
+    var d = await r.json();
+    TOKEN = d.token;
+    localStorage.setItem('moidify_token', TOKEN);
+    localStorage.setItem('moidify_user', JSON.stringify(d.user));
+    // mark step 2 done
+    qs('.step[data-step="2"]').classList.add('done');
+    goStep(3);
+  } catch(e) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
+}
+
+// --- Upload ---
+var dropZone = document.getElementById('drop-zone');
+var fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', function() { fileInput.click(); });
+dropZone.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', function(e) { e.preventDefault(); this.classList.remove('dragover'); });
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault(); this.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', function() { handleFiles(this.files); });
+
+async function handleFiles(files) {
+  if (!files.length) return;
+  var formData = new FormData();
+  for (var i = 0; i < files.length; i++) {
+    if (files[i].size === 0) continue;
+    formData.append('files', files[i]);
+  }
+  if (!formData.has('files')) return;
+  var progress = document.getElementById('upload-progress');
+  var bar = document.getElementById('upload-bar');
+  var msg = document.getElementById('upload-msg');
+  progress.classList.add('visible');
+  bar.value = 0;
+  msg.textContent = 'Uploading ' + files.length + ' file(s)...';
+  try {
+    var r = await fetch('/api/admin/upload', {
+      method: 'POST',
+      headers: { 'token': TOKEN },
+      body: formData,
+    });
+    bar.value = 1;
+    var d = await r.json();
+    msg.textContent = 'Imported: ' + (d.imported ? d.imported.join(', ') : 'none');
+  } catch(e) {
+    msg.textContent = 'Error: ' + e.message;
+  }
+}
+
+function finishSetup() {
+  window.location.href = '/';
+}
+</script>
+</body>
+</html>

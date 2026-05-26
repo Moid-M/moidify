@@ -271,6 +271,11 @@
 
   <audio id="audio"></audio>
 
+  <script>
+  fetch('/api/setup/status').then(function(r) { return r.json(); }).then(function(d) {
+    if (d.setup_needed) { window.location.href = '/setup'; }
+  }).catch(function(){});
+  </script>
   <script src="/static/js/state.js"></script>
   <script src="/static/js/icons.js"></script>
   <script src="/static/js/api.js"></script>
