@@ -57,7 +57,11 @@
 
 **🔀 Smart Queue** — crossfade, shuffle, repeat (all/one/off)
 
-**🛡️ Admin Dashboard** — rescan library, manage users, view play stats
+**🛡️ Admin Dashboard** — rescan library, manage users, view play stats, upload files via drag-and-drop
+
+**🔧 Setup Wizard** — first-run wizard at `/setup` creates admin account and guides configuration
+
+**🐳 Docker Support** — Dockerfile + docker-compose.yml for containerized deployment
 
 **📱 Responsive** — works on desktop and mobile browsers
 
@@ -86,17 +90,32 @@ curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sud
 | 3 | Copies the app to `/opt/moidify` |
 | 4 | Sets up a Python virtual environment |
 | 5 | Installs Python dependencies (FastAPI, uvicorn, mutagen, watchdog) |
-| 6 | **Asks for your music folder location** |
-| 7 | Writes config to `/etc/moidify/config.json` |
-| 8 | Installs a systemd service on port **8000** |
-| 9 | Starts the server immediately |
+| 6 | **Asks for port number** (default **8000**) |
+| 7 | **Asks for your music folder location** |
+| 8 | **Asks to create an admin account** (optional — skip to use the browser setup wizard later) |
+| 9 | Writes config to `/etc/moidify/config.json` |
+| 10 | Installs a systemd service |
+| 11 | Starts the server immediately |
 </details>
 <br>
 
 > [!TIP]
-> After installation, drop your music files into the configured folder and open **http://your-server-ip:8000** in any browser. No refresh needed — files appear automatically.
+> After installation, open **http://your-server-ip:8000** in any browser. If no admin account exists yet, you'll be guided through the **setup wizard** at `/setup`. Drop music into your folder — files appear automatically.
 
 ---
+
+## 🐳 Docker
+
+```bash
+git clone https://github.com/Moid-M/moidify.git
+cd moidify
+docker compose up -d
+```
+
+Then open **http://localhost:8000**. Music goes in `./music`, data in `./data`, covers in `./covers`.
+
+> [!TIP]
+> After starting, visit the **setup wizard** at `/setup` to create your admin account.
 
 ## 🖥️ Manual Install
 
@@ -146,6 +165,7 @@ Moidify checks three places for settings, in order of priority:
 | `MOIDIFY_MUSIC_DIR` | `./music` | Path to your music folder |
 | `MOIDIFY_COVERS_DIR` | `./covers` | Cover art cache location |
 | `MOIDIFY_DB_PATH` | `./data/music.db` | SQLite database path |
+| `MOIDIFY_PORT` | `8000` | Server port (systemd mode uses ExecStart directly) |
 
 ### Config file
 
@@ -155,7 +175,8 @@ When installed, settings live in `/etc/moidify/config.json`:
 {
   "music_dir": "/path/to/your/music",
   "covers_dir": "/var/lib/moidify/covers",
-  "db_path": "/var/lib/moidify/music.db"
+  "db_path": "/var/lib/moidify/music.db",
+  "port": 8000
 }
 ```
 
@@ -182,6 +203,8 @@ python3 server.py
 
 ```
 moidify/
+├── Dockerfile         # Container image
+├── docker-compose.yml # Docker orchestration
 ├── server.py          # FastAPI app (API + streaming)
 ├── scanner.py         # File scanner + metadata extractor
 ├── database.py        # SQLite schema + migrations
@@ -193,6 +216,7 @@ moidify/
 ├── requirements.txt   # Python dependencies
 ├── static/
 │   ├── index.html     # Main frontend
+│   ├── setup.html     # First-run setup wizard
 │   ├── admin.html     # Admin dashboard
 │   ├── style.css      # All styles
 │   ├── placeholder-cover.svg
