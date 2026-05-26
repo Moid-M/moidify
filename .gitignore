@@ -1,0 +1,8 @@
+music/
+data/
+covers/
+__pycache__/
+*.pyc
+venv/
+.env
+*.db

@@ -1,0 +1,21 @@
+[Unit]
+Description=Moidify — Self-hosted music server
+After=network.target
+
+[Service]
+Type=simple
+User=moidify
+Group=moidify
+WorkingDirectory=/opt/moidify
+Environment=MOIDIFY_MUSIC_DIR=/var/lib/moidify/music
+Environment=MOIDIFY_COVERS_DIR=/var/lib/moidify/covers
+Environment=MOIDIFY_DB_PATH=/var/lib/moidify/music.db
+ExecStart=/opt/moidify/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8000
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
