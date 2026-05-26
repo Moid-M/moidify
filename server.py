@@ -777,12 +777,10 @@ def download_album(album: str = Query(...), artist: Optional[str] = Query(None),
 def setup_status():
     conn = get_connection()
     admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
-    track_count = conn.execute("SELECT COUNT(*) FROM tracks").fetchone()[0]
     conn.close()
     return {
-        "setup_needed": admin_count == 0 or track_count == 0,
+        "setup_needed": admin_count == 0,
         "has_admin": admin_count > 0,
-        "has_tracks": track_count > 0,
     }
 
 

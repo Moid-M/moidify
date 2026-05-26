@@ -131,10 +131,7 @@ async function checkStatus() {
     if (!r.ok) { window.location.href = '/'; return; }
     var d = await r.json();
     if (!d.setup_needed) { window.location.href = '/'; return; }
-    var info = [];
-    if (!d.has_admin) info.push('No admin account exists');
-    if (!d.has_tracks) info.push('No music library found');
-    document.getElementById('status-info').textContent = info.join(' — ');
+    document.getElementById('status-info').textContent = 'No admin account exists — create one below.';
   } catch(e) {
     document.getElementById('status-info').textContent = 'Could not check setup status: ' + e.message;
   }
