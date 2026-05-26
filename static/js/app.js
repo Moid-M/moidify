@@ -63,9 +63,53 @@ function setupEvents() {
     updateVolumeFill();
     audio.muted = false;
   });
+  // Mini player
+  var miniPlayer = document.getElementById('mini-player');
+  var miniCover = document.getElementById('mini-cover');
+  var miniTitle = document.getElementById('mini-title');
+  var miniArtist = document.getElementById('mini-artist');
+  var miniPlay = document.getElementById('mini-play');
+  var miniNext = document.getElementById('mini-next');
+  var miniClose = document.getElementById('mini-close');
+  var miniBtn = document.getElementById('mini-player-btn');
+
+  function updateMiniPlayer() {
+    var track = state.queue[state.currentIndex];
+    if (!track) { miniPlayer.style.display = 'none'; return; }
+    miniCover.src = '/api/cover/' + track.id;
+    miniTitle.textContent = track.title || '';
+    miniArtist.textContent = (track.artist || 'Unknown');
+    miniPlay.innerHTML = audio.paused ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>' : '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+  }
+
+  miniBtn.addEventListener('click', function() {
+    if (!state.queue.length) return;
+    var show = miniPlayer.style.display === 'none';
+    miniPlayer.style.display = show ? 'block' : 'none';
+    if (show) updateMiniPlayer();
+  });
+  miniPlay.addEventListener('click', function(e) { e.stopPropagation(); togglePlay(); setTimeout(updateMiniPlayer, 50); });
+  miniNext.addEventListener('click', function(e) { e.stopPropagation(); nextTrack(); });
+  miniClose.addEventListener('click', function() { miniPlayer.style.display = 'none'; });
+
   document.getElementById('volume-btn').addEventListener('click', function() {
     audio.muted = !audio.muted;
     this.classList.toggle('muted', audio.muted);
+  });
+
+  var speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+  var speedBtn = document.getElementById('speed-btn');
+  function updateSpeedBtn() {
+    speedBtn.textContent = state.playbackSpeed + 'x';
+    localStorage.setItem('moidify_speed', state.playbackSpeed);
+    audio.playbackRate = state.playbackSpeed;
+  }
+  updateSpeedBtn();
+  speedBtn.addEventListener('click', function() {
+    var idx = speeds.indexOf(state.playbackSpeed);
+    state.playbackSpeed = speeds[(idx + 1) % speeds.length];
+    updateSpeedBtn();
+    showToast('Speed: ' + state.playbackSpeed + 'x', 'info');
   });
 
   document.getElementById('seek').addEventListener('input', function() {

@@ -1,3 +1,24 @@
+function copyTrackLink(track) {
+  var url = window.location.origin + '/track/' + track.id;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function() {
+      showToast('Track link copied', 'success');
+    }).catch(function() {
+      fallbackCopy(url);
+    });
+  } else {
+    fallbackCopy(url);
+  }
+}
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); showToast('Track link copied', 'success'); }
+  catch(e) { showToast('Failed to copy link', 'error'); }
+  document.body.removeChild(ta);
+}
+
 function showModal(html) {
   var overlay = document.getElementById('modal-overlay');
   document.getElementById('modal-content').innerHTML = html;
@@ -6,6 +27,19 @@ function showModal(html) {
 }
 
 function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
+
+function showToast(msg, type) {
+  type = type || 'info';
+  var c = document.getElementById('toast-container');
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(function() {
+    t.classList.add('toast-out');
+    setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 300);
+  }, 3000);
+}
 
 function showSettings() {
   var html =
@@ -582,6 +616,7 @@ function showContextMenu(event, track, queue, index) {
   if (track.album) {
     html += '<div class="context-menu-item" data-action="download-album"><span class="cmi-icon">'+iconDownload()+'</span> Download Album</div>';
   }
+  html += '<div class="context-menu-item" data-action="share-track"><span class="cmi-icon">'+iconShare()+'</span> Copy Track Link</div>';
 
   html += '<div class="context-menu-divider"></div>';
   var curRating = track.rating || 0;
@@ -616,15 +651,16 @@ function showContextMenu(event, track, queue, index) {
     el.addEventListener('click', function() {
       var action = this.dataset.action;
       if (action==='play') playFromQueue(queue, index);
-      else if (action==='play-next') addTrackToQueueNext(track);
-      else if (action==='add-queue') addTrackToQueueEnd(track);
+      else if (action==='play-next') { addTrackToQueueNext(track); showToast('Added to queue', 'success'); }
+      else if (action==='add-queue') { addTrackToQueueEnd(track); showToast('Added to queue', 'success'); }
       else if (action==='toggle-fav') { toggleFavorite(track.id); }
-      else if (action==='add-pl') addToPlaylist(parseInt(this.dataset.pl), track.id);
-      else if (action==='remove-queue') removeFromQueue(parseInt(this.dataset.qi));
+      else if (action==='add-pl') { addToPlaylist(parseInt(this.dataset.pl), track.id); showToast('Added to playlist', 'success'); }
+      else if (action==='remove-queue') { removeFromQueue(parseInt(this.dataset.qi)); showToast('Removed from queue', 'info'); }
       else if (action==='go-album') navigate('album',{album:track.album,artist:track.artist});
       else if (action==='go-artist') navigate('artist-tracks',track.artist);
       else if (action==='download') downloadTrack(track.id, track.title);
       else if (action==='download-album') downloadAlbum(track.album, track.artist);
+      else if (action==='share-track') { copyTrackLink(track); }
       hideContextMenu();
     });
   });

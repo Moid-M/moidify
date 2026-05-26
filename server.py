@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Query, UploadFile, File
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Query, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -1336,6 +1336,46 @@ def index():
 @app.get("/s/{token}")
 def shared_playlist_page(token: str):
     return FileResponse(str(STATIC_DIR / "shared.html"))
+
+
+@app.get("/track/{track_id}")
+def shared_track_page(track_id: int):
+    conn = get_connection()
+    row = conn.execute("SELECT id, title, artist, album, duration FROM tracks WHERE id = ?", (track_id,)).fetchone()
+    conn.close()
+    if not row:
+        return Response("<html><body><h1>Track not found</h1></body></html>", media_type="text/html", status_code=404)
+    title = row["title"] or "Unknown"
+    artist = row["artist"] or "Unknown Artist"
+    album = row["album"] or ""
+    dur = row["duration"] or 0
+    cover_url = f"{request.base_url}api/cover/{track_id}"
+    app_url = f"{request.base_url}?track={track_id}"
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{title} — {artist} | Moidify</title>
+  <meta property="og:title" content="{title} — {artist}">
+  <meta property="og:description" content="Listen to {title} by {artist}{' on '+album if album else ''}">
+  <meta property="og:image" content="{cover_url}">
+  <meta property="og:url" content="{app_url}">
+  <meta property="og:type" content="music.song">
+  <meta property="og:site_name" content="Moidify">
+  <meta name="theme-color" content="#a855f7">
+  <meta http-equiv="refresh" content="0;url={app_url}">
+  <style>body{{margin:0;background:#0d0d0d;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;}}a{{color:#a855f7;}}</style>
+</head>
+<body>
+  <div>
+    <img src="{cover_url}" style="width:120px;border-radius:8px;margin-bottom:12px;">
+    <h2>{title}</h2>
+    <p style="color:#888;">{artist}</p>
+    <p><a href="{app_url}">Open in Moidify</a></p>
+  </div>
+</body>
+</html>"""
+    return Response(html, media_type="text/html")
 
 
 @app.get("/api/player/now-playing")

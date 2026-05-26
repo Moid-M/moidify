@@ -74,8 +74,8 @@ async function toggleFavorite(trackId) {
   if (!state.user) { showLoginModal(); return; }
   try {
     var isFav = state.favedTracks[trackId];
-    if (isFav) { await api('/api/favorites/'+trackId,{method:'DELETE'}); state.favedTracks[trackId] = false; }
-    else { await api('/api/favorites/'+trackId,{method:'POST'}); state.favedTracks[trackId] = true; }
+    if (isFav) { await api('/api/favorites/'+trackId,{method:'DELETE'}); state.favedTracks[trackId] = false; showToast('Removed from Liked Songs', 'success'); }
+    else { await api('/api/favorites/'+trackId,{method:'POST'}); state.favedTracks[trackId] = true; showToast('Added to Liked Songs', 'success'); }
   } catch(e) { console.error(e); }
 }
 

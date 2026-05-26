@@ -23,6 +23,24 @@ function navigate(view, data) {
   }
 }
 
+function addShuffleButton(tracks, label) {
+  var filter = qs('.track-list-filter');
+  if (!filter) return;
+  var btn = document.createElement('button');
+  btn.className = 'shuffle-view-btn';
+  btn.innerHTML = iconShuffle() + ' <span>' + (label || 'Shuffle') + '</span>';
+  btn.addEventListener('click', function() {
+    var shuffled = tracks.slice();
+    for (var i = shuffled.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
+    }
+    playFromQueue(shuffled, 0);
+    showToast('Playing ' + shuffled.length + ' shuffled ' + (label || 'tracks').toLowerCase(), 'info');
+  });
+  filter.insertBefore(btn, filter.firstChild);
+}
+
 async function renderAlbums() {
   var content = document.getElementById('content');
   var isGrid = state.viewMode === 'grid';
@@ -135,6 +153,7 @@ async function renderArtistTracks(artist) {
     content.appendChild(list);
     state.currentTracks = filtered; state.currentQueue = filtered; state._favedFlag = false;
     setupTrackSorting(list, filtered);
+    addShuffleButton(filtered, 'Artist');
     var filterInput = document.getElementById('track-filter-input');
     if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
@@ -167,6 +186,7 @@ async function renderTracks(searchQuery) {
     state.currentTracks = tracks; state.currentQueue = tracks; state._favedFlag = false;
     setupTrackSorting(list, tracks);
     if (!searchQuery) {
+      addShuffleButton(tracks, 'All Tracks');
       var filterInput = document.getElementById('track-filter-input');
       if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
     }
@@ -187,6 +207,7 @@ async function renderFavorites() {
     content.appendChild(list);
     state.currentTracks = tracks; state.currentQueue = tracks; state._favedFlag = true;
     setupTrackSorting(list, tracks);
+    addShuffleButton(tracks, 'Liked Songs');
     var filterInput = document.getElementById('track-filter-input');
     if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
@@ -213,6 +234,7 @@ async function renderPlaylistDetail(playlistId) {
     setupPlaylistDragDrop(list, tracks, playlistId);
     setupPlaylistShare(playlistId);
     setupPlaylistExport(playlistId);
+    addShuffleButton(tracks, 'Playlist');
     var filterInput = document.getElementById('track-filter-input');
     if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
@@ -526,6 +548,7 @@ async function renderGenreTracks(genre) {
     content.appendChild(list);
     state.currentTracks = tracks; state.currentQueue = tracks; state._favedFlag = false;
     setupTrackSorting(list, tracks);
+    addShuffleButton(tracks, genre);
     var filterInput = document.getElementById('track-filter-input');
     if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }

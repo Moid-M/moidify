@@ -33,6 +33,7 @@ var state = {
   _favedFlag: false,
   favedTracks: {},
   streamQuality: localStorage.getItem('moidify_stream_quality') || 'high',
+  playbackSpeed: parseFloat(localStorage.getItem('moidify_speed') || '1'),
 };
 
 var audio = document.getElementById('audio');
