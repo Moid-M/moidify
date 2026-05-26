@@ -143,6 +143,17 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
         </button>
         <div id="rescan-msg" style="font-size:12px;color:var(--accent);margin-top:4px;display:none"></div>
       </div>
+
+      <div class="chart-card" style="margin-bottom:32px;">
+        <h3 style="margin-bottom:12px">Scheduled Rescan</h3>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="font-size:13px;color:var(--text2);">Rescan every</span>
+          <input type="number" id="schedule-hours" value="0" min="0" max="168" style="width:60px;padding:6px 8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg-el);color:var(--text);font-size:14px;outline:none;">
+          <span style="font-size:13px;color:var(--text2);">hours (0 = disabled)</span>
+          <button onclick="setSchedule()" class="admin-btn">Set</button>
+        </div>
+        <div id="schedule-status" style="font-size:12px;color:var(--text2);margin-top:8px;"></div>
+      </div>
     </div>
 
     <div class="tab" id="tab-statistics">
@@ -488,6 +499,41 @@ async function rescanMusic() {
     loadTracks();
   } catch(e) { msg.textContent = 'Error: '+e.message; }
   setTimeout(function(){ msg.style.display = 'none'; }, 5000);
+}
+
+async function loadSchedule() {
+  try {
+    var r = await api('/api/admin/schedule-rescan');
+    if (!r.ok) return;
+    var d = await r.json();
+    document.getElementById('schedule-hours').value = d.interval_hours || 0;
+    var statusEl = document.getElementById('schedule-status');
+    if (d.interval_hours > 0) {
+      statusEl.innerHTML = 'Running: every <strong>'+d.interval_hours+'h</strong>' +
+        (d.last_scan ? ' (last scan: '+d.last_scan+')' : '');
+    } else {
+      statusEl.textContent = 'Scheduled rescan is disabled.';
+    }
+  } catch(e) {}
+}
+
+async function setSchedule() {
+  var hours = parseFloat(document.getElementById('schedule-hours').value) || 0;
+  try {
+    var r = await api('/api/admin/schedule-rescan', {method:'POST', body:{interval_hours: hours}});
+    if (!r.ok) { var e = await r.json(); alert(e.detail||'Error'); return; }
+    loadSchedule();
+    showToast('Schedule updated', 'success');
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+function showToast(msg, type) {
+  type = type || 'info';
+  var el = document.createElement('div');
+  el.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--accent);color:#000;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:999;animation:fadeIn .2s;';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(function(){el.remove()},300); }, 2000);
 }
 
 // --- Scanner status ---
@@ -905,7 +951,7 @@ async function handleFiles(files) {
 document.getElementById('track-filter').addEventListener('input', filterTracks);
 
 checkAdmin().then(function(ok) {
-  if (ok) { document.getElementById('admin-content').style.display = ''; loadStats(); loadDashboard(); loadScannerStatus(); loadPlayStats(); loadTrends(); loadUsers(); loadTracks(); }
+  if (ok) { document.getElementById('admin-content').style.display = ''; loadStats(); loadDashboard(); loadScannerStatus(); loadPlayStats(); loadTrends(); loadUsers(); loadTracks(); loadSchedule(); }
 });
 </script>
 </body>

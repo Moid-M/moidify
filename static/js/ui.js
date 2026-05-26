@@ -90,12 +90,27 @@ function renderThemeTab() {
     return '<option value="'+code+'"'+(currentLang===code?' selected':'')+'>'+label+'</option>';
   }).join('');
 
+  var bgBrightness = localStorage.getItem('moidify_bg_brightness') || '100';
+  var fontSize = localStorage.getItem('moidify_font_size') || 'normal';
+  var fontSizeOpts = [
+    {value:'small', label:'Small'},
+    {value:'normal', label:'Normal'},
+    {value:'large', label:'Large'},
+  ];
+
   container.innerHTML =
     '<div class="settings-section" data-i18n-section="themeColor"><h3 data-i18n="settings.themeColor">Theme Color</h3><div class="color-grid">'+swatches+'</div>'+
     '<div class="color-custom-wrap"><input type="color" id="custom-color" value="'+state.accentColor+'"><span style="color:var(--text-muted);font-size:13px;">Custom</span></div></div>'+
     '<div class="settings-section"><h3 data-i18n="settings.appearance">Appearance</h3>'+
     '<label class="toggle-row" data-i18n-row="light"><span data-i18n="settings.lightMode">Light Mode</span><input type="checkbox" id="light-toggle"'+lightChecked+'><span class="toggle-slider"></span></label>'+
     '<label class="toggle-row" data-i18n-row="autoTheme"><span data-i18n="settings.autoTheme">Follow system theme</span><input type="checkbox" id="auto-theme-toggle"'+autoChecked+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3>Background Brightness</h3>'+
+    '<div class="crossfade-wrap"><span style="font-size:12px;color:var(--text-muted);min-width:30px;" id="bg-brightness-label">'+bgBrightness+'%</span>'+
+    '<input type="range" id="bg-brightness-slider" min="50" max="150" step="5" value="'+bgBrightness+'"><span style="font-size:12px;color:var(--text-muted);">150%</span></div></div>'+
+    '<div class="settings-section"><h3>Font Size</h3>'+
+    '<div class="anim-speed-wrap" id="font-size-wrap">'+
+    fontSizeOpts.map(function(f){return '<button class="anim-speed-btn'+(fontSize===f.value?' active':'')+'" data-size="'+f.value+'">'+f.label+'</button>';}).join('')+
+    '</div></div>'+
     '<div class="settings-section"><h3 data-i18n="settings.language">Language</h3><select class="lang-select" id="lang-select">'+langOpts+'</select></div>';
 
   qsa('.color-swatch', container).forEach(function(el) {
@@ -144,6 +159,45 @@ function renderThemeTab() {
       setLanguage(this.value);
     });
   }
+
+  var bgSlider = document.getElementById('bg-brightness-slider');
+  if (bgSlider) {
+    bgSlider.addEventListener('input', function() {
+      var val = parseInt(this.value);
+      document.getElementById('bg-brightness-label').textContent = val + '%';
+      localStorage.setItem('moidify_bg_brightness', val);
+      document.documentElement.style.setProperty('--bg-brightness', val + '%');
+      applyBgBrightness(val);
+    });
+  }
+
+  qsa('#font-size-wrap .anim-speed-btn', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      qsa('#font-size-wrap .anim-speed-btn', container).forEach(function(s){s.classList.remove('active');});
+      this.classList.add('active');
+      var size = this.dataset.size;
+      localStorage.setItem('moidify_font_size', size);
+      applyFontSize(size);
+    });
+  });
+}
+
+function applyBgBrightness(val) {
+  var ratio = val / 100;
+  var isLight = document.body.classList.contains('light-mode');
+  var baseR = isLight ? 245 : 13;
+  var baseG = isLight ? 245 : 13;
+  var baseB = isLight ? 245 : 13;
+  var r = Math.min(255, Math.round(baseR * ratio));
+  var g = Math.min(255, Math.round(baseG * ratio));
+  var b = Math.min(255, Math.round(baseB * ratio));
+  var bgColor = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+  if (!isLight) document.documentElement.style.setProperty('--bg', bgColor);
+}
+
+function applyFontSize(size) {
+  var sizes = {small: '13px', normal: '14px', large: '16px'};
+  document.documentElement.style.setProperty('--font-size-base', sizes[size] || '14px');
 }
 
 function renderAnimationsTab() {
@@ -269,16 +323,20 @@ function renderPlaybackTab() {
     presetHtml += '<button class="eq-preset-btn'+(state.eqPreset===name?' active':'')+'" data-preset="'+name+'">'+name+'</button>';
   });
 
-  var qualityLabels = {high:'Original', medium:'Medium (256k)', low:'Low (128k)', voice:'Voice (64k Opus)'};
+  var qualityLabels = {original:'Original (passthrough)', high:'High (192k Opus)', medium:'Medium (128k Opus)', low:'Low (96k Opus)', voice:'Voice (64k Opus)'};
   var qualityBtns = Object.keys(qualityLabels).map(function(k) {
     return '<button class="eq-preset-btn'+(state.streamQuality===k?' active':'')+'" data-quality="'+k+'">'+qualityLabels[k]+'</button>';
   }).join('');
+
+  var gaplessChecked = state.gapless ? ' checked' : '';
 
   container.innerHTML =
     '<div class="settings-section"><h3>Equalizer</h3><div class="eq-presets">'+presetHtml+'</div><div class="eq-grid">'+bands+'</div></div>'+
     '<div class="settings-section"><h3>Stream Quality</h3>'+
     '<div class="eq-presets">'+qualityBtns+'</div>'+
     '<p style="font-size:12px;color:var(--text-muted);margin-top:4px">Requires ffmpeg on the server for transcoding. Otherwise plays original.</p></div>'+
+    '<div class="settings-section"><h3>Gapless Playback</h3>'+
+    '<label class="toggle-row"><span>Preload and crossfade next track</span><input type="checkbox" id="gapless-toggle"'+gaplessChecked+'><span class="toggle-slider"></span></label></div>'+
     '<div class="settings-section"><h3>Crossfade</h3>'+
     '<div class="crossfade-wrap"><span style="font-size:12px;color:var(--text-muted);min-width:30px;">'+state.crossfade+'s</span>'+
     '<input type="range" id="crossfade-slider" min="0" max="12" step="1" value="'+state.crossfade+'"><span style="font-size:12px;color:var(--text-muted);">12s</span></div></div>'+
@@ -325,6 +383,14 @@ function renderPlaybackTab() {
       localStorage.setItem('moidify_crossfade', this.value);
       var label = this.parentElement.querySelector('span:first-child');
       if (label) label.textContent = this.value + 's';
+    });
+  }
+
+  var gaplessToggle = document.getElementById('gapless-toggle');
+  if (gaplessToggle) {
+    gaplessToggle.addEventListener('change', function() {
+      state.gapless = this.checked;
+      localStorage.setItem('moidify_gapless', state.gapless);
     });
   }
 }

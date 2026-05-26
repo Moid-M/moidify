@@ -29,8 +29,11 @@
       <div class="nav-section playlists-section">
         <div class="section-header">
           <span data-i18n="nav.playlists">Your Playlists</span>
-          <button id="new-playlist-btn" title="New Playlist" data-i18n-title="playlist.new">+</button>
-          <button id="import-playlist-btn" title="Import playlist">↑</button>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <button id="new-playlist-folder-btn" title="New Folder" style="background:none;border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;padding:0 4px;line-height:1;">📁</button>
+            <button id="new-playlist-btn" title="New Playlist" data-i18n-title="playlist.new">+</button>
+            <button id="import-playlist-btn" title="Import playlist">↑</button>
+          </div>
         </div>
         <div id="playlist-list"></div>
       </div>
@@ -113,7 +116,10 @@
       </div>
       <div class="player-body">
           <div class="player-left">
-            <img id="player-cover" src="/static/placeholder-cover.svg" alt="">
+            <div class="player-cover-wrap" style="position:relative;flex-shrink:0;">
+              <img id="player-cover" src="/static/placeholder-cover.svg" alt="">
+              <button id="player-cover-expand" class="cover-expand-btn" title="Full-screen art">⛶</button>
+            </div>
             <div class="player-eq eq-anim" style="display:none"><span></span><span></span><span></span><span></span><span></span></div>
             <div class="player-track-meta">
               <span id="player-title"></span>
@@ -206,6 +212,8 @@
       <button id="mini-close" class="ctrl-btn" title="Close">&times;</button>
     </div>
   </div>
+
+  <div id="fs-art" style="display:none"><img id="fs-art-img"><button id="fs-art-close">&times;</button></div>
 
   <div id="backdrop"></div>
 

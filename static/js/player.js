@@ -70,6 +70,8 @@ function updatePlayerUI(track) {
   refreshLyricsForCurrentTrack();
   var npOverlay = document.getElementById('nowplaying-overlay');
   if (npOverlay && npOverlay.style.display !== 'none') updateNowPlaying();
+
+  if (state.gapless) preloadNextTrack();
 }
 
 function togglePlay() {
@@ -109,7 +111,9 @@ function nextTrack() {
     }
   }
 
-  if (state.crossfade > 0 && audio.src) {
+  if (state.gapless) {
+    gaplessCrossfadeToNext();
+  } else if (state.crossfade > 0 && audio.src) {
     crossfadeTo(state.queue, next);
   } else {
     playFromQueue(state.queue, next);
@@ -330,5 +334,114 @@ function updateNowPlayingLyricsSync() {
         lines[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
     }
+  }
+}
+
+/* ---- Full-screen album art ---- */
+function openFullScreenArt(trackId) {
+  var fsArt = document.getElementById('fs-art');
+  var img = document.getElementById('fs-art-img');
+  img.src = '/api/cover/' + trackId;
+  fsArt.style.display = 'flex';
+}
+
+function closeFullScreenArt() {
+  document.getElementById('fs-art').style.display = 'none';
+}
+
+/* ---- Gapless Playback ---- */
+function preloadNextTrack() {
+  var next = getNextTrackIndex();
+  if (next == null || !state.queue[next]) return;
+  var nextTrackData = state.queue[next];
+  var existing = document.getElementById('next-audio');
+  if (existing) existing.remove();
+
+  var nextAudio = document.createElement('audio');
+  nextAudio.id = 'next-audio';
+  nextAudio.preload = 'auto';
+  nextAudio.src = '/api/stream/' + nextTrackData.id + '?quality=' + (state.streamQuality || 'high');
+  nextAudio.style.display = 'none';
+  document.body.appendChild(nextAudio);
+}
+
+function getNextTrackIndex() {
+  if (state.queue.length === 0) return null;
+  if (state.repeatMode === 'one') return state.currentIndex;
+  if (state.shuffle && state.queue.length > 1 && state.shuffleOrder.length) {
+    var si = state.shuffleIndex + 1;
+    if (si >= state.shuffleOrder.length) {
+      if (state.repeatMode === 'off') return null;
+      si = 0;
+    }
+    return state.shuffleOrder[si];
+  }
+  var next = state.currentIndex + 1;
+  if (next >= state.queue.length) {
+    if (state.repeatMode === 'all') next = 0;
+    else return null;
+  }
+  return next;
+}
+
+function gaplessCrossfadeToNext() {
+  if (isCrossfading) return;
+  var nextAudio = document.getElementById('next-audio');
+  if (!nextAudio || !nextAudio.readyState || nextAudio.readyState < 2) {
+    nextTrackFallback();
+    return;
+  }
+
+  var nextIdx = getNextTrackIndex();
+  if (nextIdx == null) { nextTrackFallback(); return; }
+
+  isCrossfading = true;
+  var fadeDuration = 2000;
+  var fadeInterval = 50;
+  var steps = fadeDuration / fadeInterval;
+  var step = 0;
+  var mainVol = parseFloat(document.getElementById('volume').value) || 1;
+  var targetVol = mainVol;
+
+  // Start playing next audio at volume 0
+  nextAudio.volume = 0;
+  nextAudio.play();
+
+  var timer = setInterval(function() {
+    step++;
+    var progress = step / steps;
+    var currentVol = Math.max(0, mainVol * (1 - progress));
+    var nextVol = Math.min(targetVol, mainVol * progress);
+    try { audio.volume = currentVol; } catch(e) {}
+    try { nextAudio.volume = nextVol; } catch(e) {}
+
+    if (progress >= 1) {
+      clearInterval(timer);
+      audio.pause();
+      audio.src = '';
+      // Swap: set main audio to next track's properties
+      var nextTrack = state.queue[nextIdx];
+      state.currentIndex = nextIdx;
+      audio.src = nextAudio.src;
+      audio.currentTime = nextAudio.currentTime;
+      audio.volume = targetVol;
+      audio.play();
+      nextAudio.remove();
+      updatePlayerUI(nextTrack);
+      isCrossfading = false;
+    }
+  }, fadeInterval);
+}
+
+function nextTrackFallback() {
+  var next = getNextTrackIndex();
+  if (next != null) {
+    playFromQueue(state.queue, next);
+  } else {
+    audio.src = '';
+    qs('#play-btn').innerHTML = iconPlay();
+    renderQueuePanel();
+    checkSleepTimer('ended');
+    clearAnimations();
   }
 }

@@ -84,19 +84,121 @@ async function loadPlaylists() {
   if (!state.user) { list.innerHTML=''; return; }
   try {
     state.playlists = await apiJson('/api/playlists');
+    var folders = await apiJson('/api/playlist-folders');
     list.innerHTML = '';
     renderPinnedPlaylists();
+
+    // Group playlists by folder
+    var uncategorized = [];
+    var byFolder = {};
     state.playlists.forEach(function(pl) {
-      var isPinned = state.pinnedPlaylists.indexOf(pl.id) !== -1;
-      var item = document.createElement('div');
-      item.className = 'playlist-item'+(state.currentView==='playlist'&&state.currentData===pl.id?' active':'');
-      item.innerHTML = '<button class="pin-btn'+(isPinned?' pinned':'')+'" data-pl="'+pl.id+'" title="Pin">'+(isPinned?iconPinFilled():iconPin())+'</button><span>'+esc(pl.name)+'</span><button class="del-pl" data-pl="'+pl.id+'" title="Delete">\u2715</button>';
-      item.addEventListener('click',function(e){if(e.target.tagName==='BUTTON')return;navigate('playlist',pl.id);});
-      qs('.pin-btn',item).addEventListener('click',function(e){e.stopPropagation();togglePinPlaylist(pl.id);});
-      qs('.del-pl',item).addEventListener('click',function(e){e.stopPropagation();deletePlaylist(pl.id);});
-      list.appendChild(item);
+      if (pl.folder_id) {
+        if (!byFolder[pl.folder_id]) byFolder[pl.folder_id] = [];
+        byFolder[pl.folder_id].push(pl);
+      } else {
+        uncategorized.push(pl);
+      }
+    });
+
+    // Render folders
+    folders.forEach(function(folder) {
+      var folderEl = document.createElement('div');
+      folderEl.className = 'playlist-folder';
+      var isExpanded = localStorage.getItem('moidify_folder_open_' + folder.id) !== 'false';
+      var folderPls = byFolder[folder.id] || [];
+      folderEl.innerHTML =
+        '<div class="playlist-folder-header">'+
+          '<span class="playlist-folder-toggle">'+(isExpanded ? '\u25BC' : '\u25B6')+'</span>'+
+          '<span class="playlist-folder-name">'+esc(folder.name)+'</span>'+
+          '<span class="playlist-folder-count">'+folderPls.length+'</span>'+
+          '<button class="del-pl" data-folder="'+folder.id+'" title="Delete folder">\u2715</button>'+
+        '</div>'+
+        '<div class="playlist-folder-items"'+(isExpanded?'':' style="display:none"')+'>'+
+        '</div>';
+      var header = folderEl.querySelector('.playlist-folder-header');
+      header.addEventListener('click', function(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        var items = folderEl.querySelector('.playlist-folder-items');
+        var toggle = folderEl.querySelector('.playlist-folder-toggle');
+        var expanded = items.style.display !== 'none';
+        items.style.display = expanded ? 'none' : '';
+        toggle.textContent = expanded ? '\u25B6' : '\u25BC';
+        localStorage.setItem('moidify_folder_open_' + folder.id, !expanded);
+      });
+      var delBtn = folderEl.querySelector('.del-pl');
+      if (delBtn) {
+        delBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (confirm('Delete folder "'+folder.name+'"? Playlists will be moved out.')) {
+            deletePlaylistFolder(folder.id);
+          }
+        });
+      }
+      list.appendChild(folderEl);
+
+      var itemsContainer = folderEl.querySelector('.playlist-folder-items');
+      folderPls.forEach(function(pl) {
+        itemsContainer.appendChild(createPlaylistItem(pl));
+      });
+    });
+
+    // Render uncategorized playlists
+    uncategorized.forEach(function(pl) {
+      list.appendChild(createPlaylistItem(pl));
     });
   } catch(e) { console.error(e); }
+}
+
+function createPlaylistItem(pl) {
+  var isPinned = state.pinnedPlaylists.indexOf(pl.id) !== -1;
+  var item = document.createElement('div');
+  item.className = 'playlist-item'+(state.currentView==='playlist'&&state.currentData===pl.id?' active':'');
+  item.innerHTML = '<button class="pin-btn'+(isPinned?' pinned':'')+'" data-pl="'+pl.id+'" title="Pin">'+(isPinned?iconPinFilled():iconPin())+'</button><span>'+esc(pl.name)+'</span><button class="del-pl" data-pl="'+pl.id+'" title="Delete">\u2715</button>';
+  item.addEventListener('click',function(e){if(e.target.tagName==='BUTTON')return;navigate('playlist',pl.id);});
+  qs('.pin-btn',item).addEventListener('click',function(e){e.stopPropagation();togglePinPlaylist(pl.id);});
+  qs('.del-pl',item).addEventListener('click',function(e){e.stopPropagation();deletePlaylist(pl.id);});
+  item.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    showPlaylistFolderMenu(e, pl.id);
+  });
+  return item;
+}
+
+function showPlaylistFolderMenu(event, playlistId) {
+  hideContextMenu();
+  var menu = document.getElementById('context-menu');
+  apiJson('/api/playlist-folders').then(function(folders) {
+    var html = '<div class="context-menu-item" style="cursor:default;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px;">Move to folder</div>';
+    html += '<div class="context-menu-item" data-action="move-folder" data-folder="">None</div>';
+    folders.forEach(function(f) {
+      html += '<div class="context-menu-item" data-action="move-folder" data-folder="'+f.id+'">'+esc(f.name)+'</div>';
+    });
+    menu.innerHTML = html;
+    menu.style.display = 'block';
+    var x = event.clientX, y = event.clientY;
+    var mw = Math.min(220, menu.offsetWidth||220);
+    if (x+mw>window.innerWidth) x=window.innerWidth-mw-10;
+    if (y+200>window.innerHeight) y=window.innerHeight-200-10;
+    if (x<10)x=10; if(y<10)y=10;
+    menu.style.left=x+'px'; menu.style.top=y+'px';
+    qsa('.context-menu-item', menu).forEach(function(el) {
+      el.addEventListener('click', function() {
+        var folderId = this.dataset.folder;
+        api('/api/playlists/'+playlistId+'/folder', { method:'PUT', body:{ folder_id: folderId ? parseInt(folderId) : null } }).then(function() {
+          loadPlaylists();
+        }).catch(function(e) { console.error(e); });
+        hideContextMenu();
+      });
+    });
+    document.addEventListener('click', hideContextMenuOnce);
+  }).catch(function(e) { console.error(e); });
+}
+
+async function deletePlaylistFolder(folderId) {
+  try {
+    await api('/api/playlist-folders/'+folderId, {method:'DELETE'});
+    loadPlaylists();
+  } catch(e) { alert('Error: '+e.message); }
 }
 
 async function deletePlaylist(id) {

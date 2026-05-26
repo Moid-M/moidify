@@ -1,3 +1,6 @@
+var _mq = localStorage.getItem('moidify_stream_quality');
+// Migrate old 'high' (passthrough) to 'original'
+if (_mq === 'high') _mq = 'original';
 var state = {
   token: localStorage.getItem('moidify_token'),
   user: null,
@@ -32,8 +35,9 @@ var state = {
   currentQueue: [],
   _favedFlag: false,
   favedTracks: {},
-  streamQuality: localStorage.getItem('moidify_stream_quality') || 'high',
+  streamQuality: _mq || 'high',
   playbackSpeed: parseFloat(localStorage.getItem('moidify_speed') || '1'),
+  gapless: localStorage.getItem('moidify_gapless') !== 'false',
 };
 
 var audio = document.getElementById('audio');

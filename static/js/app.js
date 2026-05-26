@@ -44,6 +44,11 @@ function setupEvents() {
     if (track && track.album) navigate('album', {album: track.album, artist: track.artist});
     else toggleNowPlaying();
   });
+  document.getElementById('player-cover-expand').addEventListener('click', function(e) {
+    e.stopPropagation();
+    var track = state.queue[state.currentIndex];
+    if (track) openFullScreenArt(track.id);
+  });
   qs('.player-left').addEventListener('dblclick', function() {
     toggleNowPlaying();
   });
@@ -53,6 +58,14 @@ function setupEvents() {
   document.getElementById('np-play').addEventListener('click', togglePlay);
   document.getElementById('np-next').addEventListener('click', nextTrack);
   document.getElementById('np-prev').addEventListener('click', prevTrack);
+  document.getElementById('np-cover').addEventListener('click', function() {
+    var track = state.queue[state.currentIndex];
+    if (track) openFullScreenArt(track.id);
+  });
+  document.getElementById('fs-art-close').addEventListener('click', closeFullScreenArt);
+  document.getElementById('fs-art').addEventListener('click', function(e) {
+    if (e.target === this) closeFullScreenArt();
+  });
 
   setupHoldRepeat('rewind-btn', function(){seekRelative(-10);});
   setupHoldRepeat('forward-btn', function(){seekRelative(10);});
@@ -138,6 +151,15 @@ function setupEvents() {
   document.getElementById('new-playlist-btn').addEventListener('click', function() {
     if (!state.user) { showLoginModal(); return; }
     showNewPlaylistForm(null);
+  });
+  document.getElementById('new-playlist-folder-btn').addEventListener('click', function() {
+    if (!state.user) { showLoginModal(); return; }
+    var name = prompt('Folder name:');
+    if (name && name.trim()) {
+      api('/api/playlist-folders', {method:'POST', body:{name: name.trim()}}).then(function() {
+        loadPlaylists();
+      }).catch(function(e) { alert('Error: '+e.message); });
+    }
   });
   document.getElementById('import-playlist-btn').addEventListener('click', function() {
     if (!state.user) { showLoginModal(); return; }
@@ -433,6 +455,9 @@ function init() {
   applyTheme();
   applyAnimationSettings();
   applyLanguage();
+  applyFontSize(localStorage.getItem('moidify_font_size') || 'normal');
+  var bgB = localStorage.getItem('moidify_bg_brightness');
+  if (bgB) applyBgBrightness(parseInt(bgB));
   initResizable('sidebar-drag', '#sidebar', '--sidebar-w', 180, 400, 'moidify_sidebar_w');
   initResizable('queue-drag', '#queue-panel', '--queue-w', 220, 500, 'moidify_queue_w');
   setupSearch();

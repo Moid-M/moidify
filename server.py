@@ -1,9 +1,12 @@
 import hashlib
+import json
 import os
 import secrets
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 import unicodedata
 import zipfile
 from contextlib import asynccontextmanager
@@ -29,6 +32,7 @@ async def lifespan(app: FastAPI):
     init_db()
     scan_existing()
     start_watcher()
+    start_rescan_scheduler()
     yield
 
 
@@ -181,25 +185,27 @@ def me(token: Optional[str] = Header(None)):
 FFMPEG_PATH = shutil.which("ffmpeg")
 
 TRANSCODE_MAP = {
-    "high":  {"codec": None, "bitrate": None},         # original
-    "medium": {"codec": "libmp3lame", "bitrate": "256k"},
-    "low":   {"codec": "libmp3lame", "bitrate": "128k"},
-    "voice": {"codec": "libopus", "bitrate": "64k"},
+    "original": {"codec": None, "bitrate": None},      # original passthrough
+    "high":     {"codec": "libopus", "bitrate": "192k"},
+    "medium":   {"codec": "libopus", "bitrate": "128k"},
+    "low":      {"codec": "libopus", "bitrate": "96k"},
+    "voice":    {"codec": "libopus", "bitrate": "64k"},
 }
 
 
 def _transcode_stream(file_path: str, quality: str):
-    if not FFMPEG_PATH or quality == "high" or quality not in TRANSCODE_MAP:
+    if not FFMPEG_PATH or quality == "original" or quality not in TRANSCODE_MAP:
         return None
     cfg = TRANSCODE_MAP[quality]
+    is_opus = cfg["codec"] == "libopus"
+    fmt = "ogg" if is_opus else "mp3"
     args = [
-        FFMPEG_PATH, "-i", file_path, "-f", "mp3",
-        "-acodec", cfg["codec"], "-ab", cfg["bitrate"],
+        FFMPEG_PATH, "-i", file_path,
+        "-f", fmt,
+        "-acodec", cfg["codec"],
+        "-ab", cfg["bitrate"],
         "-vn", "-nostdin", "-loglevel", "error", "-",
     ]
-    if cfg["codec"] == "libopus":
-        args[args.index("-f") + 1] = "ogg"
-        args[args.index("-acodec") + 1] = "libopus"
     process = subprocess.Popen(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
@@ -263,7 +269,8 @@ def stream_track(track_id: int, quality: Optional[str] = Query("high")):
 
     proc = _transcode_stream(str(path), quality)
     if proc:
-        media_type = "audio/ogg" if quality == "voice" else "audio/mpeg"
+        is_opus = quality in ("high", "medium", "low", "voice") and TRANSCODE_MAP.get(quality, {}).get("codec") == "libopus"
+        media_type = "audio/ogg" if is_opus else "audio/mpeg"
         return StreamingResponse(
             proc.stdout,
             media_type=media_type,
@@ -859,6 +866,112 @@ async def import_playlist(file: UploadFile = File(...), token: Optional[str] = H
 
 
 # ---------------------------------------------------------------------------
+# Playlist folder endpoints
+# ---------------------------------------------------------------------------
+
+class CreateFolderBody(BaseModel):
+    name: str
+
+class RenameFolderBody(BaseModel):
+    name: str
+
+class SetPlaylistFolderBody(BaseModel):
+    folder_id: Optional[int] = None
+
+@app.get("/api/playlist-folders")
+def list_folders(token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        return []
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT pf.*, COUNT(p.id) as playlist_count
+           FROM playlist_folders pf
+           LEFT JOIN playlists p ON p.folder_id = pf.id
+           WHERE pf.user_id = ?
+           GROUP BY pf.id
+           ORDER BY pf.sort_order, pf.name""",
+        (user["id"],),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/playlist-folders")
+def create_folder(body: CreateFolderBody, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+    conn = get_connection()
+    max_order = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), -1) FROM playlist_folders WHERE user_id = ?",
+        (user["id"],),
+    ).fetchone()[0]
+    conn.execute(
+        "INSERT INTO playlist_folders (name, user_id, sort_order) VALUES (?, ?, ?)",
+        (body.name, user["id"], max_order + 1),
+    )
+    conn.commit()
+    fid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.close()
+    return {"id": fid, "name": body.name}
+
+@app.put("/api/playlist-folders/{folder_id}")
+def rename_folder(folder_id: int, body: RenameFolderBody, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM playlist_folders WHERE id = ? AND user_id = ?",
+        (folder_id, user["id"]),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Folder not found")
+    conn.execute("UPDATE playlist_folders SET name = ? WHERE id = ?", (body.name, folder_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/api/playlist-folders/{folder_id}")
+def delete_folder(folder_id: int, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM playlist_folders WHERE id = ? AND user_id = ?",
+        (folder_id, user["id"]),
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Folder not found")
+    conn.execute("UPDATE playlists SET folder_id = NULL WHERE folder_id = ?", (folder_id,))
+    conn.execute("DELETE FROM playlist_folders WHERE id = ?", (folder_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.put("/api/playlists/{playlist_id}/folder")
+def set_playlist_folder(playlist_id: int, body: SetPlaylistFolderBody, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+    conn = get_connection()
+    pl = conn.execute(
+        "SELECT * FROM playlists WHERE id = ? AND user_id = ?",
+        (playlist_id, user["id"]),
+    ).fetchone()
+    if not pl:
+        conn.close()
+        raise HTTPException(404, "Playlist not found")
+    conn.execute("UPDATE playlists SET folder_id = ? WHERE id = ?", (body.folder_id, playlist_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Favourites endpoints
 # ---------------------------------------------------------------------------
 
@@ -1174,6 +1287,67 @@ def admin_rescan(token: Optional[str] = Header(None)):
     _require_admin(token)
     scan_existing()
     return get_scan_status()
+
+# ---------------------------------------------------------------------------
+# Scheduled rescan
+# ---------------------------------------------------------------------------
+
+SCHEDULE_FILE = BASE_DIR / "data" / "rescan_schedule.json"
+_SCAN_THREAD = None
+_SCAN_STOP = threading.Event()
+
+class ScheduleBody(BaseModel):
+    interval_hours: float
+
+def _load_schedule():
+    if SCHEDULE_FILE.exists():
+        try:
+            with open(SCHEDULE_FILE) as f:
+                return json.load(f)
+        except:
+            pass
+    return {"interval_hours": 0, "last_scan": None}
+
+def _save_schedule(data):
+    SCHEDULE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SCHEDULE_FILE, "w") as f:
+        json.dump(data, f)
+
+def _rescan_loop():
+    while not _SCAN_STOP.is_set():
+        schedule = _load_schedule()
+        interval = schedule.get("interval_hours", 0)
+        if interval > 0:
+            scan_existing()
+            schedule["last_scan"] = time.strftime('%Y-%m-%d %H:%M:%S')
+            _save_schedule(schedule)
+            _SCAN_STOP.wait(interval * 3600)
+        else:
+            _SCAN_STOP.wait(60)
+
+def start_rescan_scheduler():
+    global _SCAN_THREAD
+    if _SCAN_THREAD and _SCAN_THREAD.is_alive():
+        return
+    _SCAN_STOP.clear()
+    _SCAN_THREAD = threading.Thread(target=_rescan_loop, daemon=True)
+    _SCAN_THREAD.start()
+
+@app.get("/api/admin/schedule-rescan")
+def get_rescan_schedule(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    return _load_schedule()
+
+@app.post("/api/admin/schedule-rescan")
+def set_rescan_schedule(body: ScheduleBody, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    if body.interval_hours < 0:
+        raise HTTPException(400, "Interval must be >= 0")
+    schedule = _load_schedule()
+    schedule["interval_hours"] = body.interval_hours
+    _save_schedule(schedule)
+    start_rescan_scheduler()
+    return {"ok": True, "interval_hours": body.interval_hours}
 
 @app.get("/api/admin/listening-trends")
 def admin_listening_trends(token: Optional[str] = Header(None)):

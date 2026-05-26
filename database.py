@@ -86,6 +86,14 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS playlist_folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
     """)
 
     # migrate existing tables — add columns if missing (safe to run on fresh DB too)
@@ -93,6 +101,7 @@ def init_db():
         "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
         "ALTER TABLE tracks ADD COLUMN play_count INTEGER DEFAULT 0",
         "ALTER TABLE tracks ADD COLUMN rating INTEGER DEFAULT 0",
+        "ALTER TABLE playlists ADD COLUMN folder_id INTEGER REFERENCES playlist_folders(id) ON DELETE SET NULL",
     ]:
         try:
             conn.execute(stmt)
