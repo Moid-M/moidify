@@ -83,12 +83,53 @@ ok "Directories created."
 
 # ─── Copy files ─────────────────────────────────────────────────────────────
 info "Copying application files..."
-SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
 TMPDIR=$(mktemp -d)
 
-# Stage files into a temp dir so we can filter cleanly
-cp -r "$SRC_DIR"/* "$TMPDIR/" 2>/dev/null || true
-cp -r "$SRC_DIR"/.[!.]* "$TMPDIR/" 2>/dev/null || true
+REPO_URL="https://github.com/Moid-M/moidify.git"
+# Check if we're running from a local repo (has server.py) or from a pipe
+SRC_DIR="$(cd "$(dirname "$0")" && pwd 2>/dev/null)"
+if [[ -f "$SRC_DIR/server.py" ]]; then
+  # Local install — copy from source
+  cp -r "$SRC_DIR"/* "$TMPDIR/" 2>/dev/null || true
+  cp -r "$SRC_DIR"/.[!.]* "$TMPDIR/" 2>/dev/null || true
+else
+  # Remote install (curl pipe) — clone the repo
+  info "Downloading from $REPO_URL"
+  if command -v git &>/dev/null; then
+    git clone --depth 1 "$REPO_URL" "$TMPDIR/repo" 2>/dev/null || {
+      rm -rf "$TMPDIR" 2>/dev/null || true
+      TMPDIR=$(mktemp -d)
+      # fallback: download archive
+      info "Git not available, using archive..."
+      ARCHIVE_URL="https://github.com/Moid-M/moidify/archive/refs/heads/main.tar.gz"
+      if command -v curl &>/dev/null; then
+        curl -sL "$ARCHIVE_URL" | tar -xz -C "$TMPDIR" --strip-components=1
+      elif command -v wget &>/dev/null; then
+        wget -qO- "$ARCHIVE_URL" | tar -xz -C "$TMPDIR" --strip-components=1
+      else
+        err "Cannot download source — install curl or git first."
+        exit 1
+      fi
+    }
+    if [[ -d "$TMPDIR/repo" ]]; then
+      rm -rf "$TMPDIR/repo/.git" 2>/dev/null || true
+      cp -r "$TMPDIR/repo"/* "$TMPDIR/" 2>/dev/null || true
+      rm -rf "$TMPDIR/repo" 2>/dev/null || true
+    fi
+  else
+    ARCHIVE_URL="https://github.com/Moid-M/moidify/archive/refs/heads/main.tar.gz"
+    if command -v curl &>/dev/null; then
+      curl -sL "$ARCHIVE_URL" | tar -xz -C "$TMPDIR" --strip-components=1
+    elif command -v wget &>/dev/null; then
+      wget -qO- "$ARCHIVE_URL" | tar -xz -C "$TMPDIR" --strip-components=1
+    else
+      err "Cannot download source — install curl or git first."
+      exit 1
+    fi
+  fi
+fi
+
+# Clean up unnecessary files from the stage
 rm -rf "$TMPDIR/install.sh" "$TMPDIR/uninstall.sh" "$TMPDIR/moidify.service" \
        "$TMPDIR/__pycache__" "$TMPDIR/music" "$TMPDIR/data" "$TMPDIR/covers" \
        "$TMPDIR/.git" 2>/dev/null || true
@@ -192,7 +233,7 @@ PYEOF
 fi
 
 # ─── Systemd ────────────────────────────────────────────────────────────────
-sed "s/--port 8000/--port $PORT/" "$SRC_DIR/moidify.service" > "$SERVICE_FILE"
+sed "s/--port 8000/--port $PORT/" "$APP_DIR/moidify.service" > "$SERVICE_FILE"
 systemctl daemon-reload
 ok "Systemd service installed on port $PORT."
 
