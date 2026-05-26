@@ -6,11 +6,16 @@ BASE_DIR = Path(__file__).parent
 
 INSTALLED_CONFIG = Path("/etc/moidify/config.json")
 if INSTALLED_CONFIG.exists():
-    with open(INSTALLED_CONFIG) as f:
-        _cfg = json.load(f)
-    MUSIC_DIR = Path(_cfg.get("music_dir", "/var/lib/moidify/music"))
-    COVERS_DIR = Path(_cfg.get("covers_dir", "/var/lib/moidify/covers"))
-    DB_PATH = Path(_cfg.get("db_path", "/var/lib/moidify/music.db"))
+    try:
+        with open(INSTALLED_CONFIG) as f:
+            _cfg = json.load(f)
+        MUSIC_DIR = Path(_cfg.get("music_dir", "/var/lib/moidify/music"))
+        COVERS_DIR = Path(_cfg.get("covers_dir", "/var/lib/moidify/covers"))
+        DB_PATH = Path(_cfg.get("db_path", "/var/lib/moidify/music.db"))
+    except (json.JSONDecodeError, OSError):
+        MUSIC_DIR = BASE_DIR / "music"
+        COVERS_DIR = BASE_DIR / "covers"
+        DB_PATH = BASE_DIR / "data" / "music.db"
 else:
     MUSIC_DIR = BASE_DIR / "music"
     COVERS_DIR = BASE_DIR / "covers"

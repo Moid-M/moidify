@@ -37,10 +37,16 @@ function setupEvents() {
 
   setupHoldRepeat('rewind-btn', function(){seekRelative(-10);});
   setupHoldRepeat('forward-btn', function(){seekRelative(10);});
+  document.getElementById('sleep-timer-cancel').addEventListener('click', cancelSleepTimer);
 
   document.getElementById('volume').addEventListener('input', function() {
     audio.volume = parseFloat(this.value);
     updateVolumeFill();
+    audio.muted = false;
+  });
+  document.getElementById('volume-btn').addEventListener('click', function() {
+    audio.muted = !audio.muted;
+    this.classList.toggle('muted', audio.muted);
   });
 
   document.getElementById('seek').addEventListener('input', function() {

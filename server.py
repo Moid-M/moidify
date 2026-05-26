@@ -821,7 +821,7 @@ class ToggleAdminBody(BaseModel):
 
 @app.post("/api/admin/users/{user_id}/admin")
 def admin_toggle_user(user_id: int, body: ToggleAdminBody, token: Optional[str] = Header(None)):
-    admin_user = _require_admin(token)
+    _require_admin(token)
     conn = get_connection()
     target = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not target:
@@ -876,7 +876,7 @@ def admin_change_password(user_id: int, body: ChangePasswordBody, token: Optiona
 
 @app.delete("/api/admin/users/{user_id}")
 def admin_delete_user(user_id: int, token: Optional[str] = Header(None)):
-    admin_user = _require_admin(token)
+    _require_admin(token)
     conn = get_connection()
     target = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not target:
