@@ -10,35 +10,60 @@ SERVICE_FILE="/etc/systemd/system/moidify.service"
 PYTHON="python3"
 REPO_URL="https://github.com/Moid-M/moidify.git"
 
-# ─── Colors ─────────────────────────────────────────────────────────────────
+# ─── Parse flags ─────────────────────────────────────────────────────────────
+VERBOSE=false
+SHOW_VERSION=false
+for arg in "$@"; do
+  case "$arg" in
+    -v|--verbose) VERBOSE=true ;;
+    -V|--version) SHOW_VERSION=true ;;
+  esac
+done
+
+# Quick version display (no installation)
+if $SHOW_VERSION; then
+  # Try to get version from local copy first, then GitHub
+  if [[ -f "$(dirname "$0")/version.txt" ]]; then
+    cat "$(dirname "$0")/version.txt"
+  else
+    curl -sL "${REPO_URL}/raw/main/version.txt" 2>/dev/null || echo "unknown"
+  fi
+  exit 0
+fi
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 info()  { echo -e "${CYAN}::${NC} $1"; }
 ok()    { echo -e "${GREEN}ok${NC}  $1"; }
 warn()  { echo -e "${YELLOW}!!${NC} $1"; }
 err()   { echo -e "${RED}!!${NC} $1"; }
 
+if $VERBOSE; then
+  LOG=""     # show everything
+else
+  LOG="--quiet"  # suppress subcommand output
+fi
+
 cleanup() { [[ -d "${TMPDIR:-}" ]] && rm -rf "$TMPDIR"; }
 trap cleanup EXIT
 
-# ─── Root check ─────────────────────────────────────────────────────────────
+# ─── Root check ──────────────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
   err "This installer must be run as root (sudo)."
   exit 1
 fi
 
-# Detect interactive vs piped mode
 INTERACTIVE=0
-if [[ -t 0 ]]; then
-  INTERACTIVE=1
-fi
+[[ -t 0 ]] && INTERACTIVE=1
 
+# ─── Header ──────────────────────────────────────────────────────────────────
 echo ""
-echo -e "${CYAN}╔══════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║       ${APP_NAME} Installer v1.1          ║${NC}"
-echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
+echo -e "${CYAN}  ╭──────────────────────────╮${NC}"
+echo -e "${CYAN}  │     ${APP_NAME} Installer     │${NC}"
+echo -e "${CYAN}  ╰──────────────────────────╯${NC}"
 echo ""
 
-# ─── Detect distro ──────────────────────────────────────────────────────────
+# ─── Detect distro ───────────────────────────────────────────────────────────
 PKG_MANAGER=""
 INSTALL_CMD=""
 if command -v apt &>/dev/null; then
@@ -53,22 +78,29 @@ elif command -v apk &>/dev/null; then
   PKG_MANAGER="apk"; INSTALL_CMD="apk add"
 fi
 
-info "Detected package manager: ${PKG_MANAGER:-none}"
+# ─── System deps ─────────────────────────────────────────────────────────────
+case "$PKG_MANAGER" in
+  apt) PKG_LIST="python3 python3-pip python3-venv sqlite3 rsync git curl" ;;
+  dnf) PKG_LIST="python3 python3-pip python3-virtualenv sqlite rsync git curl" ;;
+  pacman) PKG_LIST="python python-pip python-virtualenv sqlite rsync git curl" ;;
+  zypper) PKG_LIST="python3 python3-pip python3-virtualenv sqlite3 rsync git curl" ;;
+  apk) PKG_LIST="python3 py3-pip py3-virtualenv sqlite rsync git curl" ;;
+esac
 
-# ─── System deps ────────────────────────────────────────────────────────────
-info "Installing system dependencies..."
 if [[ -n "$PKG_MANAGER" ]]; then
+  info "Installing system dependencies..."
   case "$PKG_MANAGER" in
-    apt) apt update -qq; $INSTALL_CMD python3 python3-pip python3-venv sqlite3 rsync git curl ;;
-    dnf) $INSTALL_CMD python3 python3-pip python3-virtualenv sqlite rsync git curl ;;
-    pacman) $INSTALL_CMD python python-pip python-virtualenv sqlite rsync git curl ;;
-    zypper) $INSTALL_CMD python3 python3-pip python3-virtualenv sqlite3 rsync git curl ;;
-    apk) $INSTALL_CMD python3 py3-pip py3-virtualenv sqlite rsync git curl ;;
+    apt) apt update -qq $LOG ;;
   esac
+  if $VERBOSE; then
+    $INSTALL_CMD $PKG_LIST
+  else
+    $INSTALL_CMD $PKG_LIST >/dev/null 2>&1
+  fi
+  ok "System dependencies ready."
 fi
-ok "System dependencies ready."
 
-# ─── Service user ───────────────────────────────────────────────────────────
+# ─── Service user ────────────────────────────────────────────────────────────
 if id "$SERVICE_USER" &>/dev/null; then
   info "User $SERVICE_USER already exists."
 else
@@ -76,21 +108,19 @@ else
   ok "Created system user: $SERVICE_USER"
 fi
 
-# ─── Directories ────────────────────────────────────────────────────────────
+# ─── Directories ─────────────────────────────────────────────────────────────
 install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$APP_DIR" "$DATA_DIR" "$DATA_DIR/music" "$DATA_DIR/covers"
 install -d -o root -g root "$CONFIG_DIR"
-ok "Directories created."
 
-# ─── Port ───────────────────────────────────────────────────────────────────
+# ─── Port ────────────────────────────────────────────────────────────────────
 if [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -p "Server port [8000]: " PORT </dev/tty
+  read -r -p "  Server port [8000]: " PORT </dev/tty
 fi
 PORT="${PORT:-8000}"
-ok "Port: $PORT"
 
-# ─── Music dir ──────────────────────────────────────────────────────────────
+# ─── Music dir ───────────────────────────────────────────────────────────────
 if [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -p "Music folder path [${DATA_DIR}/music]: " MUSIC_DIR_INPUT </dev/tty
+  read -r -p "  Music folder path [${DATA_DIR}/music]: " MUSIC_DIR_INPUT </dev/tty
 fi
 MUSIC_DIR_INPUT="${MUSIC_DIR_INPUT:-${DATA_DIR}/music}"
 MUSIC_DIR_INPUT="${MUSIC_DIR_INPUT/#\~/$HOME}"
@@ -99,22 +129,20 @@ if [[ ! -d "$MUSIC_DIR_INPUT" ]]; then
 else
   chown "$SERVICE_USER":"$SERVICE_USER" "$MUSIC_DIR_INPUT"
 fi
-ok "Music directory: $MUSIC_DIR_INPUT"
 
-# ─── Admin account prompt ───────────────────────────────────────────────────
+# ─── Admin account prompt ────────────────────────────────────────────────────
 if [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -p "Admin username [admin]: " ADMIN_USER </dev/tty
+  read -r -p "  Admin username [admin]: " ADMIN_USER </dev/tty
 fi
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS=""
 if [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -s -p "Admin password (leave blank to skip): " ADMIN_PASS </dev/tty
+  read -r -s -p "  Admin password (blank = skip): " ADMIN_PASS </dev/tty
   echo ""
 fi
 if [[ -z "$ADMIN_PASS" ]]; then
-  warn "No password set — use the setup wizard at http://<ip>:$PORT/setup"
-  ADMIN_SALT=""
-  ADMIN_HASH=""
+  warn "No password set — use setup wizard at http://<ip>:$PORT/setup"
+  ADMIN_SALT=""; ADMIN_HASH=""
 else
   ADMIN_SALT="$(python3 -c "import secrets; print(secrets.token_hex(16))")"
   ADMIN_HASH="$(python3 -c "
@@ -124,10 +152,9 @@ pwd = sys.stdin.readline().strip()
 h = hashlib.pbkdf2_hmac('sha256', pwd.encode(), salt.encode(), 100000)
 print(h.hex())
 " <<< "$ADMIN_PASS")"
-  ok "Admin user '$ADMIN_USER' will be created."
 fi
 
-# ─── Download / copy application files ──────────────────────────────────────
+# ─── Download / copy files ───────────────────────────────────────────────────
 info "Downloading application files..."
 TMPDIR=$(mktemp -d)
 
@@ -140,7 +167,6 @@ if command -v git &>/dev/null; then
   fi
 fi
 
-# Fallback if git clone failed or git not available
 if [[ ! -f "$TMPDIR/server.py" ]]; then
   if command -v curl &>/dev/null; then
     curl -sL "${REPO_URL}/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
@@ -152,6 +178,13 @@ fi
 if [[ ! -f "$TMPDIR/server.py" ]]; then
   err "Failed to download Moidify source."
   exit 1
+fi
+
+# Read version from downloaded source
+if [[ -f "$TMPDIR/version.txt" ]]; then
+  VERSION=$(cat "$TMPDIR/version.txt")
+else
+  VERSION="?"
 fi
 
 # Clean up staging
@@ -169,18 +202,20 @@ fi
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
 ok "Application files copied to $APP_DIR"
 
-# ─── Virtual env ────────────────────────────────────────────────────────────
+# ─── Virtual env + deps ──────────────────────────────────────────────────────
 info "Setting up Python virtual environment..."
 $PYTHON -m venv "$APP_DIR/venv"
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/venv"
-ok "Virtual environment ready."
 
-# ─── Python deps ────────────────────────────────────────────────────────────
 info "Installing Python dependencies..."
-"$APP_DIR/venv/bin/pip" install --quiet --no-cache-dir -r "$APP_DIR/requirements.txt"
+if $VERBOSE; then
+  "$APP_DIR/venv/bin/pip" install --no-cache-dir -r "$APP_DIR/requirements.txt"
+else
+  "$APP_DIR/venv/bin/pip" install --quiet --no-cache-dir -r "$APP_DIR/requirements.txt"
+fi
 ok "Python dependencies installed."
 
-# ─── Config ─────────────────────────────────────────────────────────────────
+# ─── Config ──────────────────────────────────────────────────────────────────
 cat > "$CONFIG_DIR/config.json" <<CONF
 {
   "music_dir": "$MUSIC_DIR_INPUT",
@@ -189,18 +224,16 @@ cat > "$CONFIG_DIR/config.json" <<CONF
   "port": $PORT
 }
 CONF
-ok "Config written to $CONFIG_DIR/config.json"
 
-# ─── Init DB ────────────────────────────────────────────────────────────────
+# ─── Init DB ─────────────────────────────────────────────────────────────────
 info "Initializing database..."
 "$APP_DIR/venv/bin/python" -c "
 import sys; sys.path.insert(0, '$APP_DIR')
 from database import init_db; init_db()
 " 2>&1 || warn "Database init had issues (may be fine on first start)"
 chown "$SERVICE_USER":"$SERVICE_USER" "$DATA_DIR/music.db" 2>/dev/null || true
-ok "Database initialized."
 
-# ─── Create admin user in DB ────────────────────────────────────────────────
+# ─── Create admin user ───────────────────────────────────────────────────────
 if [[ -n "${ADMIN_SALT:-}" && -n "${ADMIN_HASH:-}" ]]; then
   info "Creating admin user '$ADMIN_USER'..."
   "$APP_DIR/venv/bin/python" -c "
@@ -217,15 +250,14 @@ else:
     print('Admin user already exists, skipping.')
 conn.close()
 " 2>&1 || warn "Failed to create admin user (you can use setup wizard)"
-  ok "Admin user '$ADMIN_USER' created."
 fi
 
-# ─── Systemd ────────────────────────────────────────────────────────────────
+# ─── Systemd ─────────────────────────────────────────────────────────────────
 sed "s/--port 8000/--port $PORT/" "$APP_DIR/moidify.service" > "$SERVICE_FILE"
 systemctl daemon-reload
 ok "Systemd service installed on port $PORT."
 
-# ─── Start ──────────────────────────────────────────────────────────────────
+# ─── Start ───────────────────────────────────────────────────────────────────
 info "Starting ${APP_NAME}..."
 systemctl enable moidify.service
 systemctl restart moidify.service
@@ -237,14 +269,14 @@ else
   warn "${APP_NAME} failed to start. Check: journalctl -u moidify.service -n 30 --no-pager"
 fi
 
-# ─── Summary ────────────────────────────────────────────────────────────────
+# ─── Summary ─────────────────────────────────────────────────────────────────
 IP=$(ip route get 1 2>/dev/null | awk '{print $7}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
 echo ""
-echo -e "${CYAN}╔══════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║          Installation Complete           ║${NC}"
-echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
+echo -e "${CYAN}  ╭──────────────────────────╮${NC}"
+echo -e "${CYAN}  │    Installation Complete   │${NC}"
+echo -e "${CYAN}  ╰──────────────────────────╯${NC}"
 echo ""
-echo -e "  ${GREEN}${APP_NAME}${NC} is now running at:"
+echo -e "  ${GREEN}${APP_NAME} v${VERSION}${NC} running at:"
 echo -e "  ${CYAN}http://${IP}:${PORT}${NC}"
 echo ""
 echo -e "  ${YELLOW}Music folder:${NC}  $MUSIC_DIR_INPUT"
@@ -256,8 +288,14 @@ echo -e "  ${YELLOW}Commands:${NC}"
 echo -e "    restart:  systemctl restart moidify"
 echo -e "    stop:     systemctl stop moidify"
 echo -e "    status:   systemctl status moidify"
-echo -e "    uninstall: $APP_DIR/uninstall.sh"
+echo -e "    update:   ${APP_DIR}/update.sh"
+echo -e "    uninstall: ${APP_DIR}/uninstall.sh"
 echo ""
-echo -e "  Drop music into your music folder and it will appear automatically."
-echo -e "  Open the setup wizard at ${CYAN}http://${IP}:${PORT}/setup${NC}"
+echo -e "  Drop music into your folder — files appear automatically."
+echo -e "  Open setup wizard: ${CYAN}http://${IP}:${PORT}/setup${NC}"
+echo ""
+
+if ! $VERBOSE; then
+  echo -e "  ${YELLOW}Tip:${NC} Run with ${CYAN}-v${NC} for verbose output."
+fi
 echo ""

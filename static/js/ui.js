@@ -297,9 +297,15 @@ function renderPlaybackTab() {
 
 function renderAboutTab() {
   var container = document.getElementById('tab-about');
+  var verEl = document.createElement('div');
+  verEl.className = 'about-row';
+  verEl.innerHTML = '<span>Version</span><span class="about-val" id="app-version">...</span>';
+  fetch('/api/version').then(function(r){return r.json();}).then(function(d){
+    document.getElementById('app-version').textContent = d.version || '?';
+  }).catch(function(){document.getElementById('app-version').textContent='?';});
   container.innerHTML =
     '<div class="about-section"><h3>Moidify</h3>'+
-    '<div class="about-row"><span>Version</span><span class="about-val">1.0.0</span></div>'+
+    verEl.outerHTML +
     '<div class="about-row"><span>Database</span><span class="about-val">SQLite</span></div>'+
     '<div class="about-row"><span>Music folder</span><span class="about-val" style="font-size:11px;">music/</span></div>'+
     '<div class="about-row"><span>Admin</span><span class="about-val"><a href="/admin" style="color:var(--accent);text-decoration:none;font-size:13px;">Open &rarr;</a></span></div>'+

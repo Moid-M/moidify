@@ -98,6 +98,17 @@ def _require_admin(token: Optional[str]):
     return user
 
 
+# Load version
+try:
+    with open(BASE_DIR / "version.txt") as f:
+        APP_VERSION = f.read().strip()
+except:
+    APP_VERSION = "0.0.0"
+
+@app.get("/api/version")
+def get_version():
+    return {"version": APP_VERSION}
+
 # ---------------------------------------------------------------------------
 # Auth endpoints
 # ---------------------------------------------------------------------------
