@@ -19,6 +19,37 @@ function playFromQueue(queue, index) {
   audio.play();
   fetch('/api/play/' + track.id, {method:'POST'});
 
+  updatePlayerUI(track);
+  saveSession();
+}
+
+function loadAndPlay(track, queue, index, startTime) {
+  if (state.currentIndex >= 0 && state.currentIndex !== index && state.currentIndex < state.queue.length) {
+    state.playHistory.push(state.currentIndex);
+  }
+  state.queue = queue; state.currentIndex = index;
+
+  if (state.shuffle && (!state.shuffleOrder.length || state.shuffleOrder.length !== queue.length)) {
+    state.shuffleOrder = generateShuffleOrder(queue.length);
+    state.shuffleIndex = 0;
+    for (var si = 0; si < state.shuffleOrder.length; si++) {
+      if (state.shuffleOrder[si] === index) { state.shuffleIndex = si; break; }
+    }
+  }
+
+  if (!track) return;
+
+  updatePlayerUI(track);
+  audio.src = '/api/stream/' + track.id + '?quality=' + (state.streamQuality || 'high');
+  audio.addEventListener('loadedmetadata', function onMeta() {
+    audio.removeEventListener('loadedmetadata', onMeta);
+    audio.currentTime = startTime || 0;
+    audio.play();
+  });
+  fetch('/api/play/' + track.id, {method:'POST'});
+}
+
+function updatePlayerUI(track) {
   document.getElementById('player-title').textContent = track.title||'';
   document.getElementById('player-artist').textContent = (track.artist||'Unknown')+(track.album?'  '+track.album:'');
   document.getElementById('player-cover').src = '/api/cover/'+track.id;
@@ -26,7 +57,7 @@ function playFromQueue(queue, index) {
 
   qsa('.track-row.playing').forEach(function(el){el.classList.remove('playing');});
   var rows = qsa('.track-row');
-  if (rows[index]) rows[index].classList.add('playing');
+  if (rows[state.currentIndex]) rows[state.currentIndex].classList.add('playing');
 
   checkFavoriteStatus(track.id);
   renderQueuePanel();

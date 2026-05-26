@@ -13,7 +13,7 @@ from typing import Optional
 import uvicorn
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -392,6 +392,10 @@ class ReorderPlaylistBody(BaseModel):
     order: list[int]
 
 
+class RatingBody(BaseModel):
+    rating: int
+
+
 @app.get("/api/playlists")
 def list_user_playlists(token: Optional[str] = Header(None)):
     user = _get_user_from_token(token)
@@ -650,6 +654,200 @@ def get_shared_playlist(token: str):
 
 
 # ---------------------------------------------------------------------------
+# Playlist export / import
+# ---------------------------------------------------------------------------
+
+def _build_m3u(tracks_data, playlist_name):
+    lines = ["#EXTM3U"]
+    lines.append(f"#PLAYLIST: {playlist_name}")
+    for t in tracks_data:
+        dur = int(t["duration"]) if t.get("duration") else -1
+        artist = t.get("artist") or "Unknown"
+        title = t.get("title") or "Unknown"
+        lines.append(f"#EXTINF:{dur},{artist} - {title}")
+        lines.append(t.get("file_path") or "")
+    return "\n".join(lines)
+
+
+@app.get("/api/playlists/{playlist_id}/export")
+def export_playlist(playlist_id: int, format: str = Query("m3u"), token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+    conn = get_connection()
+    pl = conn.execute(
+        "SELECT * FROM playlists WHERE id = ? AND user_id = ?",
+        (playlist_id, user["id"]),
+    ).fetchone()
+    if pl is None:
+        conn.close()
+        raise HTTPException(404, "Playlist not found")
+    rows = conn.execute(
+        """SELECT t.* FROM playlist_tracks pt
+           JOIN tracks t ON pt.track_id = t.id
+           WHERE pt.playlist_id = ?
+           ORDER BY pt.position""",
+        (playlist_id,),
+    ).fetchall()
+    conn.close()
+
+    tracks_data = [dict(r) for r in rows]
+    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in pl["name"])
+
+    if format == "json":
+        import json
+        payload = {
+            "playlist_name": pl["name"],
+            "format_version": 1,
+            "tracks": [
+                {
+                    "title": t.get("title"),
+                    "artist": t.get("artist"),
+                    "album": t.get("album"),
+                    "duration": t.get("duration"),
+                    "file_path": t.get("file_path"),
+                }
+                for t in tracks_data
+            ],
+        }
+        return Response(
+            content=json.dumps(payload, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.json"'},
+        )
+
+    content = _build_m3u(tracks_data, pl["name"])
+    return Response(
+        content=content,
+        media_type="audio/x-mpegurl",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.m3u"'},
+    )
+
+
+def _parse_m3u(content: str):
+    """Parse M3U/M3U8 content and return list of (artist, title, path) tuples."""
+    entries = []
+    lines = content.strip().split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if line.startswith("#EXTINF:"):
+            # #EXTINF:123,Artist - Title
+            info = line[len("#EXTINF:"):]
+            dur_and_title = info.split(",", 1)
+            artist_title = dur_and_title[-1] if len(dur_and_title) > 1 else ""
+            artist = ""
+            title = artist_title
+            if " - " in artist_title:
+                parts = artist_title.split(" - ", 1)
+                artist = parts[0].strip()
+                title = parts[1].strip()
+            # next non-comment line is the path
+            i += 1
+            while i < len(lines) and (lines[i].strip() == "" or lines[i].startswith("#")):
+                i += 1
+            path = lines[i].strip() if i < len(lines) else ""
+            entries.append({"artist": artist, "title": title, "file_path": path})
+        elif not line.startswith("#") and line:
+            # No EXTINF, just a path
+            entries.append({"artist": "", "title": "", "file_path": line})
+        i += 1
+    return entries
+
+
+@app.post("/api/playlists/import")
+async def import_playlist(file: UploadFile = File(...), token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+
+    content = await file.read()
+    filename = file.filename or "import"
+    text = content.decode("utf-8", errors="replace")
+
+    entries = []
+    name_hint = filename.rsplit(".", 1)[0]
+
+    if filename.endswith(".json"):
+        import json
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict) and "tracks" in data:
+                name_hint = data.get("playlist_name", name_hint)
+                for t in data["tracks"]:
+                    entries.append({
+                        "artist": t.get("artist", ""),
+                        "title": t.get("title", ""),
+                        "file_path": t.get("file_path", ""),
+                    })
+            else:
+                raise HTTPException(400, "Invalid JSON format")
+        except json.JSONDecodeError:
+            raise HTTPException(400, "Invalid JSON file")
+    else:
+        # M3U / M3U8 / plain text
+        entries = _parse_m3u(text)
+
+    if not entries:
+        raise HTTPException(400, "No tracks found in file")
+
+    conn = get_connection()
+    # Create playlist
+    conn.execute(
+        "INSERT INTO playlists (name, user_id) VALUES (?, ?)",
+        (name_hint, user["id"]),
+    )
+    conn.commit()
+    pid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    matched = 0
+    position = 0
+    for entry in entries:
+        track_id = None
+        # Try matching by file_path first
+        if entry["file_path"]:
+            row = conn.execute(
+                "SELECT id FROM tracks WHERE file_path = ?",
+                (entry["file_path"],),
+            ).fetchone()
+            if row:
+                track_id = row["id"]
+
+        # Try matching by title + artist
+        if track_id is None and entry["title"]:
+            if entry["artist"]:
+                row = conn.execute(
+                    "SELECT id FROM tracks WHERE title = ? AND artist = ?",
+                    (entry["title"], entry["artist"]),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT id FROM tracks WHERE title = ?",
+                    (entry["title"],),
+                ).fetchone()
+            if row:
+                track_id = row["id"]
+
+        if track_id is not None:
+            position += 1
+            conn.execute(
+                "INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)",
+                (pid, track_id, position),
+            )
+            matched += 1
+
+    conn.commit()
+    conn.close()
+    return {
+        "ok": True,
+        "playlist_id": pid,
+        "name": name_hint,
+        "matched": matched,
+        "total": len(entries),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Favourites endpoints
 # ---------------------------------------------------------------------------
 
@@ -709,6 +907,30 @@ def increment_play_count(track_id: int):
     conn.commit()
     conn.close()
     return {"ok": True}
+
+
+@app.put("/api/tracks/{track_id}/rating")
+def set_track_rating(track_id: int, body: RatingBody, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
+    if body.rating < 0 or body.rating > 5:
+        raise HTTPException(400, "Rating must be 0-5")
+    conn = get_connection()
+    conn.execute("UPDATE tracks SET rating = ? WHERE id = ?", (body.rating, track_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "rating": body.rating}
+
+
+@app.get("/api/tracks/{track_id}/rating")
+def get_track_rating(track_id: int):
+    conn = get_connection()
+    row = conn.execute("SELECT rating FROM tracks WHERE id = ?", (track_id,)).fetchone()
+    conn.close()
+    if row is None:
+        raise HTTPException(404, "Track not found")
+    return {"rating": row["rating"] or 0}
 
 @app.get("/api/favorites/check/{track_id}")
 def check_favorite(track_id: int, token: Optional[str] = Header(None)):

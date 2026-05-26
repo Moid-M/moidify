@@ -92,6 +92,7 @@ def init_db():
     for stmt in [
         "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
         "ALTER TABLE tracks ADD COLUMN play_count INTEGER DEFAULT 0",
+        "ALTER TABLE tracks ADD COLUMN rating INTEGER DEFAULT 0",
     ]:
         try:
             conn.execute(stmt)

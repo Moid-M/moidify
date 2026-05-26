@@ -57,6 +57,10 @@
 
 **🔀 Smart Queue** — crossfade, shuffle, repeat (all/one/off)
 
+**💾 Session Persistence** — close or reload the tab and pick up exactly where you left off (position, queue, shuffle mode all saved)
+
+**💿 Vinyl Animation** — spinning disc with CD hole effect on the queue cover art (toggle in settings)
+
 **🛡️ Admin Dashboard** — rescan library, manage users, view play stats, upload files via drag-and-drop
 
 **🔧 Setup Wizard** — first-run wizard at `/setup` creates admin account and guides configuration
@@ -70,6 +74,8 @@
 **🎮 Discord Rich Presence** — companion script shows your currently playing track on Discord
 
 **📱 Responsive** — works on desktop and mobile browsers
+
+**🎚️ Track Rating** — rate songs 1-5 stars from the track list or context menu
 
 </td>
 </tr>
@@ -107,6 +113,12 @@ curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sud
 
 > [!TIP]
 > After installation, open **http://your-server-ip:8000** in any browser. If no admin account exists yet, you'll be guided through the **setup wizard** at `/setup`. Drop music into your folder — files appear automatically.
+
+> [!NOTE]
+> **Moidify is 100% vibecoded.**  
+> Every line was written through natural language prompts — no copy-paste, no templates, just pure AI-generated code.
+> If something breaks (and it might), please [open an issue](https://github.com/Moid-M/moidify/issues).  
+> It'll get fixed, and the AI will learn from it.
 
 ---
 
@@ -242,17 +254,18 @@ moidify/
 │   ├── admin.html     # Admin dashboard
 │   ├── style.css      # All styles
 │   ├── placeholder-cover.svg
-│   └── js/
+│       └── js/
 │       ├── state.js   # App state + utility functions
 │       ├── icons.js   # SVG icon library (share, copy, check icons)
-│       ├── api.js     # API client + auth
+│       ├── api.js     # API client + auth + favorites
+│       ├── i18n.js    # Internationalization (English/German)
 │       ├── player.js  # Audio engine + EQ + transcoding quality
 │       ├── queue.js   # Queue management + shuffle
 │       ├── lyrics.js  # Lyrics fetching + synced display
-│       ├── animations.js  # Visual effects
-│       ├── ui.js      # Modals, settings, context menu
-│       ├── views.js   # All page renderers (share button in playlists)
-│       └── app.js     # Event binding + init
+│       ├── animations.js  # Visual effects (vinyl spin, CD hole, glow)
+│       ├── ui.js      # Modals, settings, context menu, keyboard shortcuts
+│       ├── views.js   # All page renderers (albums, artists, playlists, search)
+│       └── app.js     # Event binding + session persistence + init
 └── music/             # Your music goes here (local dev)
 ```
 
@@ -284,12 +297,14 @@ moidify/
 
 ## 📄 License
 
-[MIT](LICENSE) — Do whatever you want with it.
+This project is **open source** — you are free to use, modify, share, sell, or do absolutely anything you want with it. No strings attached.
+
+[MIT](LICENSE)
 
 ---
 
 <div align="center">
-  <p>Made with ❤️ for people who love their music collection.</p>
+  <p>Made with ❤️ + 🤖 for people who love their music collection.</p>
   <p>
     <a href="https://github.com/Moid-M/moidify/issues">🐛 Report a bug</a>
     ·

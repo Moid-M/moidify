@@ -13,23 +13,24 @@
       <div class="logo">Moidify</div>
 
       <div class="search-box">
-        <input type="text" id="search" placeholder="Search tracks, artists, albums..." autocomplete="off">
+        <input type="text" id="search" data-i18n="search.placeholder" placeholder="Search tracks, artists, albums..." autocomplete="off">
       </div>
 
       <div id="pinned-section" class="pinned-section" style="display:none"></div>
 
       <nav class="nav-section">
-        <a class="nav-item" data-view="tracks">All Tracks</a>
-        <a class="nav-item active" data-view="albums">Albums</a>
-        <a class="nav-item" data-view="artists">Artists</a>
-        <a class="nav-item" data-view="genres">Genres</a>
-        <a class="nav-item" data-view="favorites" id="fav-nav" style="display:none">Liked Songs</a>
+        <a class="nav-item" data-view="tracks" data-i18n="nav.tracks">All Tracks</a>
+        <a class="nav-item active" data-view="albums" data-i18n="nav.albums">Albums</a>
+        <a class="nav-item" data-view="artists" data-i18n="nav.artists">Artists</a>
+        <a class="nav-item" data-view="genres" data-i18n="nav.genres">Genres</a>
+        <a class="nav-item" data-view="favorites" id="fav-nav" style="display:none" data-i18n="nav.favorites">Liked Songs</a>
       </nav>
 
       <div class="nav-section playlists-section">
         <div class="section-header">
-          <span>Your Playlists</span>
-          <button id="new-playlist-btn" title="New Playlist">+</button>
+          <span data-i18n="nav.playlists">Your Playlists</span>
+          <button id="new-playlist-btn" title="New Playlist" data-i18n-title="playlist.new">+</button>
+          <button id="import-playlist-btn" title="Import playlist">↑</button>
         </div>
         <div id="playlist-list"></div>
       </div>
@@ -44,12 +45,12 @@
         </div>
         <div class="top-bar-right" id="top-auth">
           <div id="auth-logged-out">
-            <button id="login-btn" class="top-auth-btn">Log In</button>
-            <button id="register-btn" class="top-auth-btn">Register</button>
+            <button id="login-btn" class="top-auth-btn" data-i18n="auth.login">Log In</button>
+            <button id="register-btn" class="top-auth-btn" data-i18n="auth.register">Register</button>
           </div>
           <div id="auth-logged-in" style="display:none">
             <span id="user-display" class="top-username"></span>
-            <button id="logout-btn" class="top-auth-btn">Log Out</button>
+            <button id="logout-btn" class="top-auth-btn" data-i18n="auth.logout">Log Out</button>
           </div>
         </div>
       </header>
@@ -60,13 +61,13 @@
     <aside id="queue-panel" class="queue-panel" style="display:none">
       <div class="drag-handle" id="queue-drag"></div>
       <div class="queue-header">
-        <span>Queue</span>
+        <span data-i18n="player.queue">Queue</span>
         <button id="close-queue-btn" class="icon-btn" title="Close">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
       <div class="queue-now-playing">
-        <img id="queue-cover" src="/static/placeholder-cover.svg" alt="">
+        <div id="queue-cover-wrap" class="queue-cover-wrap"><img id="queue-cover" src="/static/placeholder-cover.svg" alt=""></div>
         <div class="queue-now-info">
           <span id="queue-title" class="queue-now-title"></span>
           <span id="queue-artist" class="queue-now-artist"></span>
@@ -80,7 +81,7 @@
         </div>
       </div>
       <div class="queue-divider">
-        <span>Next up</span>
+        <span data-i18n="tracks.addQueue">Next up</span>
         <span id="queue-count"></span>
       </div>
       <div id="queue-list"></div>
@@ -121,46 +122,43 @@
           </div>
         <div class="player-center">
           <div class="player-controls">
-            <button id="shuffle-btn" class="ctrl-btn" title="Shuffle">
+            <button id="shuffle-btn" class="ctrl-btn" title="Shuffle" data-i18n-title="player.shuffle">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm0 16l2.04-2.04L4 5.41 5.41 4 17.96 16.54 20 14.5V20h-5.5z"/></svg>
             </button>
-            <button id="prev-btn" class="ctrl-btn" title="Previous">
+            <button id="prev-btn" class="ctrl-btn" title="Previous" data-i18n-title="player.previous">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="19,20 9,12 19,4"/><polygon points="5,4 5,20 7,20 7,4"/></svg>
             </button>
-            <button id="rewind-btn" class="ctrl-btn" title="-10 seconds">
+            <button id="rewind-btn" class="ctrl-btn" title="-10 seconds" data-i18n-title="player.rewind">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="12,20 2,12 12,4"/><text x="12" y="10" text-anchor="middle" font-size="6" fill="currentColor" font-weight="bold">10</text></svg>
             </button>
-            <button id="play-btn" class="play-btn" title="Play">
+            <button id="play-btn" class="play-btn" title="Play" data-i18n-title="player.play">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>
             </button>
-            <button id="forward-btn" class="ctrl-btn" title="+10 seconds">
+            <button id="forward-btn" class="ctrl-btn" title="+10 seconds" data-i18n-title="player.forward">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="12,4 22,12 12,20"/><text x="12" y="10" text-anchor="middle" font-size="6" fill="currentColor" font-weight="bold">10</text></svg>
             </button>
-            <button id="next-btn" class="ctrl-btn" title="Next">
+            <button id="next-btn" class="ctrl-btn" title="Next" data-i18n-title="player.next">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="5,20 15,12 5,4"/><polygon points="17,4 17,20 19,20 19,4"/></svg>
             </button>
-            <button id="repeat-btn" class="ctrl-btn" title="Repeat: Off">
+            <button id="repeat-btn" class="ctrl-btn" title="Repeat: Off" data-i18n-title="player.repeat_off">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
             </button>
           </div>
         </div>
         <div class="player-right">
-          <button id="fav-btn" class="ctrl-btn" title="Like">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          </button>
           <div class="volume-wrap">
-            <button id="volume-btn" class="ctrl-btn" title="Mute">
+            <button id="volume-btn" class="ctrl-btn" title="Mute" data-i18n-title="player.mute">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
             </button>
             <input type="range" id="volume" min="0" max="1" step="0.05" value="1">
           </div>
-          <button id="eq-btn" class="ctrl-btn" title="Equalizer">
+          <button id="eq-btn" class="ctrl-btn" title="Equalizer" data-i18n-title="player.eq">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
           </button>
-          <button id="lyrics-btn" class="ctrl-btn" title="Lyrics">
+          <button id="lyrics-btn" class="ctrl-btn" title="Lyrics" data-i18n-title="player.lyrics">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
           </button>
-          <button id="queue-toggle-btn" class="ctrl-btn" title="Queue">
+          <button id="queue-toggle-btn" class="ctrl-btn" title="Queue" data-i18n-title="player.queue">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1.5"/><circle cx="4" cy="12" r="1.5"/><circle cx="4" cy="18" r="1.5"/></svg>
             <span id="queue-badge" class="badge" style="display:none">0</span>
           </button>
@@ -169,13 +167,13 @@
     </footer>
 
     <div id="selection-bar">
-      <span class="sel-count">0 selected</span>
+      <span class="sel-count" data-i18n="tracks.selected">0 selected</span>
       <div class="sel-actions">
-        <button class="btn-primary" data-sel="play">Play All</button>
-        <button class="btn-primary" data-sel="queue">Add to Queue</button>
-        <button class="btn-primary" data-sel="playlist">Add to Playlist</button>
-        <button class="btn-primary" data-sel="download">Download</button>
-        <button class="sel-clear-btn" data-sel="clear">Clear</button>
+        <button class="btn-primary" data-sel="play" data-i18n="tracks.playAll">Play All</button>
+        <button class="btn-primary" data-sel="queue" data-i18n="tracks.addQueue">Add to Queue</button>
+        <button class="btn-primary" data-sel="playlist" data-i18n="tracks.addPlaylist">Add to Playlist</button>
+        <button class="btn-primary" data-sel="download" data-i18n="tracks.download">Download</button>
+        <button class="sel-clear-btn" data-sel="clear" data-i18n="tracks.clear">Clear</button>
       </div>
     </div>
   </div> <!-- /app -->
@@ -276,6 +274,7 @@
     if (d.setup_needed) { window.location.href = '/setup'; }
   }).catch(function(){});
   </script>
+  <script src="/static/js/i18n.js"></script>
   <script src="/static/js/state.js"></script>
   <script src="/static/js/icons.js"></script>
   <script src="/static/js/api.js"></script>

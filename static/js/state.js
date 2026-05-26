@@ -10,11 +10,13 @@ var state = {
   eq: JSON.parse(localStorage.getItem('moidify_eq') || 'null'),
   eqPreset: localStorage.getItem('moidify_eq_preset') || 'Normal',
   crossfade: parseFloat(localStorage.getItem('moidify_crossfade') || '0'),
-  animations: JSON.parse(localStorage.getItem('moidify_animations') || '{"cards":true,"rows":true,"transitions":true,"queueSlide":true,"vinylSpin":false,"glowPulse":true,"coverZoom":true,"eqAnim":true,"seekShimmer":true}'),
+  animations: JSON.parse(localStorage.getItem('moidify_animations') || '{"cards":true,"rows":true,"transitions":true,"queueSlide":true,"vinylSpin":false,"glowPulse":true,"coverZoom":true,"eqAnim":true,"seekShimmer":true,"cdHole":true}'),
   animSpeed: localStorage.getItem('moidify_anim_speed') || 'normal',
+  vinylSpinSpeed: parseInt(localStorage.getItem('moidify_vinyl_speed') || '4'),
   repeatMode: localStorage.getItem('moidify_repeat') || 'off',
   shuffle: localStorage.getItem('moidify_shuffle') === 'true',
   lightMode: localStorage.getItem('moidify_light') === 'true',
+  autoTheme: localStorage.getItem('moidify_auto_theme') !== 'false',
   sleepTimer: null,
   pinnedPlaylists: JSON.parse(localStorage.getItem('moidify_pinned') || '[]'),
   viewMode: localStorage.getItem('moidify_view') || 'grid',
@@ -29,6 +31,7 @@ var state = {
   currentTracks: [],
   currentQueue: [],
   _favedFlag: false,
+  favedTracks: {},
   streamQuality: localStorage.getItem('moidify_stream_quality') || 'high',
 };
 
@@ -110,8 +113,13 @@ function applyAccent(color) {
 }
 
 function applyTheme() {
-  document.body.classList.toggle('light-mode', state.lightMode);
+  var light = state.lightMode;
+  if (state.autoTheme && window.matchMedia) {
+    light = window.matchMedia('(prefers-color-scheme: light)').matches;
+  }
+  document.body.classList.toggle('light-mode', light);
   localStorage.setItem('moidify_light', state.lightMode);
+  localStorage.setItem('moidify_auto_theme', state.autoTheme);
 }
 
 function lightenColor(hex, percent) {

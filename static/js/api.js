@@ -63,27 +63,19 @@ function renderAuth() {
 }
 
 async function checkFavoriteStatus(trackId) {
-  if (!state.user) {
-    var btn = document.getElementById('fav-btn');
-    btn.className = 'ctrl-btn'; btn.innerHTML = iconHeart(); delete btn.dataset.track; return;
-  }
+  if (!state.user) { state.favedTracks[trackId] = false; return; }
   try {
     var data = await apiJson('/api/favorites/check/'+trackId);
-    var btn = document.getElementById('fav-btn');
-    if (data.favorite) { btn.className='ctrl-btn faved'; btn.innerHTML=iconHeartFilled(); }
-    else { btn.className='ctrl-btn'; btn.innerHTML=iconHeart(); }
-    btn.dataset.track = trackId;
+    state.favedTracks[trackId] = !!data.favorite;
   } catch(e) {}
 }
 
-async function toggleFavorite(trackId, btn) {
+async function toggleFavorite(trackId) {
   if (!state.user) { showLoginModal(); return; }
   try {
-    var isFav = btn.classList.contains('faved');
-    if (isFav) { await api('/api/favorites/'+trackId,{method:'DELETE'}); btn.classList.remove('faved'); btn.innerHTML=iconHeart(); }
-    else { await api('/api/favorites/'+trackId,{method:'POST'}); btn.classList.add('faved'); btn.innerHTML=iconHeartFilled(); }
-    var playerBtn = document.getElementById('fav-btn');
-    if (playerBtn.dataset.track==trackId) { playerBtn.className='ctrl-btn'+(btn.classList.contains('faved')?' faved':''); playerBtn.innerHTML=btn.innerHTML; }
+    var isFav = state.favedTracks[trackId];
+    if (isFav) { await api('/api/favorites/'+trackId,{method:'DELETE'}); state.favedTracks[trackId] = false; }
+    else { await api('/api/favorites/'+trackId,{method:'POST'}); state.favedTracks[trackId] = true; }
   } catch(e) { console.error(e); }
 }
 

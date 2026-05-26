@@ -40,6 +40,7 @@ async function renderAlbums() {
         card.className = 'album-card';
         card.innerHTML = '<img src="/api/cover/'+album.cover_track_id+'" alt="" loading="lazy"><div class="album-name">'+esc(album.album)+'</div><div class="album-artist">'+esc(album.artist||'Unknown Artist')+'</div>';
         card.addEventListener('click', function() { navigate('album', {album:album.album, artist:album.artist}); });
+        card.addEventListener('contextmenu', function(e) { e.preventDefault(); showAlbumContextMenu(e, album); });
         container.appendChild(card);
       });
     } else {
@@ -57,6 +58,7 @@ async function renderAlbums() {
           '<span class="track-album">'+(album.track_count||'')+' tracks</span>'+
           '<span class="track-actions"></span>';
         row.addEventListener('click',function(){navigate('album',{album:album.album,artist:album.artist});});
+        row.addEventListener('contextmenu',function(e){e.preventDefault();showAlbumContextMenu(e, album);});
         container.appendChild(row);
       });
     }
@@ -79,12 +81,26 @@ async function renderAlbumDetail(data) {
     var albumTracks = await apiJson(url);
     var first = albumTracks[0]||{};
     var yearStr = first.year ? '<div class="album-detail-year">'+first.year+'</div>' : '';
-    content.innerHTML = '<div class="album-detail-header"><img src="/api/cover/'+(first.id||0)+'" alt=""><div class="album-detail-meta"><div class="album-detail-title">'+esc(data.album)+'</div><div class="album-detail-artist">'+esc(data.artist||'Unknown Artist')+'</div>'+yearStr+'</div></div><div class="track-list">'+trackHeaderHTML()+'</div>';
+    content.innerHTML = '<div class="album-detail-header"><img src="/api/cover/'+(first.id||0)+'" alt=""><div class="album-detail-meta"><div class="album-detail-title">'+esc(data.album)+'</div><div class="album-detail-artist">'+esc(data.artist||'Unknown Artist')+'</div>'+yearStr+'</div><button class="shuffle-play-btn" id="album-shuffle-btn" title="Shuffle Album">'+iconShuffle()+' <span>Shuffle</span></button></div><div class="track-list">'+trackHeaderHTML()+'</div>';
     var list = qs('.track-list');
     albumTracks.forEach(function(t,i) { list.appendChild(createTrackRow(t,i,albumTracks)); });
     state.currentTracks = albumTracks; state.currentQueue = albumTracks; state._favedFlag = false;
     setupTrackSorting(list, albumTracks);
+    setupAlbumShuffle(albumTracks);
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+}
+
+function setupAlbumShuffle(tracks) {
+  var btn = document.getElementById('album-shuffle-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function() {
+    var shuffled = tracks.slice();
+    for (var i = shuffled.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
+    }
+    playFromQueue(shuffled, 0);
+  });
 }
 
 async function renderArtists() {
@@ -100,6 +116,7 @@ async function renderArtists() {
       item.className = 'artist-item';
       item.innerHTML = '<span class="artist-name">'+esc(a.artist)+'</span><span class="artist-meta">'+a.track_count+' tracks, '+a.album_count+' albums</span>';
       item.addEventListener('click',function(){navigate('artist-tracks',a.artist);});
+      item.addEventListener('contextmenu',function(e){e.preventDefault();showArtistContextMenu(e, a);});
       list.appendChild(item);
     });
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
@@ -107,48 +124,71 @@ async function renderArtists() {
 
 async function renderArtistTracks(artist) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(artist)+'</div></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(artist)+'</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
   try {
     var filtered = await apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist));
     if (filtered.length===0) { content.innerHTML += '<p style="color:#727272;">No tracks found.</p>'; return; }
     var list = document.createElement('div'); list.className = 'track-list';
+    list.id = 'current-track-list';
     list.innerHTML = trackHeaderHTML();
     filtered.forEach(function(t,i){list.appendChild(createTrackRow(t,i,filtered));});
     content.appendChild(list);
     state.currentTracks = filtered; state.currentQueue = filtered; state._favedFlag = false;
     setupTrackSorting(list, filtered);
+    var filterInput = document.getElementById('track-filter-input');
+    if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+}
+
+function filterTrackList(query) {
+  var list = document.getElementById('current-track-list');
+  if (!list) return;
+  var q = query.toLowerCase().trim();
+  qsa('.track-row', list).forEach(function(row) {
+    var title = (qs('.track-title', row) || {}).textContent || '';
+    var artist = (qs('.track-artist', row) || {}).textContent || '';
+    var album = (qs('.track-album', row) || {}).textContent || '';
+    row.style.display = (!q || title.toLowerCase().indexOf(q) !== -1 || artist.toLowerCase().indexOf(q) !== -1 || album.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
+  });
 }
 
 async function renderTracks(searchQuery) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">'+(searchQuery?'Search Results':'All Tracks')+'</div></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">'+(searchQuery?'Search Results':'All Tracks')+'</div></div>'+(searchQuery?'':'<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>');
   try {
     var url = searchQuery ? '/api/tracks?search='+encodeURIComponent(searchQuery) : '/api/tracks';
     var tracks = await apiJson(url);
     if (tracks.length===0) { content.innerHTML += '<p style="color:#727272;">'+(searchQuery?'No results for "'+esc(searchQuery)+'".':'No tracks yet.')+'</p>'; return; }
     var list = document.createElement('div'); list.className='track-list';
+    list.id = searchQuery ? '' : 'current-track-list';
     list.innerHTML = trackHeaderHTML();
     tracks.forEach(function(t,i){list.appendChild(createTrackRow(t,i,tracks));});
     content.appendChild(list);
     state.currentTracks = tracks; state.currentQueue = tracks; state._favedFlag = false;
     setupTrackSorting(list, tracks);
+    if (!searchQuery) {
+      var filterInput = document.getElementById('track-filter-input');
+      if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
+    }
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
 async function renderFavorites() {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">Liked Songs</div></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">Liked Songs</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
   if (!state.user) { content.innerHTML += '<p style="color:#727272;padding:20px 0;">Log in to see your liked songs.</p>'; return; }
   try {
     var tracks = await apiJson('/api/favorites');
     if (tracks.length===0) { content.innerHTML += '<div class="fav-empty">No liked songs yet. Click the heart on any track.</div>'; return; }
     var list = document.createElement('div'); list.className='track-list';
+    list.id = 'current-track-list';
     list.innerHTML = trackHeaderHTML();
     tracks.forEach(function(t,i){list.appendChild(createTrackRow(t,i,tracks,true));});
     content.appendChild(list);
     state.currentTracks = tracks; state.currentQueue = tracks; state._favedFlag = true;
     setupTrackSorting(list, tracks);
+    var filterInput = document.getElementById('track-filter-input');
+    if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
@@ -159,10 +199,12 @@ async function renderPlaylistDetail(playlistId) {
     var tracks = await apiJson('/api/playlists/'+playlistId+'/tracks');
     var playlistName = state.playlists.find(function(p){return p.id===playlistId;});
     content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(playlistName?playlistName.name:'Playlist')+'</div>'+
-      '<div style="display:flex;gap:8px"><button id="share-pl-btn" class="icon-btn" title="Share playlist">'+iconShare()+'</button></div></div>'+
-      '<div id="share-pl-status" style="display:none;padding:10px 14px;background:var(--bg-el);border-radius:var(--radius);margin-bottom:12px;font-size:13px;align-items:center;gap:10px"></div>';
+      '<div style="display:flex;gap:8px"><button id="share-pl-btn" class="icon-btn" title="Share playlist">'+iconShare()+'</button><button id="export-pl-btn" class="icon-btn" title="Export playlist">'+iconDownload()+'</button></div></div>'+
+      '<div id="share-pl-status" style="display:none;padding:10px 14px;background:var(--bg-el);border-radius:var(--radius);margin-bottom:12px;font-size:13px;align-items:center;gap:10px"></div>'+
+      '<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
     if (tracks.length===0) { content.innerHTML += '<div class="fav-empty">This playlist is empty.</div>'; return; }
-    var list = document.createElement('div'); list.className='track-list';
+    var list = document.createElement('div'); list.className = 'track-list';
+    list.id = 'current-track-list';
     list.innerHTML = trackHeaderHTML();
     tracks.forEach(function(t,i){list.appendChild(createTrackRow(t,i,tracks));});
     content.appendChild(list);
@@ -170,6 +212,9 @@ async function renderPlaylistDetail(playlistId) {
     setupTrackSorting(list, tracks);
     setupPlaylistDragDrop(list, tracks, playlistId);
     setupPlaylistShare(playlistId);
+    setupPlaylistExport(playlistId);
+    var filterInput = document.getElementById('track-filter-input');
+    if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
@@ -207,6 +252,39 @@ function setupPlaylistShare(playlistId) {
   });
 }
 
+function setupPlaylistExport(playlistId) {
+  var btn = document.getElementById('export-pl-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function() {
+    var dropdown = document.createElement('div');
+    dropdown.className = 'context-menu';
+    dropdown.style.display = 'block';
+    dropdown.style.position = 'absolute';
+    var rect = btn.getBoundingClientRect();
+    dropdown.innerHTML =
+      '<div class="context-menu-item" data-format="m3u">Export as M3U</div>'+
+      '<div class="context-menu-item" data-format="json">Export as JSON</div>';
+    dropdown.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    document.body.appendChild(dropdown);
+    function cleanup() { dropdown.remove(); document.removeEventListener('click', cleanup); }
+    setTimeout(function() { document.addEventListener('click', cleanup); }, 0);
+    qsa('.context-menu-item', dropdown).forEach(function(el) {
+      el.addEventListener('click', function() {
+        var format = this.dataset.format;
+        var link = '/api/playlists/'+playlistId+'/export?format='+format;
+        var a = document.createElement('a');
+        a.href = link;
+        a.download = '';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        cleanup();
+      });
+    });
+  });
+}
+
 function createTrackRow(track, index, queue, isFaved) {
   var row = document.createElement('div');
   row.className = 'track-row';
@@ -217,17 +295,20 @@ function createTrackRow(track, index, queue, isFaved) {
   if (state.selectedTrackIds.indexOf(track.id) !== -1) row.classList.add('selected');
   var dur = formatTime(track.duration);
   var isFav = isFaved||false;
+  var rating = track.rating || 0;
+  var stars = '';
+  for (var s = 1; s <= 5; s++) {
+    stars += '<span class="star-rating-star'+(s<=rating?' filled':'')+'" data-rating="'+s+'">'+(s<=rating?'★':'☆')+'</span>';
+  }
   row.innerHTML = '<span class="track-num">'+(index+1)+'</span>'+
     (state.showTrackCovers ? '<img class="track-cover" src="/api/cover/'+track.id+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '')+
     '<span class="track-title">'+esc(track.title)+'</span>'+
     '<span class="track-artist">'+esc(track.artist||'Unknown')+'</span>'+
     '<span class="track-album">'+esc(track.album||'')+'</span>'+
+    '<span class="track-rating">'+stars+'</span>'+
     '<span class="track-dur">'+dur+'</span>'+
-    '<span class="track-actions">'+
-      '<button class="fav-btn'+(isFav?' faved':'')+'" data-track="'+track.id+'" title="Like">'+(isFav?iconHeartFilled():iconHeart())+'</button>'+
-      '<button class="more-btn" data-track="'+track.id+'" title="More">'+iconMore()+'</button></span>';
+    '';
   row.addEventListener('click',function(e){
-    if(e.target.tagName==='BUTTON'||e.target.closest('button'))return;
     if(e.ctrlKey||e.metaKey||e.shiftKey){
       handleTrackSelect(e, track.id, index);
     } else {
@@ -235,8 +316,22 @@ function createTrackRow(track, index, queue, isFaved) {
     }
   });
   row.addEventListener('contextmenu',function(e){e.preventDefault();showContextMenu(e,track,queue,index);});
-  qs('.fav-btn',row).addEventListener('click',function(e){e.stopPropagation();toggleFavorite(track.id,this);});
-  qs('.more-btn',row).addEventListener('click',function(e){e.stopPropagation();showContextMenu(e,track,queue,index);});
+  qsa('.star-rating-star', row).forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var newRating = parseInt(this.dataset.rating);
+      var currentRating = track.rating || 0;
+      var finalRating = newRating === currentRating ? 0 : newRating;
+      track.rating = finalRating;
+      api('/api/tracks/'+track.id+'/rating', { method:'PUT', body:{ rating: finalRating } }).then(function() {
+        qsa('.star-rating-star', row).forEach(function(st) {
+          var r = parseInt(st.dataset.rating);
+          st.textContent = r <= finalRating ? '★' : '☆';
+          st.classList.toggle('filled', r <= finalRating);
+        });
+      }).catch(function() { track.rating = currentRating; });
+    });
+  });
   return row;
 }
 
@@ -304,6 +399,7 @@ function trackHeaderHTML() {
     '<span class="sortable" data-sort="title">Title<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="artist">Artist<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="album">Album<span class="sort-indicator"></span></span>'+
+    '<span class="sortable" data-sort="rating">Rating<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="duration">Duration<span class="sort-indicator"></span></span>'+
     '<span></span></div>';
 }
@@ -317,6 +413,7 @@ function sortTracks(tracks, field, dir) {
       case 'title': va = (a.title||'').toLowerCase(); vb = (b.title||'').toLowerCase(); break;
       case 'artist': va = (a.artist||'').toLowerCase(); vb = (b.artist||'').toLowerCase(); break;
       case 'album': va = (a.album||'').toLowerCase(); vb = (b.album||'').toLowerCase(); break;
+      case 'rating': va = a.rating || 0; vb = b.rating || 0; break;
       case 'duration': va = a.duration || 0; vb = b.duration || 0; break;
       default: return 0;
     }
@@ -418,16 +515,19 @@ async function renderGenres() {
 
 async function renderGenreTracks(genre) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(genre)+'</div></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(genre)+'</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
   try {
     var tracks = await apiJson('/api/genres/tracks?genre='+encodeURIComponent(genre));
     if (tracks.length === 0) { content.innerHTML += '<p style="color:#727272;">No tracks found.</p>'; return; }
     var list = document.createElement('div'); list.className = 'track-list';
+    list.id = 'current-track-list';
     list.innerHTML = trackHeaderHTML();
     tracks.forEach(function(t,i) { list.appendChild(createTrackRow(t,i,tracks)); });
     content.appendChild(list);
     state.currentTracks = tracks; state.currentQueue = tracks; state._favedFlag = false;
     setupTrackSorting(list, tracks);
+    var filterInput = document.getElementById('track-filter-input');
+    if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 

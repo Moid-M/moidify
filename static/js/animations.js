@@ -19,8 +19,10 @@ function updateBackdrop(trackId) {
 
 function applyAnimations() {
   var cover = document.getElementById('queue-cover');
+  var wrap = document.getElementById('queue-cover-wrap');
   var showVinyl = state.animations.vinylSpin !== false && state.currentIndex >= 0;
   cover.classList.toggle('vinyl-spin', showVinyl);
+  if (wrap) wrap.classList.toggle('cd-hole', state.animations.cdHole !== false && showVinyl);
 
   var playBtn = document.getElementById('play-btn');
   var isPlaying = !audio.paused && audio.src;
@@ -30,10 +32,19 @@ function applyAnimations() {
   if (eqAnim) {
     eqAnim.style.display = state.animations.eqAnim !== false && isPlaying ? 'flex' : 'none';
   }
+
+  applyVinylSpeed();
+}
+
+function applyVinylSpeed() {
+  var speed = state.vinylSpinSpeed || 4;
+  document.documentElement.style.setProperty('--vinyl-speed', speed + 's');
 }
 
 function clearAnimations() {
   document.getElementById('queue-cover').classList.remove('vinyl-spin');
+  var w = document.getElementById('queue-cover-wrap');
+  if (w) w.classList.remove('cd-hole');
   document.getElementById('play-btn').classList.remove('playing');
 }
 
@@ -51,6 +62,8 @@ function applyAnimationSettings() {
 
   app.classList.toggle('anim-cover-zoom', state.animations.coverZoom !== false);
   app.classList.toggle('anim-seek-shimmer', state.animations.seekShimmer !== false);
+
+  applyVinylSpeed();
 }
 
 function applyTrackCovers() {

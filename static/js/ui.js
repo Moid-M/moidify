@@ -11,10 +11,10 @@ function showSettings() {
   var html =
     '<div class="settings-layout">'+
       '<div class="settings-sidebar">'+
-        '<div class="settings-sidebar-item active" data-tab="theme">Theme</div>'+
-        '<div class="settings-sidebar-item" data-tab="animations">Animations</div>'+
-        '<div class="settings-sidebar-item" data-tab="playback">Playback</div>'+
-        '<div class="settings-sidebar-item" data-tab="about">About</div>'+
+        '<div class="settings-sidebar-item active" data-tab="theme" data-i18n="settings.theme">Theme</div>'+
+        '<div class="settings-sidebar-item" data-tab="animations" data-i18n="settings.animations">Animations</div>'+
+        '<div class="settings-sidebar-item" data-tab="playback" data-i18n="settings.playback">Playback</div>'+
+        '<div class="settings-sidebar-item" data-tab="about" data-i18n="settings.about">About</div>'+
       '</div>'+
       '<div class="settings-main">'+
         '<div class="settings-tab-content active" id="tab-theme"></div>'+
@@ -24,6 +24,7 @@ function showSettings() {
       '</div>'+
     '</div>';
   showModal(html);
+  translateDOM(document.getElementById('modal'));
   renderThemeTab();
   renderAnimationsTab();
   renderPlaybackTab();
@@ -48,10 +49,20 @@ function renderThemeTab() {
   });
 
   var lightChecked = state.lightMode ? ' checked' : '';
+  var autoChecked = state.autoTheme ? ' checked' : '';
+  var currentLang = getLanguage();
+  var langOpts = Object.keys(TRANSLATIONS).map(function(code) {
+    var label = code === 'en' ? 'English' : (code === 'de' ? 'Deutsch' : code);
+    return '<option value="'+code+'"'+(currentLang===code?' selected':'')+'>'+label+'</option>';
+  }).join('');
+
   container.innerHTML =
-    '<div class="settings-section"><h3>Theme Color</h3><div class="color-grid">'+swatches+'</div>'+
+    '<div class="settings-section" data-i18n-section="themeColor"><h3 data-i18n="settings.themeColor">Theme Color</h3><div class="color-grid">'+swatches+'</div>'+
     '<div class="color-custom-wrap"><input type="color" id="custom-color" value="'+state.accentColor+'"><span style="color:var(--text-muted);font-size:13px;">Custom</span></div></div>'+
-    '<div class="settings-section"><h3>Appearance</h3><label class="toggle-row"><span>Light Mode</span><input type="checkbox" id="light-toggle"'+lightChecked+'><span class="toggle-slider"></span></label></div>';
+    '<div class="settings-section"><h3 data-i18n="settings.appearance">Appearance</h3>'+
+    '<label class="toggle-row" data-i18n-row="light"><span data-i18n="settings.lightMode">Light Mode</span><input type="checkbox" id="light-toggle"'+lightChecked+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row" data-i18n-row="autoTheme"><span data-i18n="settings.autoTheme">Follow system theme</span><input type="checkbox" id="auto-theme-toggle"'+autoChecked+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3 data-i18n="settings.language">Language</h3><select class="lang-select" id="lang-select">'+langOpts+'</select></div>';
 
   qsa('.color-swatch', container).forEach(function(el) {
     el.addEventListener('click', function() {
@@ -78,6 +89,27 @@ function renderThemeTab() {
       applyTheme();
     });
   }
+
+  var at = document.getElementById('auto-theme-toggle');
+  if (at) {
+    at.addEventListener('change', function() {
+      state.autoTheme = this.checked;
+      if (state.autoTheme) {
+        document.getElementById('light-toggle').disabled = true;
+      } else {
+        document.getElementById('light-toggle').disabled = false;
+      }
+      applyTheme();
+    });
+    if (state.autoTheme) document.getElementById('light-toggle').disabled = true;
+  }
+
+  var ls = document.getElementById('lang-select');
+  if (ls) {
+    ls.addEventListener('change', function() {
+      setLanguage(this.value);
+    });
+  }
 }
 
 function renderAnimationsTab() {
@@ -102,6 +134,10 @@ function renderAnimationsTab() {
     '</div>'+
     '<div class="settings-section"><h3>Player</h3>'+
     '<div class="anim-toggle-row"><span>Vinyl spin on album art</span><button class="toggle-switch'+(animEnabled.vinylSpin?' on':'')+'" data-anim="vinylSpin"></button></div>'+
+    '<div id="vinyl-extras"'+(animEnabled.vinylSpin?'':' style="display:none"')+'>'+
+    '<div class="anim-toggle-row"><span>CD hole in center</span><button class="toggle-switch'+(animEnabled.cdHole?' on':'')+'" data-anim="cdHole"></button></div>'+
+    '<div class="anim-toggle-row" style="flex-wrap:wrap;"><span>Vinyl spin speed</span><input type="range" id="vinyl-speed-slider" min="2" max="10" step="1" value="'+state.vinylSpinSpeed+'" style="width:100px;height:4px;"><span style="font-size:12px;color:var(--text-muted);min-width:20px;">'+state.vinylSpinSpeed+'s</span></div>'+
+    '</div>'+
     '<div class="anim-toggle-row"><span>Glow pulse on play button</span><button class="toggle-switch'+(animEnabled.glowPulse?' on':'')+'" data-anim="glowPulse"></button></div>'+
     '<div class="anim-toggle-row"><span>Equalizer visualizer bars</span><button class="toggle-switch'+(animEnabled.eqAnim?' on':'')+'" data-anim="eqAnim"></button></div>'+
     '<div class="anim-toggle-row"><span>Seek bar shimmer effect</span><button class="toggle-switch'+(animEnabled.seekShimmer?' on':'')+'" data-anim="seekShimmer"></button></div>'+
@@ -124,6 +160,10 @@ function renderAnimationsTab() {
         localStorage.setItem('moidify_animations', JSON.stringify(state.animations));
         applyAnimationSettings();
         applyAnimations();
+        if (key === 'vinylSpin') {
+          var extras = document.getElementById('vinyl-extras');
+          if (extras) extras.style.display = state.animations.vinylSpin ? '' : 'none';
+        }
       }
     });
   });
@@ -136,6 +176,8 @@ function renderAnimationsTab() {
     this.classList.toggle('on', val);
     applyAnimationSettings();
     applyAnimations();
+    var extras = document.getElementById('vinyl-extras');
+    if (extras) extras.style.display = state.animations.vinylSpin ? '' : 'none';
   });
 
   qsa('.anim-speed-btn', container).forEach(function(el) {
@@ -164,6 +206,17 @@ function renderAnimationsTab() {
       this.classList.toggle('on');
       localStorage.setItem('moidify_show_track_covers', state.showTrackCovers);
       applyTrackCovers();
+    });
+  }
+
+  var vinylSpeed = document.getElementById('vinyl-speed-slider');
+  if (vinylSpeed) {
+    vinylSpeed.addEventListener('input', function() {
+      state.vinylSpinSpeed = parseInt(this.value);
+      localStorage.setItem('moidify_vinyl_speed', this.value);
+      var label = this.parentElement.querySelector('span:last-child');
+      if (label) label.textContent = this.value + 's';
+      applyVinylSpeed();
     });
   }
 }
@@ -381,6 +434,124 @@ function renderSleepTimer() {
   }
 }
 
+function showAlbumContextMenu(event, album) {
+  hideContextMenu();
+  var menu = document.getElementById('context-menu');
+  var x = event.clientX, y = event.clientY;
+  var html = '';
+  html += '<div class="context-menu-item" data-action="album-play"><span class="cmi-icon">'+iconPlay()+'</span> Play All</div>';
+  html += '<div class="context-menu-item" data-action="album-shuffle"><span class="cmi-icon">'+iconShuffle()+'</span> Shuffle Album</div>';
+  html += '<div class="context-menu-item" data-action="album-add-queue"><span class="cmi-icon">'+iconQueue()+'</span> Add to Queue</div>';
+  html += '<div class="context-menu-divider"></div>';
+  if (album.artist) html += '<div class="context-menu-item" data-action="album-go-artist"><span class="cmi-icon">'+iconArtist()+'</span> Go to Artist</div>';
+  html += '<div class="context-menu-item" data-action="album-download"><span class="cmi-icon">'+iconDownload()+'</span> Download Album</div>';
+  html += '<div class="context-menu-divider"></div>';
+  html += '<div class="context-menu-item" style="cursor:default;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px;">Rate All Tracks</div>';
+  for (var ari = 1; ari <= 5; ari++) {
+    html += '<div class="context-menu-item" data-action="album-rate" data-rating="'+ari+'"><span class="cmi-icon" style="color:var(--accent);">★</span> '+ari+' Star'+(ari>1?'s':'')+'</div>';
+  }
+
+  menu.innerHTML = html;
+  menu.style.display = 'block';
+  var mw = Math.min(260, menu.offsetWidth||220);
+  var mh = menu.offsetHeight||300;
+  if (x+mw>window.innerWidth) x=window.innerWidth-mw-10;
+  if (y+mh>window.innerHeight) y=window.innerHeight-mh-10;
+  if (x<10)x=10; if(y<10)y=10;
+  menu.style.left=x+'px'; menu.style.top=y+'px';
+
+  qsa('.context-menu-item', menu).forEach(function(el) {
+    el.addEventListener('click', function() {
+      var action = this.dataset.action;
+      if (action === 'album-play') {
+        apiJson('/api/albums/tracks?album='+encodeURIComponent(album.album)+(album.artist?'&artist='+encodeURIComponent(album.artist):'')).then(function(tracks) {
+          playFromQueue(tracks, 0);
+        });
+      } else if (action === 'album-shuffle') {
+        apiJson('/api/albums/tracks?album='+encodeURIComponent(album.album)+(album.artist?'&artist='+encodeURIComponent(album.artist):'')).then(function(tracks) {
+          var shuffled = tracks.slice();
+          for (var i = shuffled.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
+          }
+          playFromQueue(shuffled, 0);
+        });
+      } else if (action === 'album-add-queue') {
+        apiJson('/api/albums/tracks?album='+encodeURIComponent(album.album)+(album.artist?'&artist='+encodeURIComponent(album.artist):'')).then(function(tracks) {
+          tracks.forEach(function(t) { addTrackToQueueEnd(t); });
+        });
+      } else if (action === 'album-go-artist') {
+        navigate('artist-tracks', album.artist);
+      } else if (action === 'album-download') {
+        downloadAlbum(album.album, album.artist);
+      } else if (action === 'album-rate') {
+        var rateVal = parseInt(this.dataset.rating);
+        apiJson('/api/albums/tracks?album='+encodeURIComponent(album.album)+(album.artist?'&artist='+encodeURIComponent(album.artist):'')).then(function(tracks) {
+          var done = 0;
+          tracks.forEach(function(t) {
+            api('/api/tracks/'+t.id+'/rating', { method:'PUT', body:{ rating: rateVal } }).then(function() {
+              done++;
+              if (done === tracks.length) {
+                // Refresh current view to update star displays
+                if (state.currentView === 'album' && state.currentData && state.currentData.album === album.album) {
+                  navigate('album', state.currentData);
+                }
+              }
+            }).catch(function(){ done++; });
+          });
+        });
+      }
+      hideContextMenu();
+    });
+  });
+  document.addEventListener('click', hideContextMenuOnce);
+}
+
+function showArtistContextMenu(event, artist) {
+  hideContextMenu();
+  var menu = document.getElementById('context-menu');
+  var x = event.clientX, y = event.clientY;
+  var html = '';
+  html += '<div class="context-menu-item" data-action="artist-play"><span class="cmi-icon">'+iconPlay()+'</span> Play All</div>';
+  html += '<div class="context-menu-item" data-action="artist-shuffle"><span class="cmi-icon">'+iconShuffle()+'</span> Shuffle Artist</div>';
+  html += '<div class="context-menu-item" data-action="artist-add-queue"><span class="cmi-icon">'+iconQueue()+'</span> Add to Queue</div>';
+
+  menu.innerHTML = html;
+  menu.style.display = 'block';
+  var mw = Math.min(260, menu.offsetWidth||220);
+  var mh = menu.offsetHeight||200;
+  if (x+mw>window.innerWidth) x=window.innerWidth-mw-10;
+  if (y+mh>window.innerHeight) y=window.innerHeight-mh-10;
+  if (x<10)x=10; if(y<10)y=10;
+  menu.style.left=x+'px'; menu.style.top=y+'px';
+
+  qsa('.context-menu-item', menu).forEach(function(el) {
+    el.addEventListener('click', function() {
+      var action = this.dataset.action;
+      if (action === 'artist-play') {
+        apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist.artist)).then(function(tracks) {
+          playFromQueue(tracks, 0);
+        });
+      } else if (action === 'artist-shuffle') {
+        apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist.artist)).then(function(tracks) {
+          var shuffled = tracks.slice();
+          for (var i = shuffled.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
+          }
+          playFromQueue(shuffled, 0);
+        });
+      } else if (action === 'artist-add-queue') {
+        apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist.artist)).then(function(tracks) {
+          tracks.forEach(function(t) { addTrackToQueueEnd(t); });
+        });
+      }
+      hideContextMenu();
+    });
+  });
+  document.addEventListener('click', hideContextMenuOnce);
+}
+
 function showContextMenu(event, track, queue, index) {
   hideContextMenu();
   var menu = document.getElementById('context-menu');
@@ -394,8 +565,7 @@ function showContextMenu(event, track, queue, index) {
   html += '<div class="context-menu-item" data-action="add-queue"><span class="cmi-icon">'+iconQueue()+'</span> Add to Queue</div>';
   html += '<div class="context-menu-divider"></div>';
 
-  var isFav = qs('.fav-btn[data-track="'+track.id+'"]')||{};
-  var isFaved = isFav.classList&&isFav.classList.contains('faved');
+  var isFaved = state.favedTracks[track.id];
   html += '<div class="context-menu-item" data-action="toggle-fav"><span class="cmi-icon">'+(isFaved?iconHeartFilled():iconHeart())+'</span> '+(isFaved?'Remove from Liked Songs':'Like')+'</div>';
 
   if (track.album) html += '<div class="context-menu-item" data-action="go-album"><span class="cmi-icon">'+iconAlbum()+'</span> Go to Album</div>';
@@ -406,6 +576,15 @@ function showContextMenu(event, track, queue, index) {
   if (track.album) {
     html += '<div class="context-menu-item" data-action="download-album"><span class="cmi-icon">'+iconDownload()+'</span> Download Album</div>';
   }
+
+  html += '<div class="context-menu-divider"></div>';
+  var curRating = track.rating || 0;
+  html += '<div class="context-menu-item" style="cursor:default;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px;">Rate</div>';
+  html += '<div class="context-menu-rating" data-track="'+track.id+'">';
+  for (var ri = 1; ri <= 5; ri++) {
+    html += '<span class="cm-rating-star'+(ri<=curRating?' filled':'')+'" data-rating="'+ri+'">'+(ri<=curRating?'★':'☆')+'</span>';
+  }
+  html += '</div>';
 
   if (queue===state.queue && state.currentIndex>=0 && index>state.currentIndex) {
     html += '<div class="context-menu-divider"></div>';
@@ -433,13 +612,47 @@ function showContextMenu(event, track, queue, index) {
       if (action==='play') playFromQueue(queue, index);
       else if (action==='play-next') addTrackToQueueNext(track);
       else if (action==='add-queue') addTrackToQueueEnd(track);
-      else if (action==='toggle-fav') { var btn=qs('.fav-btn[data-track="'+track.id+'"]'); if(btn) toggleFavorite(track.id,btn); }
+      else if (action==='toggle-fav') { toggleFavorite(track.id); }
       else if (action==='add-pl') addToPlaylist(parseInt(this.dataset.pl), track.id);
       else if (action==='remove-queue') removeFromQueue(parseInt(this.dataset.qi));
       else if (action==='go-album') navigate('album',{album:track.album,artist:track.artist});
       else if (action==='go-artist') navigate('artist-tracks',track.artist);
       else if (action==='download') downloadTrack(track.id, track.title);
       else if (action==='download-album') downloadAlbum(track.album, track.artist);
+      hideContextMenu();
+    });
+  });
+  qsa('.cm-rating-star', menu).forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var newRating = parseInt(this.dataset.rating);
+      var currentRating = track.rating || 0;
+      var finalRating = newRating === currentRating ? 0 : newRating;
+      track.rating = finalRating;
+      api('/api/tracks/'+track.id+'/rating', { method:'PUT', body:{ rating: finalRating } }).then(function() {
+        qsa('.cm-rating-star', menu).forEach(function(st) {
+          var r = parseInt(st.dataset.rating);
+          st.textContent = r <= finalRating ? '★' : '☆';
+          st.classList.toggle('filled', r <= finalRating);
+        });
+        var row = qs('[data-track-id="'+track.id+'"]');
+        if (row) {
+          qsa('.star-rating-star', row).forEach(function(st) {
+            var r = parseInt(st.dataset.rating);
+            st.textContent = r <= finalRating ? '★' : '☆';
+            st.classList.toggle('filled', r <= finalRating);
+          });
+        }
+        var favRow = qs('.fav-btn[data-track="'+track.id+'"]');
+        if (favRow && favRow.closest('.track-row')) {
+          var row2 = favRow.closest('.track-row');
+          qsa('.star-rating-star', row2).forEach(function(st) {
+            var r = parseInt(st.dataset.rating);
+            st.textContent = r <= finalRating ? '★' : '☆';
+            st.classList.toggle('filled', r <= finalRating);
+          });
+        }
+      }).catch(function() { track.rating = currentRating; });
       hideContextMenu();
     });
   });
@@ -585,6 +798,26 @@ function setupSearch() {
   });
 }
 
+function showTrackInfo(track) {
+  var html = '<div class="track-info-modal"><h2 data-i18n="trackInfo.title">Track Info</h2>'+
+    '<div class="track-info-cover"><img src="/api/cover/'+track.id+'" alt="" onerror="this.style.display=\'none\'"></div>'+
+    '<table class="track-info-table">'+
+    '<tr><td data-i18n="common.track">Track</td><td>'+esc(track.title)+'</td></tr>'+
+    (track.artist ? '<tr><td data-i18n="common.artist">Artist</td><td>'+esc(track.artist)+'</td></tr>' : '')+
+    (track.album ? '<tr><td data-i18n="common.album">Album</td><td>'+esc(track.album)+'</td></tr>' : '')+
+    (track.year ? '<tr><td data-i18n="common.year">Year</td><td>'+esc(track.year)+'</td></tr>' : '')+
+    (track.track_number ? '<tr><td data-i18n="common.number">#</td><td>'+track.track_number+'</td></tr>' : '')+
+    (track.genre ? '<tr><td>Genre</td><td>'+esc(track.genre)+'</td></tr>' : '')+
+    (track.duration ? '<tr><td data-i18n="trackInfo.duration">Duration</td><td>'+formatTime(track.duration)+'</td></tr>' : '')+
+    (track.file_path ? '<tr><td data-i18n="trackInfo.filePath">File Path</td><td style="font-size:11px;word-break:break-all;">'+esc(track.file_path)+'</td></tr>' : '')+
+    (track.play_count != null ? '<tr><td data-i18n="trackInfo.playCount">Play Count</td><td>'+track.play_count+'</td></tr>' : '')+
+    (track.created_at ? '<tr><td data-i18n="trackInfo.added">Added</td><td>'+esc(track.created_at)+'</td></tr>' : '')+
+    '</table></div>'+
+    '<div class="modal-actions"><button onclick="closeModal()" class="btn-secondary" data-i18n="common.close">Close</button></div>';
+  showModal(html);
+  translateDOM(document.getElementById('modal'));
+}
+
 function setupKeyboard() {
   document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT') return;
@@ -596,7 +829,7 @@ function setupKeyboard() {
       case 'ArrowDown': e.preventDefault(); audio.volume=Math.max(0,audio.volume-0.1); document.getElementById('volume').value=audio.volume; break;
       case 'n': case 'N': nextTrack(); break;
       case 'p': case 'P': prevTrack(); break;
-      case 'l': case 'L': { var btn=document.getElementById('fav-btn'); if(btn.dataset.track) toggleFavorite(parseInt(btn.dataset.track),btn); break; }
+      case 'l': case 'L': { if (state.queue[state.currentIndex]) toggleFavorite(state.queue[state.currentIndex].id); break; }
       case 'r': case 'R': cycleRepeat(); break;
       case 's': case 'S': e.preventDefault(); document.getElementById('search').focus(); break;
       case 'Escape': closeModal(); hideContextMenu(); closeLyricsPanel(); closeEQPanel(); break;

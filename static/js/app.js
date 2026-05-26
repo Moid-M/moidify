@@ -27,7 +27,26 @@ function setupEvents() {
   document.getElementById('close-queue-btn').addEventListener('click', toggleQueuePanel);
   document.getElementById('clear-queue-btn').addEventListener('click', clearQueue);
   document.getElementById('settings-btn').addEventListener('click', showSettings);
-  document.getElementById('player-cover').addEventListener('click', toggleNowPlaying);
+  document.getElementById('player-title').addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (state.queue[state.currentIndex]) {
+      showTrackInfo(state.queue[state.currentIndex]);
+    }
+  });
+  document.getElementById('player-artist').addEventListener('click', function(e) {
+    e.stopPropagation();
+    var track = state.queue[state.currentIndex];
+    if (track && track.artist) navigate('artist-tracks', track.artist);
+  });
+  document.getElementById('player-cover').addEventListener('click', function(e) {
+    e.stopPropagation();
+    var track = state.queue[state.currentIndex];
+    if (track && track.album) navigate('album', {album: track.album, artist: track.artist});
+    else toggleNowPlaying();
+  });
+  qs('.player-left').addEventListener('dblclick', function() {
+    toggleNowPlaying();
+  });
   document.getElementById('close-np-btn').addEventListener('click', toggleNowPlaying);
   var npOverlay = document.getElementById('nowplaying-overlay');
   npOverlay.addEventListener('click', function(e) { if (e.target === npOverlay) toggleNowPlaying(); });
@@ -69,17 +88,36 @@ function setupEvents() {
     }
   });
 
-  document.getElementById('fav-btn').addEventListener('click', function() {
-    if (this.dataset.track) toggleFavorite(parseInt(this.dataset.track), this);
-    else if (!state.user) showLoginModal();
-  });
-
   document.getElementById('login-btn').addEventListener('click', showLoginModal);
   document.getElementById('register-btn').addEventListener('click', showRegisterModal);
   document.getElementById('logout-btn').addEventListener('click', logout);
   document.getElementById('new-playlist-btn').addEventListener('click', function() {
     if (!state.user) { showLoginModal(); return; }
     showNewPlaylistForm(null);
+  });
+  document.getElementById('import-playlist-btn').addEventListener('click', function() {
+    if (!state.user) { showLoginModal(); return; }
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.m3u,.m3u8,.json,.txt';
+    input.addEventListener('change', function() {
+      var file = input.files[0];
+      if (!file) return;
+      var formData = new FormData();
+      formData.append('file', file);
+      fetch('/api/playlists/import', { method:'POST', headers: state.token ? { 'token': state.token } : {}, body: formData })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) {
+            loadPlaylists();
+            navigate('playlist', d.playlist_id);
+            showModal('<div style="text-align:center;padding:20px;"><h2>Import complete</h2><p style="color:var(--text-secondary);margin-top:8px;">Matched '+d.matched+' of '+d.total+' tracks</p><div class="modal-actions" style="margin-top:16px;"><button onclick="closeModal()" class="btn-secondary">OK</button></div></div>');
+          } else {
+            alert('Import failed: ' + (d.detail || 'Unknown error'));
+          }
+        }).catch(function(e) { alert('Error: '+e.message); });
+    });
+    input.click();
   });
 
   document.getElementById('selection-bar').addEventListener('click', function(e) {
@@ -282,10 +320,75 @@ function initSeekSmooth() {
   requestAnimationFrame(tick);
 }
 
+var _sessionSaveTimer = null;
+
+function saveSession() {
+  if (!state.queue.length || state.currentIndex < 0) return;
+  try {
+    var session = {
+      queue: state.queue.slice(0, 200),
+      currentIndex: state.currentIndex,
+      currentTime: audio.currentTime || 0,
+      shuffle: state.shuffle,
+      repeatMode: state.repeatMode,
+      shuffleOrder: state.shuffleOrder,
+      shuffleIndex: state.shuffleIndex,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem('moidify_session', JSON.stringify(session));
+  } catch(e) { /* storage full, ignore */ }
+}
+
+function scheduleSessionSave() {
+  if (_sessionSaveTimer) clearInterval(_sessionSaveTimer);
+  _sessionSaveTimer = setInterval(saveSession, 10000);
+}
+
+function restoreSession() {
+  var raw = localStorage.getItem('moidify_session');
+  if (!raw) return;
+  try {
+    var session = JSON.parse(raw);
+    if (!session.queue || !session.queue.length) return;
+    // Discard sessions older than 1 hour
+    if (Date.now() - (session.timestamp || 0) > 3600000) {
+      localStorage.removeItem('moidify_session');
+      return;
+    }
+    // Restore queue and modes
+    state.queue = session.queue;
+    state.currentIndex = session.currentIndex;
+    state.shuffle = session.shuffle || false;
+    state.repeatMode = session.repeatMode || 'off';
+    state.shuffleOrder = session.shuffleOrder || [];
+    state.shuffleIndex = session.shuffleIndex || 0;
+    renderRepeatShuffleButtons();
+    // Start periodic saves so we always have fresh state
+    scheduleSessionSave();
+    // Restore playback after a short delay
+    var savedTime = session.currentTime || 0;
+    setTimeout(function() {
+      if (state.currentIndex >= 0 && state.queue[state.currentIndex]) {
+        loadAndPlay(state.queue[state.currentIndex], state.queue, state.currentIndex, savedTime);
+      }
+    }, 500);
+    // Don't remove session yet — clear it after playback actually resumes
+    var resumeCheck = setInterval(function() {
+      if (audio.currentTime > 1 || audio.paused === false) {
+        clearInterval(resumeCheck);
+        localStorage.removeItem('moidify_session');
+      }
+    }, 1000);
+    // Safety: clear after 30s regardless
+    setTimeout(function() { localStorage.removeItem('moidify_session'); }, 30000);
+  } catch(e) { console.warn('Session restore failed', e); }
+}
+
 function init() {
   applyAccent(state.accentColor);
   applyTheme();
   applyAnimationSettings();
+  applyLanguage();
   initResizable('sidebar-drag', '#sidebar', '--sidebar-w', 180, 400, 'moidify_sidebar_w');
   initResizable('queue-drag', '#queue-panel', '--queue-w', 220, 500, 'moidify_queue_w');
   setupSearch();
@@ -296,7 +399,21 @@ function init() {
   initSeekWave();
   initSeekSmooth();
   applyTrackCovers();
-  checkAuth().then(function() { navigate('albums'); });
+  checkAuth().then(function() {
+    restoreSession();
+    // always show albums view
+    navigate('albums');
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: light)');
+    mq.addEventListener('change', function() {
+      if (state.autoTheme) applyTheme();
+    });
+  }
+  window.addEventListener('beforeunload', saveSession);
+  window.addEventListener('pagehide', saveSession);
+  // Also save on timeupdate (every 10 seconds via the interval)
+  scheduleSessionSave();
 }
 
 document.addEventListener('DOMContentLoaded', init);
