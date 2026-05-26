@@ -155,7 +155,7 @@ if [[ ! -f "$TMPDIR/server.py" ]]; then
 fi
 
 # Clean up staging
-rm -rf "$TMPDIR/install.sh" "$TMPDIR/uninstall.sh" "$TMPDIR/moidify.service" \
+rm -rf "$TMPDIR/install.sh" "$TMPDIR/uninstall.sh" \
        "$TMPDIR/__pycache__" "$TMPDIR/music" "$TMPDIR/data" "$TMPDIR/covers" \
        "$TMPDIR/.git" 2>/dev/null || true
 find "$TMPDIR" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
