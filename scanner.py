@@ -1,5 +1,6 @@
 import os
 import time
+import re
 import hashlib
 import threading
 from pathlib import Path
@@ -17,9 +18,9 @@ from config import MUSIC_DIR, COVERS_DIR
 
 AUDIO_EXTENSIONS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.wma', '.aac'}
 
-# Scanner tracking (with lock for thread safety)
 SCAN_STATUS = {"last_scan": None, "files_found": 0, "files_imported": 0, "errors": []}
 SCAN_LOCK = threading.Lock()
+_MAX_ERRORS = 100
 
 
 
@@ -32,12 +33,15 @@ def extract_metadata(file_path):
         info = {
             'title': None,
             'artist': None,
+            'album_artist': None,
             'album': None,
             'track_number': None,
+            'disc_number': None,
             'genre': None,
             'year': None,
             'duration': None,
             'cover_data': None,
+            'lyrics': None,
         }
 
         try:
@@ -50,32 +54,52 @@ def extract_metadata(file_path):
             if tags:
                 info['title'] = str(tags.get('TIT2', '') or '')
                 info['artist'] = str(tags.get('TPE1', '') or '')
+                info['album_artist'] = str(tags.get('TPE2', '') or '')
                 info['album'] = str(tags.get('TALB', '') or '')
                 info['track_number'] = str(tags.get('TRCK', '') or '')
+                info['disc_number'] = str(tags.get('TPOS', '') or '')
                 info['genre'] = str(tags.get('TCON', '') or '')
                 info['year'] = str(tags.get('TDRC', '') or '')
-                if 'APIC:' in tags:
-                    info['cover_data'] = tags['APIC:'].data
-                elif 'APIC' in tags:
-                    info['cover_data'] = tags['APIC'].data
+                if 'APIC:' in tags or 'APIC' in tags:
+                    apic = tags.getall('APIC')
+                    if apic and apic[0].data:
+                        info['cover_data'] = apic[0].data
+                for uslt in tags.getall('USLT'):
+                    if uslt and uslt.text:
+                        info['lyrics'] = str(uslt.text)
+                        break
 
         elif isinstance(audio, FLAC):
             info['title'] = audio.get('title', [''])[0]
             info['artist'] = audio.get('artist', [''])[0]
+            info['album_artist'] = audio.get('albumartist', [''])[0]
+            if not info['album_artist']:
+                info['album_artist'] = audio.get('album_artist', [''])[0]
             info['album'] = audio.get('album', [''])[0]
             info['track_number'] = audio.get('tracknumber', [''])[0]
+            info['disc_number'] = audio.get('discnumber', [''])[0]
+            if not info['disc_number']:
+                info['disc_number'] = audio.get('disc', [''])[0]
             info['genre'] = audio.get('genre', [''])[0]
             info['year'] = audio.get('date', [''])[0]
+            info['lyrics'] = audio.get('lyrics', [''])[0]
+            if not info['lyrics']:
+                info['lyrics'] = audio.get('unsyncedlyrics', [''])[0]
             if audio.pictures:
                 info['cover_data'] = audio.pictures[0].data
 
         elif isinstance(audio, OggVorbis):
             info['title'] = audio.get('title', [''])[0]
             info['artist'] = audio.get('artist', [''])[0]
+            info['album_artist'] = audio.get('albumartist', [''])[0]
+            if not info['album_artist']:
+                info['album_artist'] = audio.get('album_artist', [''])[0]
             info['album'] = audio.get('album', [''])[0]
             info['track_number'] = audio.get('tracknumber', [''])[0]
+            info['disc_number'] = audio.get('discnumber', [''])[0]
             info['genre'] = audio.get('genre', [''])[0]
             info['year'] = audio.get('date', [''])[0]
+            info['lyrics'] = audio.get('lyrics', [''])[0]
             if hasattr(audio, 'pictures') and audio.pictures:
                 info['cover_data'] = audio.pictures[0].data
 
@@ -84,14 +108,17 @@ def extract_metadata(file_path):
             if tags:
                 info['title'] = tags.get('\xa9nam', [''])[0]
                 info['artist'] = tags.get('\xa9ART', [''])[0]
+                info['album_artist'] = tags.get('aART', [''])[0]
                 info['album'] = tags.get('\xa9alb', [''])[0]
                 info['track_number'] = tags.get('trkn', [(0, 0)])[0][0]
+                info['disc_number'] = tags.get('disk', [(0, 0)])[0][0]
                 info['genre'] = tags.get('\xa9gen', [''])[0]
                 info['year'] = tags.get('\xa9day', [''])[0]
                 if 'covr' in tags:
                     info['cover_data'] = tags['covr'][0]
+                info['lyrics'] = tags.get('\xa9lyr', [''])[0]
 
-        for key in ['title', 'artist', 'album', 'genre', 'year', 'track_number']:
+        for key in ['title', 'artist', 'album_artist', 'album', 'genre', 'year', 'track_number', 'disc_number']:
             val = info[key]
             if isinstance(val, bytes):
                 val = val.decode('utf-8', errors='replace')
@@ -112,10 +139,19 @@ def extract_metadata(file_path):
             except ValueError:
                 info['track_number'] = None
 
+        if info['disc_number']:
+            dn = str(info['disc_number'])
+            if '/' in dn:
+                dn = dn.split('/')[0]
+            try:
+                info['disc_number'] = int(dn)
+            except ValueError:
+                info['disc_number'] = None
+
         if info['year']:
-            y = str(info['year'])
-            if len(y) == 4 and y.isdigit():
-                info['year'] = int(y)
+            m = re.search(r'\b(\d{4})\b', str(info['year']))
+            if m:
+                info['year'] = int(m.group(1))
             else:
                 info['year'] = None
 
@@ -140,65 +176,94 @@ def get_file_hash(file_path):
     return h.hexdigest()
 
 
-def process_file(file_path):
+def process_file(file_path, conn=None):
     path = Path(file_path)
     if path.suffix.lower() not in AUDIO_EXTENSIONS:
         return
 
-    conn = get_connection()
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
 
-    existing = conn.execute(
-        "SELECT id FROM tracks WHERE file_path = ?", (str(path),)
-    ).fetchone()
-    if existing:
-        conn.close()
-        return
+    try:
+        existing = conn.execute(
+            "SELECT id FROM tracks WHERE file_path = ?", (str(path),)
+        ).fetchone()
+        if existing:
+            return
 
-    metadata = extract_metadata(str(path))
-    if metadata is None:
+        metadata = extract_metadata(str(path))
+        if metadata is None:
+            with SCAN_LOCK:
+                SCAN_STATUS["errors"].append(f"Failed to parse: {path.name}")
+                if len(SCAN_STATUS["errors"]) > _MAX_ERRORS:
+                    SCAN_STATUS["errors"] = SCAN_STATUS["errors"][-_MAX_ERRORS:]
+            return
+
+        try:
+            file_hash = get_file_hash(str(path))
+        except Exception:
+            with SCAN_LOCK:
+                SCAN_STATUS["errors"].append(f"Failed to hash: {path.name}")
+                if len(SCAN_STATUS["errors"]) > _MAX_ERRORS:
+                    SCAN_STATUS["errors"] = SCAN_STATUS["errors"][-_MAX_ERRORS:]
+            return
+
+        import hashlib
+
+        cover_hash = None
+        if metadata['cover_data']:
+            cover_data = metadata['cover_data']
+            if isinstance(cover_data, bytes):
+                if cover_data[:4] == b'\x89PNG':
+                    ext = '.png'
+                elif cover_data[:2] == b'\xff\xd8':
+                    ext = '.jpg'
+                elif cover_data[:4] == b'RIFF' and cover_data[8:12] == b'WEBP':
+                    ext = '.webp'
+                else:
+                    ext = '.jpg'
+                cover_hash = hashlib.sha256(cover_data).hexdigest()[:16]
+                cover_path = COVERS_DIR / f"{cover_hash}{ext}"
+                if not cover_path.exists():
+                    with open(cover_path, 'wb') as f:
+                        f.write(cover_data)
+
+        cursor = conn.execute(
+            """INSERT OR IGNORE INTO tracks
+            (file_path, file_hash, title, artist, album_artist, album, track_number, disc_number, genre, year, duration, has_cover, lyrics, cover_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                str(path),
+                file_hash,
+                metadata['title'],
+                metadata['artist'],
+                metadata['album_artist'],
+                metadata['album'],
+                metadata['track_number'],
+                metadata['disc_number'],
+                metadata['genre'],
+                metadata['year'],
+                metadata['duration'],
+                1 if metadata['cover_data'] else 0,
+                metadata['lyrics'],
+                cover_hash,
+            ),
+        )
+        if cursor.rowcount == 0:
+            return
+
+        track_id = cursor.lastrowid
+    except Exception:
         with SCAN_LOCK:
-            SCAN_STATUS["errors"].append(f"Failed to parse: {path.name}")
-        conn.close()
-        return
-
-    file_hash = get_file_hash(str(path))
-
-    cursor = conn.execute(
-        """INSERT INTO tracks
-        (file_path, file_hash, title, artist, album, track_number, genre, year, duration, has_cover)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            str(path),
-            file_hash,
-            metadata['title'],
-            metadata['artist'],
-            metadata['album'],
-            metadata['track_number'],
-            metadata['genre'],
-            metadata['year'],
-            metadata['duration'],
-            1 if metadata['cover_data'] else 0,
-        ),
-    )
-    track_id = cursor.lastrowid
-
-    if metadata['cover_data']:
-        cover_data = metadata['cover_data']
-        if isinstance(cover_data, bytes):
-            if cover_data[:4] == b'\x89PNG':
-                ext = '.png'
-            elif cover_data[:2] == b'\xff\xd8':
-                ext = '.jpg'
-            elif cover_data[:4] == b'RIFF' and cover_data[8:12] == b'WEBP':
-                ext = '.webp'
-            else:
-                ext = '.jpg'
-            cover_path = COVERS_DIR / f"{track_id}{ext}"
-            with open(cover_path, 'wb') as f:
-                f.write(cover_data)
-
-    conn.commit()
-    conn.close()
+            SCAN_STATUS["errors"].append(f"Error processing: {path.name}")
+            if len(SCAN_STATUS["errors"]) > _MAX_ERRORS:
+                SCAN_STATUS["errors"] = SCAN_STATUS["errors"][-_MAX_ERRORS:]
+    finally:
+        if close_conn:
+            conn.commit()
+            conn.close()
 
 
 
@@ -213,17 +278,28 @@ def scan_existing():
         SCAN_STATUS["errors"] = []
         SCAN_STATUS["files_found"] = 0
         SCAN_STATUS["files_imported"] = 0
-    for root, _, files in os.walk(str(MUSIC_DIR)):
-        for f in files:
-            if Path(f).suffix.lower() not in AUDIO_EXTENSIONS:
-                continue
-            with SCAN_LOCK:
-                SCAN_STATUS["files_found"] += 1
-                was = len(SCAN_STATUS["errors"])
-            process_file(os.path.join(root, f))
-            with SCAN_LOCK:
-                if len(SCAN_STATUS["errors"]) == was:
-                    SCAN_STATUS["files_imported"] += 1
+    conn = get_connection()
+    count = 0
+    try:
+        for root, _, files in os.walk(str(MUSIC_DIR)):
+            for f in files:
+                if Path(f).suffix.lower() not in AUDIO_EXTENSIONS:
+                    continue
+                with SCAN_LOCK:
+                    SCAN_STATUS["files_found"] += 1
+                    was = len(SCAN_STATUS["errors"])
+                process_file(os.path.join(root, f), conn=conn)
+                with SCAN_LOCK:
+                    if len(SCAN_STATUS["errors"]) == was:
+                        SCAN_STATUS["files_imported"] += 1
+                count += 1
+                if count % 50 == 0:
+                    conn.commit()
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
     with SCAN_LOCK:
         SCAN_STATUS["last_scan"] = time.strftime('%Y-%m-%d %H:%M:%S')
 

@@ -14,10 +14,8 @@ function setupEvents() {
   var closeLyrics = function() {
     lyricsOverlay.style.display='none'; qs('#lyrics-btn').classList.remove('active');
     clearLyricsSync(); stopLyricsVisualizer(); vizActive=false;
-    var panel = document.getElementById('lyrics-panel');
-    if (panel) panel.classList.remove('viz-open');
-    var canvas = document.getElementById('lyrics-visualizer');
-    if (canvas) canvas.style.display = 'none';
+    var body = document.getElementById('lyrics-body');
+    if (body) body.classList.remove('viz-open');
     var btn = document.getElementById('viz-toggle-btn');
     if (btn) btn.classList.remove('active');
   };
@@ -27,6 +25,9 @@ function setupEvents() {
   document.getElementById('close-queue-btn').addEventListener('click', toggleQueuePanel);
   document.getElementById('clear-queue-btn').addEventListener('click', clearQueue);
   document.getElementById('settings-btn').addEventListener('click', showSettings);
+  document.getElementById('sidebar-toggle').addEventListener('click', function() {
+    document.body.classList.toggle('sidebar-open');
+  });
   document.getElementById('player-title').addEventListener('click', function(e) {
     e.stopPropagation();
     if (state.queue[state.currentIndex]) {
@@ -94,6 +95,7 @@ function setupEvents() {
     miniArtist.textContent = (track.artist || 'Unknown');
     miniPlay.innerHTML = audio.paused ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>' : '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
   }
+  window.updateMiniPlayer = updateMiniPlayer;
 
   miniBtn.addEventListener('click', function() {
     if (!state.queue.length) return;
@@ -226,6 +228,10 @@ function setupEvents() {
     }
   });
 
+  document.getElementById('content').addEventListener('click', function() {
+    document.body.classList.remove('sidebar-open');
+  });
+
   qsa('.nav-item').forEach(function(el) {
     el.addEventListener('click', function() { navigate(this.dataset.view); });
   });
@@ -233,6 +239,23 @@ function setupEvents() {
   document.addEventListener('click', function(e) {
     if (state.selectedTrackIds.length && !e.target.closest('.track-row') && !e.target.closest('#selection-bar')) {
       clearSelection();
+    }
+    if (e.target.id === 'select-all-checkbox') {
+      e.stopPropagation();
+      var checked = e.target.checked;
+      var rows = qsa('.track-row');
+      if (checked) {
+        rows.forEach(function(r) {
+          var id = parseInt(r.dataset.trackId);
+          if (id && state.selectedTrackIds.indexOf(id) === -1) {
+            state.selectedTrackIds.push(id);
+            r.classList.add('selected');
+          }
+        });
+      } else {
+        clearSelection();
+      }
+      updateSelectionBar();
     }
   });
 
@@ -470,8 +493,7 @@ function init() {
   applyTrackCovers();
   checkAuth().then(function() {
     restoreSession();
-    // always show albums view
-    navigate('albums');
+    navigate('home');
   });
   if (window.matchMedia) {
     var mq = window.matchMedia('(prefers-color-scheme: light)');

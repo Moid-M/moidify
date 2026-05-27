@@ -1,12 +1,14 @@
 import sqlite3
+import time
 from config import DB_PATH
 
 
 def get_connection():
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA synchronous=NORMAL")
     return conn
 
 
@@ -36,13 +38,16 @@ def init_db():
             file_hash TEXT,
             title TEXT,
             artist TEXT,
+            album_artist TEXT,
             album TEXT,
             track_number INTEGER,
+            disc_number INTEGER DEFAULT 1,
             genre TEXT,
             year INTEGER,
             duration REAL,
             has_cover INTEGER DEFAULT 0,
             play_count INTEGER DEFAULT 0,
+            lyrics TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -94,22 +99,77 @@ def init_db():
             sort_order INTEGER DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS shared_albums (
+            token TEXT PRIMARY KEY,
+            album TEXT NOT NULL,
+            artist TEXT,
+            user_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        );
     """)
 
+    # Indexes for performance
+    for idx in [
+        "CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist)",
+        "CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album)",
+        "CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title)",
+        "CREATE INDEX IF NOT EXISTS idx_tracks_file_hash ON tracks(file_hash)",
+        "CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at)",
+        "CREATE INDEX IF NOT EXISTS idx_playlists_user_id ON playlists(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)",
+        "CREATE INDEX IF NOT EXISTS idx_shared_albums_album ON shared_albums(album)",
+        "CREATE INDEX IF NOT EXISTS idx_tracks_cover_hash ON tracks(cover_hash)",
+    ]:
+        try:
+            conn.execute(idx)
+        except sqlite3.OperationalError:
+            pass
+
     # migrate existing tables — add columns if missing (safe to run on fresh DB too)
+    _existing_cols = {}
+
+    def _has_col(table, col):
+        if table not in _existing_cols:
+            _existing_cols[table] = {
+                r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+        return col in _existing_cols[table]
+
     for stmt in [
         "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
         "ALTER TABLE tracks ADD COLUMN play_count INTEGER DEFAULT 0",
         "ALTER TABLE tracks ADD COLUMN rating INTEGER DEFAULT 0",
+        "ALTER TABLE tracks ADD COLUMN disc_number INTEGER DEFAULT 1",
+        "ALTER TABLE tracks ADD COLUMN album_artist TEXT DEFAULT NULL",
+        "ALTER TABLE tracks ADD COLUMN lyrics TEXT DEFAULT NULL",
         "ALTER TABLE playlists ADD COLUMN folder_id INTEGER REFERENCES playlist_folders(id) ON DELETE SET NULL",
+        "ALTER TABLE sessions ADD COLUMN expires_at INTEGER DEFAULT NULL",
+        "ALTER TABLE tracks ADD COLUMN cover_hash TEXT DEFAULT NULL",
+        "ALTER TABLE tracks ADD COLUMN artist_img_hash TEXT DEFAULT NULL",
     ]:
-        try:
-            conn.execute(stmt)
-        except sqlite3.OperationalError as e:
-            if "duplicate column" not in str(e).lower():
-                print(f"Migration warning: {e}")
+        table = stmt.split()[2]
+        col = stmt.split()[3].split(" ")[0].split("(")[0]
+        if not _has_col(table, col):
+            try:
+                conn.execute(stmt)
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    print(f"Migration warning: {e}")
+        else:
+            pass  # column already exists
 
     # ensure the "admin" user has is_admin=1
-    conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
+    for attempt in range(3):
+        try:
+            conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < 2:
+                time.sleep(1)
+            else:
+                raise
     conn.commit()
     conn.close()

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Shared Album — Moidify</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0d0d;--bg-el:#131313;--bg-hover:#1f1f1f;--card:#1a1a1a;--text:#fff;--text2:#b3b3b3;--text3:#6a6a6a;--accent:#a855f7;--accent-dim:rgba(168,85,247,.15);--radius:8px}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
+.wrap{max-width:700px;margin:0 auto;padding:40px 20px}
+.album-header{display:flex;gap:24px;margin-bottom:32px;align-items:center}
+.album-cover{width:160px;height:160px;border-radius:12px;object-fit:cover;background:var(--bg-el);flex-shrink:0}
+.album-info{flex:1;min-width:0}
+.album-info h1{font-size:28px;margin-bottom:4px}
+.album-info .artist{font-size:16px;color:var(--text2);margin-bottom:8px}
+.album-info .meta{font-size:13px;color:var(--text3)}
+.header{text-align:center;margin-bottom:32px}
+.header .by{font-size:14px;color:var(--text3)}
+.track-list{display:flex;flex-direction:column;gap:2px}
+.track-row{display:grid;grid-template-columns:32px 1fr 60px;gap:12px;align-items:center;padding:10px 14px;border-radius:var(--radius);background:var(--bg-el);transition:.15s;cursor:pointer}
+.track-row:hover{background:var(--bg-hover)}
+.track-row .num{color:var(--text3);font-size:13px;text-align:center}
+.track-row .title{color:var(--text);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track-row .dur{color:var(--text3);font-size:13px;text-align:right}
+.track-row .play-indicator{color:var(--accent);font-size:13px;text-align:center;display:none}
+.track-row.playing .play-indicator{display:block}
+.track-row.playing .num{display:none}
+.empty{padding:40px;text-align:center;color:var(--text3);font-size:15px}
+.loading{text-align:center;padding:40px;color:var(--text3)}
+.error{text-align:center;padding:40px;color:#e74c3c}
+.footer{text-align:center;margin-top:32px;font-size:13px;color:var(--text3)}
+.footer a{color:var(--accent);text-decoration:none}
+@media(max-width:600px){
+  .album-header{flex-direction:column;text-align:center}
+  .album-cover{width:120px;height:120px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="album-header" id="album-header">
+    <img class="album-cover" id="album-cover" src="" alt="Cover">
+    <div class="album-info">
+      <h1 id="album-name">Loading...</h1>
+      <div class="artist" id="album-artist"></div>
+      <div class="meta" id="album-meta"></div>
+    </div>
+  </div>
+  <div id="track-container">
+    <div class="loading" id="loading">Loading album...</div>
+  </div>
+  <div class="footer">
+    Streamed with <a href="https://github.com/Moid-M/moidify">Moidify</a>
+  </div>
+</div>
+
+<script>
+var token = window.location.pathname.split('/').pop();
+var currentAudio = null;
+var currentRow = null;
+
+fetch('/api/album-shared/' + token).then(function(r) {
+  if (!r.ok) throw new Error('Album not found');
+  return r.json();
+}).then(function(data) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('album-name').textContent = data.album;
+  document.getElementById('album-artist').textContent = data.artist || 'Various Artists';
+
+  var coverTrack = data.tracks && data.tracks[0];
+  if (coverTrack) {
+    document.getElementById('album-cover').src = '/api/cover/' + coverTrack.id;
+  }
+
+  var container = document.getElementById('track-container');
+  if (!data.tracks || !data.tracks.length) {
+    container.innerHTML = '<div class="empty">This album has no tracks.</div>';
+    return;
+  }
+
+  var total = data.tracks.reduce(function(s, t) { return s + (t.duration || 0); }, 0);
+  var totalMin = Math.floor(total / 60);
+  var totalSec = Math.floor(total % 60);
+  document.getElementById('album-meta').textContent = data.tracks.length + ' tracks \u00B7 ' + totalMin + ':' + (totalSec < 10 ? '0' : '') + totalSec;
+
+  var list = document.createElement('div');
+  list.className = 'track-list';
+  data.tracks.forEach(function(t, i) {
+    var dur = t.duration ? Math.floor(t.duration/60)+':'+String(Math.floor(t.duration%60)).padStart(2,'0') : '?';
+    var row = document.createElement('div');
+    row.className = 'track-row';
+    row.innerHTML =
+      '<span class="num">'+(i+1)+'</span>'+
+      '<span class="play-indicator">\u25B6</span>'+
+      '<span class="title">'+esc(t.title||'Unknown')+'</span>'+
+      '<span class="dur">'+dur+'</span>';
+    row.addEventListener('click', function() {
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+      if (currentRow) currentRow.classList.remove('playing');
+      currentAudio = new Audio('/api/stream/'+t.id+'?quality=low');
+      currentRow = row;
+      row.classList.add('playing');
+      currentAudio.play();
+      currentAudio.addEventListener('ended', function() {
+        row.classList.remove('playing');
+        currentAudio = null;
+        currentRow = null;
+      });
+    });
+    list.appendChild(row);
+  });
+  container.appendChild(list);
+}).catch(function(e) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('album-header').style.display = 'none';
+  document.getElementById('track-container').innerHTML = '<div class="error">'+e.message+'</div>';
+});
+
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>

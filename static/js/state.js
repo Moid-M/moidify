@@ -1,5 +1,9 @@
+function safeJSON(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+  catch(e) { return fallback; }
+}
+
 var _mq = localStorage.getItem('moidify_stream_quality');
-// Migrate old 'high' (passthrough) to 'original'
 if (_mq === 'high') _mq = 'original';
 var state = {
   token: localStorage.getItem('moidify_token'),
@@ -10,10 +14,10 @@ var state = {
   currentIndex: -1,
   playlists: [],
   accentColor: localStorage.getItem('moidify_accent') || '#a855f7',
-  eq: JSON.parse(localStorage.getItem('moidify_eq') || 'null'),
+  eq: safeJSON('moidify_eq', null),
   eqPreset: localStorage.getItem('moidify_eq_preset') || 'Normal',
   crossfade: parseFloat(localStorage.getItem('moidify_crossfade') || '0'),
-  animations: JSON.parse(localStorage.getItem('moidify_animations') || '{"cards":true,"rows":true,"transitions":true,"queueSlide":true,"vinylSpin":false,"glowPulse":true,"coverZoom":true,"eqAnim":true,"seekShimmer":true,"cdHole":true}'),
+  animations: safeJSON('moidify_animations', {"cards":true,"rows":true,"transitions":true,"queueSlide":true,"vinylSpin":false,"glowPulse":true,"coverZoom":true,"eqAnim":true,"seekShimmer":true,"cdHole":true,"lyricsFade":true}),
   animSpeed: localStorage.getItem('moidify_anim_speed') || 'normal',
   vinylSpinSpeed: parseInt(localStorage.getItem('moidify_vinyl_speed') || '4'),
   repeatMode: localStorage.getItem('moidify_repeat') || 'off',
@@ -21,7 +25,7 @@ var state = {
   lightMode: localStorage.getItem('moidify_light') === 'true',
   autoTheme: localStorage.getItem('moidify_auto_theme') !== 'false',
   sleepTimer: null,
-  pinnedPlaylists: JSON.parse(localStorage.getItem('moidify_pinned') || '[]'),
+  pinnedPlaylists: safeJSON('moidify_pinned', []),
   viewMode: localStorage.getItem('moidify_view') || 'grid',
   selectedTrackIds: [],
   shuffleOrder: [],
@@ -38,6 +42,13 @@ var state = {
   streamQuality: _mq || 'high',
   playbackSpeed: parseFloat(localStorage.getItem('moidify_speed') || '1'),
   gapless: localStorage.getItem('moidify_gapless') !== 'false',
+  autoplay: localStorage.getItem('moidify_autoplay') === 'true',
+  volumeNorm: localStorage.getItem('moidify_volume_norm') === 'true',
+  pinnedAlbums: safeJSON('moidify_pinned_albums', []),
+  pinnedArtists: safeJSON('moidify_pinned_artists', []),
+  vizBars: parseInt(localStorage.getItem('moidify_viz_bars') || '32'),
+  vizMirror: localStorage.getItem('moidify_viz_mirror') === 'true',
+  vizStyle: localStorage.getItem('moidify_viz_style') || 'bars',
 };
 
 var audio = document.getElementById('audio');

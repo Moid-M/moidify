@@ -13,10 +13,14 @@ REPO_URL="https://github.com/Moid-M/moidify.git"
 # ─── Parse flags ─────────────────────────────────────────────────────────────
 VERBOSE=false
 SHOW_VERSION=false
-for arg in "$@"; do
-  case "$arg" in
-    -v|--verbose) VERBOSE=true ;;
-    -V|--version) SHOW_VERSION=true ;;
+CLI_MUSIC_DIR=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -v|--verbose) VERBOSE=true; shift ;;
+    -V|--version) SHOW_VERSION=true; shift ;;
+    --music-dir) CLI_MUSIC_DIR="$2"; shift 2 ;;
+    --music-dir=*) CLI_MUSIC_DIR="${1#*=}"; shift ;;
+    *) shift ;;
   esac
 done
 
@@ -44,7 +48,11 @@ else
   LOG="--quiet"  # suppress subcommand output
 fi
 
-cleanup() { [[ -d "${TMPDIR:-}" ]] && rm -rf "$TMPDIR"; }
+cleanup() {
+  if [[ -n "${TMPDIR:-}" && "${TMPDIR:-}" != "$SCRIPT_DIR" ]]; then
+    rm -rf "$TMPDIR"
+  fi
+}
 trap cleanup EXIT
 
 # ─── Root check ──────────────────────────────────────────────────────────────
@@ -55,12 +63,13 @@ fi
 
 INTERACTIVE=0
 [[ -t 0 ]] && INTERACTIVE=1
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ─── Header ──────────────────────────────────────────────────────────────────
 echo ""
-echo -e "${CYAN}  ╭──────────────────────────╮${NC}"
-echo -e "${CYAN}  │     ${APP_NAME} Installer     │${NC}"
-echo -e "${CYAN}  ╰──────────────────────────╯${NC}"
+echo -e "${CYAN}  ╔═══════════════════════════╗${NC}"
+echo -e "${CYAN}  ║     Moidify Installer     ║${NC}"
+echo -e "${CYAN}  ╚═══════════════════════════╝${NC}"
 echo ""
 
 # ─── Detect distro ───────────────────────────────────────────────────────────
@@ -119,10 +128,15 @@ fi
 PORT="${PORT:-8000}"
 
 # ─── Music dir ───────────────────────────────────────────────────────────────
-if [[ $INTERACTIVE -eq 1 ]]; then
+if [[ -n "$CLI_MUSIC_DIR" ]]; then
+  MUSIC_DIR_INPUT="$CLI_MUSIC_DIR"
+  info "Using music dir from --music-dir: $MUSIC_DIR_INPUT"
+elif [[ $INTERACTIVE -eq 1 ]]; then
   read -r -p "  Music folder path [${DATA_DIR}/music]: " MUSIC_DIR_INPUT </dev/tty
+  MUSIC_DIR_INPUT="${MUSIC_DIR_INPUT:-${DATA_DIR}/music}"
+else
+  MUSIC_DIR_INPUT="${DATA_DIR}/music"
 fi
-MUSIC_DIR_INPUT="${MUSIC_DIR_INPUT:-${DATA_DIR}/music}"
 MUSIC_DIR_INPUT="${MUSIC_DIR_INPUT/#\~/$HOME}"
 if [[ ! -d "$MUSIC_DIR_INPUT" ]]; then
   install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$MUSIC_DIR_INPUT"
@@ -137,8 +151,20 @@ fi
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS=""
 if [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -s -p "  Admin password (blank = skip): " ADMIN_PASS </dev/tty
-  echo ""
+  while true; do
+    read -r -s -p "  Admin password (blank = skip): " ADMIN_PASS </dev/tty
+    echo ""
+    if [[ -z "$ADMIN_PASS" ]]; then
+      warn "No password set — use setup wizard at http://<ip>:$PORT/setup"
+      break
+    fi
+    read -r -s -p "  Confirm password: " ADMIN_PASS2 </dev/tty
+    echo ""
+    if [[ "$ADMIN_PASS" == "$ADMIN_PASS2" ]]; then
+      break
+    fi
+    err "Passwords do not match, try again."
+  done
 fi
 if [[ -z "$ADMIN_PASS" ]]; then
   warn "No password set — use setup wizard at http://<ip>:$PORT/setup"
@@ -154,53 +180,62 @@ print(h.hex())
 " <<< "$ADMIN_PASS")"
 fi
 
-# ─── Download / copy files ───────────────────────────────────────────────────
-info "Downloading application files..."
-TMPDIR=$(mktemp -d)
-
-if command -v git &>/dev/null; then
-  git clone --depth 1 "$REPO_URL" "$TMPDIR/repo" 2>&1 | tail -1 || true
-  if [[ -d "$TMPDIR/repo" ]]; then
-    rm -rf "$TMPDIR/repo/.git" 2>/dev/null || true
-    cp -r "$TMPDIR/repo"/* "$TMPDIR/" 2>/dev/null || true
-    rm -rf "$TMPDIR/repo" 2>/dev/null || true
+# ─── Source files ─────────────────────────────────────────────────────────────
+if [[ -f "$SCRIPT_DIR/server.py" ]]; then
+  info "Using local source files from $SCRIPT_DIR"
+  VERSION=$(cat "$SCRIPT_DIR/version.txt" 2>/dev/null || echo "?")
+  if command -v rsync &>/dev/null; then
+    rsync -a --delete --exclude='install.sh' --exclude='uninstall.sh' \
+      --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' \
+      --exclude='venv' --exclude='music' --exclude='data' --exclude='covers' \
+      "$SCRIPT_DIR/" "$APP_DIR/"
+  else
+    cp -r "$SCRIPT_DIR"/* "$APP_DIR/"
   fi
-fi
+  chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
+  ok "Application files copied to $APP_DIR"
+else
+  info "Downloading application files..."
+  TMPDIR=$(mktemp -d)
 
-if [[ ! -f "$TMPDIR/server.py" ]]; then
-  if command -v curl &>/dev/null; then
-    curl -sL "${REPO_URL}/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
-  elif command -v wget &>/dev/null; then
-    wget -qO- "${REPO_URL}/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
+  if command -v git &>/dev/null; then
+    git clone --depth 1 "$REPO_URL" "$TMPDIR/repo" 2>&1 | tail -1 || true
+    if [[ -d "$TMPDIR/repo" ]]; then
+      rm -rf "$TMPDIR/repo/.git" 2>/dev/null || true
+      cp -r "$TMPDIR/repo"/* "$TMPDIR/" 2>/dev/null || true
+      rm -rf "$TMPDIR/repo" 2>/dev/null || true
+    fi
   fi
-fi
 
-if [[ ! -f "$TMPDIR/server.py" ]]; then
-  err "Failed to download Moidify source."
-  exit 1
-fi
+  if [[ ! -f "$TMPDIR/server.py" ]]; then
+    if command -v curl &>/dev/null; then
+      curl -sL "${REPO_URL}/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
+    elif command -v wget &>/dev/null; then
+      wget -qO- "${REPO_URL}/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
+    fi
+  fi
 
-# Read version from downloaded source
-if [[ -f "$TMPDIR/version.txt" ]]; then
-  VERSION=$(cat "$TMPDIR/version.txt")
-else
-  VERSION="?"
-fi
+  if [[ ! -f "$TMPDIR/server.py" ]]; then
+    err "Failed to download Moidify source."
+    exit 1
+  fi
 
-# Clean up staging
-rm -rf "$TMPDIR/install.sh" "$TMPDIR/uninstall.sh" \
-       "$TMPDIR/__pycache__" "$TMPDIR/music" "$TMPDIR/data" "$TMPDIR/covers" \
-       "$TMPDIR/.git" 2>/dev/null || true
-find "$TMPDIR" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-find "$TMPDIR" -name '*.pyc' -delete 2>/dev/null || true
+  VERSION=$(cat "$TMPDIR/version.txt" 2>/dev/null || echo "?")
 
-if command -v rsync &>/dev/null; then
-  rsync -a --delete "$TMPDIR/" "$APP_DIR/"
-else
-  cp -r "$TMPDIR"/* "$APP_DIR/"
+  rm -rf "$TMPDIR/install.sh" "$TMPDIR/uninstall.sh" \
+         "$TMPDIR/__pycache__" "$TMPDIR/music" "$TMPDIR/data" "$TMPDIR/covers" \
+         "$TMPDIR/.git" 2>/dev/null || true
+  find "$TMPDIR" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+  find "$TMPDIR" -name '*.pyc' -delete 2>/dev/null || true
+
+  if command -v rsync &>/dev/null; then
+    rsync -a --delete "$TMPDIR/" "$APP_DIR/"
+  else
+    cp -r "$TMPDIR"/* "$APP_DIR/"
+  fi
+  chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
+  ok "Application files copied to $APP_DIR"
 fi
-chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
-ok "Application files copied to $APP_DIR"
 
 # ─── Virtual env + deps ──────────────────────────────────────────────────────
 info "Setting up Python virtual environment..."
@@ -272,9 +307,9 @@ fi
 # ─── Summary ─────────────────────────────────────────────────────────────────
 IP=$(ip route get 1 2>/dev/null | awk '{print $7}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
 echo ""
-echo -e "${CYAN}  ╭──────────────────────────╮${NC}"
-echo -e "${CYAN}  │    Installation Complete   │${NC}"
-echo -e "${CYAN}  ╰──────────────────────────╯${NC}"
+echo -e "${CYAN}  ╔═══════════════════════════╗${NC}"
+echo -e "${CYAN}  ║   Installation Complete   ║${NC}"
+echo -e "${CYAN}  ╚═══════════════════════════╝${NC}"
 echo ""
 echo -e "  ${GREEN}${APP_NAME} v${VERSION}${NC} running at:"
 echo -e "  ${CYAN}http://${IP}:${PORT}${NC}"

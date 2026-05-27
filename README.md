@@ -23,6 +23,7 @@
   <p align="center">
     <img src="https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python">
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
+    <img src="https://img.shields.io/badge/version-1.4.0-purple?style=flat-square">
     <img src="https://img.shields.io/badge/status-stable-brightgreen?style=flat-square">
   </p>
   <br>
@@ -70,6 +71,10 @@
 **🔗 Shareable Playlists** — generate a public link anyone can open and listen to (no account needed)
 
 **📻 On-the-fly Transcoding** — serve medium (256k), low (128k), or voice (64k Opus) streams via ffmpeg
+
+**🏠 Personalized Home Feed** — recently played, top listened, and randomly recommended tracks on login
+
+**🔌 Subsonic API Compatible** — works with clients like Sonixd, Sublime Music, and DSub (`/rest/getArtists`, `/rest/getAlbum`, `/rest/stream`, scrobbling, star/unstar, and more)
 
 **🎮 Discord Rich Presence** — companion script shows your currently playing track on Discord
 
@@ -235,38 +240,47 @@ python3 server.py
 ```
 moidify/
 ├── contrib/
-│   └── discord-presence.py  # Discord RPC companion script
-├── Dockerfile         # Container image
-├── docker-compose.yml # Docker orchestration
-├── server.py          # FastAPI app (API + streaming)
-├── scanner.py         # File scanner + metadata extractor
-├── database.py        # SQLite schema + migrations
-├── config.py          # Configuration loader
-├── install.sh         # System installer script
-├── uninstall.sh       # Cleanup script
-├── update.sh          # Git-pull updater
-├── moidify.service    # Systemd unit file
-├── requirements.txt   # Python dependencies
+│   └── discord-presence.py   # Discord RPC companion script
+├── routes/
+│   ├── __init__.py
+│   ├── deps.py               # Shared utilities, auth helpers, Pydantic models
+│   ├── auth.py               # Register, login, me, setup wizard
+│   ├── tracks.py             # Tracks, albums, artists, genres, home, ratings
+│   ├── streaming.py          # Transcode, stream, cover art, download album
+│   ├── playlists.py          # Playlists CRUD, share, folders, favorites, export
+│   ├── admin.py              # Dashboard, stats, users, rescan scheduler
+│   └── subsonic.py           # Subsonic API compatibility layer (23 endpoints)
+├── Dockerfile                # Container image
+├── docker-compose.yml        # Docker orchestration
+├── server.py                 # FastAPI app (~80 lines, includes all route modules)
+├── scanner.py                # File scanner + metadata extractor
+├── database.py               # SQLite schema + migrations + indexes
+├── config.py                 # Configuration loader
+├── install.sh                # System installer script
+├── uninstall.sh              # Cleanup script
+├── update.sh                 # Git-pull updater
+├── moidify.service           # Systemd unit file
+├── requirements.txt          # Python dependencies
 ├── static/
-│   ├── index.html     # Main frontend
-│   ├── setup.html     # First-run setup wizard
-│   ├── shared.html    # Public shared playlist page
-│   ├── admin.html     # Admin dashboard
-│   ├── style.css      # All styles
+│   ├── index.html            # Main frontend
+│   ├── setup.html            # First-run setup wizard
+│   ├── shared.html           # Public shared playlist page
+│   ├── admin.html            # Admin dashboard
+│   ├── style.css             # All styles
 │   ├── placeholder-cover.svg
-│       └── js/
-│       ├── state.js   # App state + utility functions
-│       ├── icons.js   # SVG icon library (share, copy, check icons)
-│       ├── api.js     # API client + auth + favorites
-│       ├── i18n.js    # Internationalization (English/German)
-│       ├── player.js  # Audio engine + EQ + transcoding quality
-│       ├── queue.js   # Queue management + shuffle
-│       ├── lyrics.js  # Lyrics fetching + synced display
-│       ├── animations.js  # Visual effects (vinyl spin, CD hole, glow)
-│       ├── ui.js      # Modals, settings, context menu, keyboard shortcuts
-│       ├── views.js   # All page renderers (albums, artists, playlists, search)
-│       └── app.js     # Event binding + session persistence + init
-└── music/             # Your music goes here (local dev)
+│   └── js/
+│       ├── state.js          # App state + utility functions
+│       ├── icons.js          # SVG icon library
+│       ├── api.js            # API client + auth + favorites
+│       ├── i18n.js           # Internationalization (English/German)
+│       ├── player.js         # Audio engine + EQ + transcoding quality
+│       ├── queue.js          # Queue management + shuffle
+│       ├── lyrics.js         # Lyrics fetching + synced display
+│       ├── animations.js     # Visual effects (vinyl spin, CD hole, glow)
+│       ├── ui.js             # Modals, settings, context menu, keyboard shortcuts
+│       ├── views.js          # All page renderers
+│       └── app.js            # Event binding + session persistence + init
+└── music/                    # Your music goes here (local dev)
 ```
 
 ---
@@ -289,9 +303,11 @@ moidify/
 |---|---|
 | **Backend** | Python + [FastAPI](https://fastapi.tiangolo.com/) + uvicorn |
 | **Frontend** | Vanilla JavaScript (no framework, no build step) |
-| **Database** | SQLite (via `sqlite3`) |
+| **Database** | SQLite (via `sqlite3`) with WAL mode |
 | **Metadata** | [Mutagen](https://mutagen.readthedocs.io/) |
 | **File watching** | [watchdog](https://github.com/gorakhargosh/watchdog) |
+| **Transcoding** | [ffmpeg](https://ffmpeg.org/) — Opus, MP3, FLAC, WAV |
+| **Subsonic API** | Built-in `/rest/*` endpoints for third-party clients |
 
 ---
 

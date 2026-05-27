@@ -249,6 +249,9 @@ function renderAnimationsTab() {
   var speeds = ['slow','normal','fast','off'];
   var speedLabels = {slow:'Slow',normal:'Normal',fast:'Fast',off:'Off'};
 
+  var vizStyles = ['bars', 'wave', 'blend'];
+  var vizStyleLabels = {bars:'Bars', wave:'Wave', blend:'Blend'};
+
   container.innerHTML =
     '<div class="settings-section">'+
       '<div class="anim-toggle-row" style="border-bottom:1px solid var(--accent-dim);padding-bottom:12px;margin-bottom:12px;">'+
@@ -269,13 +272,21 @@ function renderAnimationsTab() {
     '<div class="anim-toggle-row" style="flex-wrap:wrap;"><span>Vinyl spin speed</span><input type="range" id="vinyl-speed-slider" min="2" max="10" step="1" value="'+state.vinylSpinSpeed+'" style="width:100px;height:4px;"><span style="font-size:12px;color:var(--text-muted);min-width:20px;">'+state.vinylSpinSpeed+'s</span></div>'+
     '</div>'+
     '<div class="anim-toggle-row"><span>Glow pulse on play button</span><button class="toggle-switch'+(animEnabled.glowPulse?' on':'')+'" data-anim="glowPulse"></button></div>'+
-    '<div class="anim-toggle-row"><span>Equalizer visualizer bars</span><button class="toggle-switch'+(animEnabled.eqAnim?' on':'')+'" data-anim="eqAnim"></button></div>'+
+    '<div class="anim-toggle-row"><span>Visualizer bars</span><button class="toggle-switch'+(animEnabled.eqAnim?' on':'')+'" data-anim="eqAnim"></button></div>'+
     '<div class="anim-toggle-row"><span>Seek bar shimmer effect</span><button class="toggle-switch'+(animEnabled.seekShimmer?' on':'')+'" data-anim="seekShimmer"></button></div>'+
     '<div class="anim-toggle-row"><span>Queue slide animation</span><button class="toggle-switch'+(animEnabled.queueSlide?' on':'')+'" data-anim="queueSlide"></button></div>'+
+    '<div class="anim-toggle-row"><span>Lyrics fade effect</span><button class="toggle-switch'+(animEnabled.lyricsFade?' on':'')+'" data-anim="lyricsFade"></button></div>'+
     '</div>'+
     '<div class="settings-section"><h3>Speed</h3><div class="anim-speed-wrap">'+
     speeds.map(function(s){return '<button class="anim-speed-btn'+(state.animSpeed===s?' active':'')+'" data-speed="'+s+'">'+speedLabels[s]+'</button>';}).join('')+
     '</div></div>'+
+    '<div class="settings-section"><h3>Visualizer</h3>'+
+    '<div class="anim-toggle-row"><span>Bar count</span><div style="display:flex;align-items:center;gap:8px;"><input type="range" id="viz-bars-slider" min="8" max="128" step="8" value="'+state.vizBars+'" style="width:80px;height:4px;"><span id="viz-bars-label" style="font-size:12px;color:var(--text-muted);min-width:20px;">'+state.vizBars+'</span></div></div>'+
+    '<div class="anim-toggle-row"><span>Mirror mode</span><button class="toggle-switch'+(state.vizMirror?' on':'')+'" id="toggle-viz-mirror"></button></div>'+
+    '<div class="anim-toggle-row" style="flex-wrap:wrap;"><span>Style</span><div class="anim-speed-wrap" style="margin:0;">'+
+    vizStyles.map(function(s){return '<button class="anim-speed-btn viz-style-btn'+(state.vizStyle===s?' active':'')+'" data-style="'+s+'">'+vizStyleLabels[s]+'</button>';}).join('')+
+    '</div></div>'+
+    '</div>'+
     '<div class="settings-section"><h3>Performance</h3>'+
     '<div class="anim-toggle-row"><span>Smooth seek (60fps)</span><button class="toggle-switch'+(state.smoothSeek?' on':'')+'" id="toggle-smooth-seek"></button></div>'+
     '<div class="anim-toggle-row"><span>Track cover thumbnails</span><button class="toggle-switch'+(state.showTrackCovers?' on':'')+'" id="toggle-track-covers"></button></div>'+
@@ -349,6 +360,35 @@ function renderAnimationsTab() {
       applyVinylSpeed();
     });
   }
+
+  var mirrorToggle = document.getElementById('toggle-viz-mirror');
+  if (mirrorToggle) {
+    mirrorToggle.addEventListener('click', function() {
+      state.vizMirror = !state.vizMirror;
+      this.classList.toggle('on');
+      localStorage.setItem('moidify_viz_mirror', state.vizMirror);
+    });
+  }
+
+  var vizBarsSlider = document.getElementById('viz-bars-slider');
+  if (vizBarsSlider) {
+    vizBarsSlider.addEventListener('input', function() {
+      var val = parseInt(this.value);
+      state.vizBars = val;
+      localStorage.setItem('moidify_viz_bars', val);
+      var label = document.getElementById('viz-bars-label');
+      if (label) label.textContent = val;
+    });
+  }
+
+  qsa('.viz-style-btn', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      qsa('.viz-style-btn', container).forEach(function(s){s.classList.remove('active');});
+      this.classList.add('active');
+      state.vizStyle = this.dataset.style;
+      localStorage.setItem('moidify_viz_style', state.vizStyle);
+    });
+  });
 }
 
 function renderPlaybackTab() {
@@ -371,6 +411,8 @@ function renderPlaybackTab() {
   }).join('');
 
   var gaplessChecked = state.gapless ? ' checked' : '';
+  var autoplayChecked = state.autoplay ? ' checked' : '';
+  var volumeNormChecked = state.volumeNorm ? ' checked' : '';
 
   container.innerHTML =
     '<div class="settings-section"><h3>Equalizer</h3><div class="eq-presets">'+presetHtml+'</div><div class="eq-grid">'+bands+'</div></div>'+
@@ -379,6 +421,10 @@ function renderPlaybackTab() {
     '<p style="font-size:12px;color:var(--text-muted);margin-top:4px">Requires ffmpeg on the server for transcoding. Otherwise plays original.</p></div>'+
     '<div class="settings-section"><h3>Gapless Playback</h3>'+
     '<label class="toggle-row"><span>Preload and crossfade next track</span><input type="checkbox" id="gapless-toggle"'+gaplessChecked+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3>Autoplay / Radio</h3>'+
+    '<label class="toggle-row"><span>Auto-play similar tracks when queue ends</span><input type="checkbox" id="autoplay-toggle"'+autoplayChecked+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3>Volume Normalization</h3>'+
+    '<label class="toggle-row"><span>Apply ReplayGain volume normalization</span><input type="checkbox" id="volume-norm-toggle"'+volumeNormChecked+'><span class="toggle-slider"></span></label></div>'+
     '<div class="settings-section"><h3>Crossfade</h3>'+
     '<div class="crossfade-wrap"><span style="font-size:12px;color:var(--text-muted);min-width:30px;">'+state.crossfade+'s</span>'+
     '<input type="range" id="crossfade-slider" min="0" max="12" step="1" value="'+state.crossfade+'"><span style="font-size:12px;color:var(--text-muted);">12s</span></div></div>'+
@@ -433,6 +479,22 @@ function renderPlaybackTab() {
     gaplessToggle.addEventListener('change', function() {
       state.gapless = this.checked;
       localStorage.setItem('moidify_gapless', state.gapless);
+    });
+  }
+
+  var autoplayToggle = document.getElementById('autoplay-toggle');
+  if (autoplayToggle) {
+    autoplayToggle.addEventListener('change', function() {
+      state.autoplay = this.checked;
+      localStorage.setItem('moidify_autoplay', state.autoplay);
+    });
+  }
+
+  var volumeNormToggle = document.getElementById('volume-norm-toggle');
+  if (volumeNormToggle) {
+    volumeNormToggle.addEventListener('change', function() {
+      state.volumeNorm = this.checked;
+      localStorage.setItem('moidify_volume_norm', state.volumeNorm);
     });
   }
 }
@@ -896,17 +958,69 @@ function startVisualizer() {
     analyserNode.getByteFrequencyData(dataArray);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    var barCount = Math.min(bufferLength, 64);
-    var barWidth = canvas.width / barCount;
-    var gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+    var barCount = Math.min(state.vizBars || 64, bufferLength);
+    var mirror = state.vizMirror;
+    var style = state.vizStyle || 'bars';
     var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-    gradient.addColorStop(0, accent + '33');
-    gradient.addColorStop(1, accent);
 
-    for (var i = 0; i < barCount; i++) {
-      var barHeight = (dataArray[i] / 255) * canvas.height;
-      ctx.fillStyle = gradient;
-      ctx.fillRect(i * barWidth, canvas.height - barHeight, barWidth - 1, barHeight);
+    if (style === 'wave') {
+      ctx.beginPath();
+      var step = Math.max(1, Math.floor(bufferLength / 80));
+      for (var i = 0; i < bufferLength; i += step) {
+        var x = (i / bufferLength) * canvas.width;
+        var y = canvas.height - (dataArray[i] / 255) * canvas.height * 0.8;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = accent + 'aa';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      if (mirror) {
+        ctx.beginPath();
+        for (var i = 0; i < bufferLength; i += step) {
+          var x = (i / bufferLength) * canvas.width;
+          var y = (dataArray[i] / 255) * canvas.height * 0.8;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      return;
+    }
+
+    if (mirror) {
+      var halfCount = Math.ceil(barCount / 2);
+      var w = canvas.width / halfCount;
+      var gap = 1;
+      var centerX = canvas.width / 2;
+      for (var i = 0; i < halfCount; i++) {
+        var idx = Math.min(i * 2, bufferLength - 1);
+        var barHeight = (dataArray[idx] / 255) * canvas.height;
+        var gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+        gradient.addColorStop(0, accent + '33');
+        gradient.addColorStop(1, accent);
+        ctx.fillStyle = gradient;
+        var barW = w - gap;
+        ctx.beginPath();
+        ctx.roundRect(centerX - (i + 1) * w, canvas.height - barHeight, barW, barHeight, 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.roundRect(centerX + i * w + (w - barW) / 2, canvas.height - barHeight, barW, barHeight, 2);
+        ctx.fill();
+      }
+    } else {
+      var barWidth = canvas.width / barCount;
+      var gap = 1;
+      for (var i = 0; i < barCount; i++) {
+        var barHeight = (dataArray[i] / 255) * canvas.height;
+        var gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+        gradient.addColorStop(0, accent + '33');
+        gradient.addColorStop(1, accent);
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.roundRect(i * barWidth + gap / 2, canvas.height - barHeight, barWidth - gap, barHeight, 2);
+        ctx.fill();
+      }
     }
   }
   draw();

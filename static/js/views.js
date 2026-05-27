@@ -9,6 +9,7 @@ function navigate(view, data) {
   qsa('.nav-item').forEach(function(el) { el.classList.toggle('active', el.dataset.view === view); });
   qsa('.playlist-item').forEach(function(el) { el.classList.remove('active'); });
   switch (view) {
+    case 'home': renderHome(); break;
     case 'albums': renderAlbums(); break;
     case 'artists': renderArtists(); break;
     case 'tracks': renderTracks(data || null); break;
@@ -19,7 +20,7 @@ function navigate(view, data) {
     case 'genres': renderGenres(); break;
     case 'genre-tracks': renderGenreTracks(data); break;
     case 'search': renderSearchResults(data); break;
-    default: renderAlbums();
+    default: renderHome();
   }
 }
 
@@ -41,6 +42,140 @@ function addShuffleButton(tracks, label) {
   filter.insertBefore(btn, filter.firstChild);
 }
 
+function togglePinAlbum(albumName) {
+  var idx = state.pinnedAlbums.indexOf(albumName);
+  if (idx === -1) { state.pinnedAlbums.push(albumName); } else { state.pinnedAlbums.splice(idx, 1); }
+  localStorage.setItem('moidify_pinned_albums', JSON.stringify(state.pinnedAlbums));
+  renderAlbums();
+}
+
+function togglePinArtist(artistName) {
+  var idx = state.pinnedArtists.indexOf(artistName);
+  if (idx === -1) { state.pinnedArtists.push(artistName); } else { state.pinnedArtists.splice(idx, 1); }
+  localStorage.setItem('moidify_pinned_artists', JSON.stringify(state.pinnedArtists));
+  renderArtists();
+}
+
+var _homeData = null;
+
+function homeNavAlbum(e) {
+  var card = e.target.closest('.home-card');
+  if (!card) return;
+  var idx = parseInt(card.dataset.idx);
+  if (!_homeData || !_homeData.recommended_albums || !_homeData.recommended_albums[idx]) return;
+  var a = _homeData.recommended_albums[idx];
+  navigate('album', {album: a.album, artist: a.album_artist || a.artist});
+}
+
+function homeNavRecent(e) {
+  var card = e.target.closest('.home-card');
+  if (!card) return;
+  var idx = parseInt(card.dataset.idx);
+  if (!_homeData || !_homeData.recently_played || !_homeData.recently_played[idx]) return;
+  var t = _homeData.recently_played[idx];
+  navigate('album', {album: t.album, artist: t.artist});
+}
+
+function homePlayTrack(i) {
+  if (!_homeData || !_homeData.recommended_tracks) return;
+  playFromQueue(_homeData.recommended_tracks, i);
+}
+
+async function renderHome() {
+  var content = document.getElementById('content');
+  content.innerHTML = '<div class="content-header"><div class="view-title">🏠 Home</div></div><div id="home-feed"></div>';
+
+  apiJson('/api/home').then(function(data) {
+    _homeData = data;
+    var feed = document.getElementById('home-feed');
+
+    if (data.recently_played && data.recently_played.length) {
+      var section = document.createElement('div');
+      section.className = 'home-section';
+      section.innerHTML = '<div class="home-section-title">Recently played</div><div class="home-grid" id="home-recent-grid"></div>';
+      feed.appendChild(section);
+      var grid = document.getElementById('home-recent-grid');
+      data.recently_played.slice(0, 6).forEach(function(t, i) {
+        var card = document.createElement('div');
+        card.className = 'home-card';
+        card.dataset.idx = i;
+        card.innerHTML = '<img class="home-card-img" src="/api/cover/'+t.id+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><div class="home-card-title">'+esc(t.title||'')+'</div><div class="home-card-sub">'+esc(t.artist||'')+'</div>';
+        card.addEventListener('click', homeNavRecent);
+        grid.appendChild(card);
+      });
+    }
+
+    if (data.recommended_albums && data.recommended_albums.length) {
+      var section = document.createElement('div');
+      section.className = 'home-section';
+      section.innerHTML = '<div class="home-section-title">Recommended albums</div><div class="home-grid" id="home-album-grid"></div>';
+      feed.appendChild(section);
+      var grid = document.getElementById('home-album-grid');
+      data.recommended_albums.forEach(function(a, i) {
+        var artistName = a.album_artist || a.artist || 'Unknown';
+        var card = document.createElement('div');
+        card.className = 'home-card';
+        card.dataset.idx = i;
+        card.innerHTML = '<img class="home-card-img home-card-img-album" src="/api/cover/'+a.cover_track_id+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><div class="home-card-title">'+esc(a.album||'')+'</div><div class="home-card-sub">'+esc(artistName)+'</div>';
+        card.addEventListener('click', homeNavAlbum);
+        grid.appendChild(card);
+      });
+    }
+
+    if (data.recommended_tracks && data.recommended_tracks.length) {
+      var section = document.createElement('div');
+      section.className = 'home-section';
+      section.innerHTML = '<div class="home-section-title">Recommended tracks</div><div class="home-track-list" id="home-track-list"></div>';
+      feed.appendChild(section);
+      var list = document.getElementById('home-track-list');
+      data.recommended_tracks.slice(0, 10).forEach(function(t, i) {
+        var dur = formatTime(t.duration);
+        var row = document.createElement('div');
+        row.className = 'home-track-row';
+        row.innerHTML = '<span class="home-track-idx">'+(i+1)+'</span><img class="home-track-cover" src="/api/cover/'+t.id+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><span class="home-track-title">'+esc(t.title||'')+'</span><span class="home-track-artist">'+esc(t.artist||'')+'</span><span class="home-track-dur">'+dur+'</span>';
+        row.addEventListener('click', function() { homePlayTrack(i); });
+        list.appendChild(row);
+      });
+    }
+
+    if (data.recommended_artists && data.recommended_artists.length) {
+      var section = document.createElement('div');
+      section.className = 'home-section';
+      section.innerHTML = '<div class="home-section-title">Recommended artists</div><div class="home-grid" id="home-artist-grid"></div>';
+      feed.appendChild(section);
+      var grid = document.getElementById('home-artist-grid');
+      data.recommended_artists.forEach(function(a) {
+        var card = document.createElement('div');
+        card.className = 'home-card';
+        card.innerHTML = '<img class="home-card-img home-card-artist" src="/api/cover/'+a.cover_track_id+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><div class="home-card-title">'+esc(a.artist||'')+'</div><div class="home-card-sub">'+a.track_count+' tracks</div>';
+        card.addEventListener('click', function() { navigate('artist-tracks', a.artist); });
+        grid.appendChild(card);
+      });
+    }
+
+    if (data.playlists && data.playlists.length) {
+      var section = document.createElement('div');
+      section.className = 'home-section';
+      section.innerHTML = '<div class="home-section-title">Your playlists</div><div class="home-grid" id="home-playlist-grid"></div>';
+      feed.appendChild(section);
+      var grid = document.getElementById('home-playlist-grid');
+      data.playlists.forEach(function(p) {
+        var card = document.createElement('div');
+        card.className = 'home-card';
+        card.innerHTML = '<div class="home-card-img home-card-playlist">🎶</div><div class="home-card-title">'+esc(p.name||'')+'</div><div class="home-card-sub">'+p.track_count+' tracks</div>';
+        card.addEventListener('click', function() { navigate('playlist', p.id); });
+        grid.appendChild(card);
+      });
+    }
+
+    if (!feed.children.length) {
+      feed.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);"><div style="font-size:48px;margin-bottom:16px;">🎵</div><div style="font-size:18px;font-weight:600;margin-bottom:8px;">Welcome to Moidify</div><div style="font-size:14px;">Upload some music to get started</div></div>';
+    }
+  }).catch(function() {
+    document.getElementById('home-feed').innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">Failed to load home feed</div>';
+  });
+}
+
 async function renderAlbums() {
   var content = document.getElementById('content');
   var isGrid = state.viewMode === 'grid';
@@ -51,12 +186,19 @@ async function renderAlbums() {
   try {
     var albums = await apiJson('/api/albums');
     if (albums.length === 0) { content.innerHTML = '<div class="content-header"><div class="view-title">Albums</div></div><p style="color:#727272;padding:20px 0;">Drop music into the <strong>music/</strong> folder.</p>'; return; }
+    albums.sort(function(a, b) {
+      var aPinned = state.pinnedAlbums.indexOf(a.album) !== -1 ? 0 : 1;
+      var bPinned = state.pinnedAlbums.indexOf(b.album) !== -1 ? 0 : 1;
+      return aPinned - bPinned;
+    });
     if (isGrid) {
       albums.forEach(function(album) {
         if (!album.album) return;
+        var isPinned = state.pinnedAlbums.indexOf(album.album) !== -1;
         var card = document.createElement('div');
         card.className = 'album-card';
-        card.innerHTML = '<img src="/api/cover/'+album.cover_track_id+'" alt="" loading="lazy"><div class="album-name">'+esc(album.album)+'</div><div class="album-artist">'+esc(album.artist||'Unknown Artist')+'</div>';
+        card.innerHTML = '<img src="/api/cover/'+album.cover_track_id+'" alt="" loading="lazy"><button class="album-pin-btn'+(isPinned?' pinned':'')+'" data-album="'+esc(album.album)+'">'+iconPin()+'</button><div class="album-name">'+esc(album.album)+'</div><div class="album-artist">'+esc(album.artist||'Unknown Artist')+'</div>';
+        qs('.album-pin-btn', card).addEventListener('click', function(e) { e.stopPropagation(); togglePinAlbum(this.dataset.album); });
         card.addEventListener('click', function() { navigate('album', {album:album.album, artist:album.artist}); });
         card.addEventListener('contextmenu', function(e) { e.preventDefault(); showAlbumContextMenu(e, album); });
         container.appendChild(card);
@@ -66,15 +208,17 @@ async function renderAlbums() {
       list.innerHTML = '<div class="track-header"><span></span><span>Album</span><span>Artist</span><span>Tracks</span><span></span></div>';
       albums.forEach(function(album) {
         if (!album.album) return;
+        var isPinned = state.pinnedAlbums.indexOf(album.album) !== -1;
         var row = document.createElement('div');
         row.className = 'track-row';
         var coverUrl = '/api/cover/' + album.cover_track_id;
         row.innerHTML =
-          '<span class="track-num"><img src="'+coverUrl+'" alt="" class="album-list-cover" loading="lazy"></span>'+
+          '<span class="track-num"><img src="'+coverUrl+'" alt="" class="album-list-cover" loading="lazy"><button class="album-pin-btn'+(isPinned?' pinned':'')+'" data-album="'+esc(album.album)+'" style="background:none;border:none;cursor:pointer;padding:0;color:var(--text-muted);margin-left:4px;display:inline-flex;">'+iconPin()+'</button></span>'+
           '<span class="track-title">'+esc(album.album)+'</span>'+
           '<span class="track-artist">'+esc(album.artist||'Unknown Artist')+'</span>'+
           '<span class="track-album">'+(album.track_count||'')+' tracks</span>'+
           '<span class="track-actions"></span>';
+        qs('.album-pin-btn', row).addEventListener('click', function(e) { e.stopPropagation(); togglePinAlbum(this.dataset.album); });
         row.addEventListener('click',function(){navigate('album',{album:album.album,artist:album.artist});});
         row.addEventListener('contextmenu',function(e){e.preventDefault();showAlbumContextMenu(e, album);});
         container.appendChild(row);
@@ -99,12 +243,13 @@ async function renderAlbumDetail(data) {
     var albumTracks = await apiJson(url);
     var first = albumTracks[0]||{};
     var yearStr = first.year ? '<div class="album-detail-year">'+first.year+'</div>' : '';
-    content.innerHTML = '<div class="album-detail-header"><img src="/api/cover/'+(first.id||0)+'" alt=""><div class="album-detail-meta"><div class="album-detail-title">'+esc(data.album)+'</div><div class="album-detail-artist">'+esc(data.artist||'Unknown Artist')+'</div>'+yearStr+'</div><button class="shuffle-play-btn" id="album-shuffle-btn" title="Shuffle Album">'+iconShuffle()+' <span>Shuffle</span></button></div><div class="track-list">'+trackHeaderHTML()+'</div>';
+    content.innerHTML = '<div class="album-detail-header"><img src="/api/cover/'+(first.id||0)+'" alt=""><div class="album-detail-meta"><div class="album-detail-title">'+esc(data.album)+'</div><div class="album-detail-artist">'+esc(data.artist||'Unknown Artist')+'</div>'+yearStr+'</div><div style="display:flex;gap:8px;align-items:center"><button class="shuffle-play-btn" id="album-shuffle-btn" title="Shuffle Album">'+iconShuffle()+' <span>Shuffle</span></button><button class="icon-btn" id="album-share-btn" title="Share album">'+iconShare()+'</button></div></div><div class="track-list">'+trackHeaderHTML()+'</div>';
     var list = qs('.track-list');
     albumTracks.forEach(function(t,i) { list.appendChild(createTrackRow(t,i,albumTracks)); });
     state.currentTracks = albumTracks; state.currentQueue = albumTracks; state._favedFlag = false;
     setupTrackSorting(list, albumTracks);
     setupAlbumShuffle(albumTracks);
+    setupAlbumShare(data.album, data.artist);
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
@@ -121,28 +266,57 @@ function setupAlbumShuffle(tracks) {
   });
 }
 
+function setupAlbumShare(album, artist) {
+  var btn = document.getElementById('album-share-btn');
+  if (!btn) return;
+  var status = document.getElementById('share-album-status');
+  btn.addEventListener('click', function() {
+    apiJson('/api/albums/share', {method:'POST', body:{album:album, artist:artist||null}}).then(function(d) {
+      var origin = window.location.origin;
+      var link = origin + '/a/' + d.token;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(function() {
+          showToast('Album share link copied!', 'success');
+        }).catch(function() {
+          prompt('Share this link:', link);
+        });
+      } else {
+        prompt('Share this link:', link);
+      }
+    }).catch(function() {
+      showToast('Failed to share album', 'error');
+    });
+  });
+}
+
 async function renderArtists() {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div><div class="artist-list"></div>';
-  var list = qs('.artist-list');
+  content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div>';
   try {
     var artists = await apiJson('/api/artists');
     if (artists.length===0) { content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div><p style="color:#727272;">No artists found.</p>'; return; }
+    artists.sort(function(a, b) {
+      var aPinned = state.pinnedArtists.indexOf(a.artist) !== -1 ? 0 : 1;
+      var bPinned = state.pinnedArtists.indexOf(b.artist) !== -1 ? 0 : 1;
+      return aPinned - bPinned;
+    });
+    var grid = document.createElement('div'); grid.className = 'artist-grid';
     artists.forEach(function(a) {
       if (!a.artist) return;
-      var item = document.createElement('div');
-      item.className = 'artist-item';
-      item.innerHTML = '<span class="artist-name">'+esc(a.artist)+'</span><span class="artist-meta">'+a.track_count+' tracks, '+a.album_count+' albums</span>';
-      item.addEventListener('click',function(){navigate('artist-tracks',a.artist);});
-      item.addEventListener('contextmenu',function(e){e.preventDefault();showArtistContextMenu(e, a);});
-      list.appendChild(item);
+      var card = document.createElement('div');
+      card.className = 'artist-card';
+      card.innerHTML = '<img class="artist-card-img" src="/api/artist-image/'+encodeURIComponent(a.artist)+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><div class="artist-card-name">'+esc(a.artist)+'</div><div class="artist-card-meta">'+a.track_count+' tracks, '+a.album_count+' albums</div>';
+      card.addEventListener('click',function(){navigate('artist-tracks',a.artist);});
+      card.addEventListener('contextmenu',function(e){e.preventDefault();showArtistContextMenu(e, a);});
+      grid.appendChild(card);
     });
+    content.appendChild(grid);
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
 async function renderArtistTracks(artist) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(artist)+'</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
+  content.innerHTML = '<div class="album-detail-header" style="margin-bottom:16px;"><img src="/api/artist-image/'+encodeURIComponent(artist)+'" alt="" style="width:80px;height:80px;border-radius:50%;object-fit:cover;"><div class="album-detail-meta"><div class="album-detail-title">'+esc(artist)+'</div></div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
   try {
     var filtered = await apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist));
     if (filtered.length===0) { content.innerHTML += '<p style="color:#727272;">No tracks found.</p>'; return; }
@@ -322,7 +496,8 @@ function createTrackRow(track, index, queue, isFaved) {
   for (var s = 1; s <= 5; s++) {
     stars += '<span class="star-rating-star'+(s<=rating?' filled':'')+'" data-rating="'+s+'">'+(s<=rating?'★':'☆')+'</span>';
   }
-  row.innerHTML = '<span class="track-num">'+(index+1)+'</span>'+
+  var numLabel = (track.disc_number && track.disc_number > 1) ? (track.disc_number+'-'+(track.track_number||(index+1))) : ((track.track_number||0) > 0 ? track.track_number : (index+1));
+  row.innerHTML = '<span class="track-num">'+numLabel+'</span>'+
     (state.showTrackCovers ? '<img class="track-cover" src="/api/cover/'+track.id+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '')+
     '<span class="track-title">'+esc(track.title)+'</span>'+
     '<span class="track-artist">'+esc(track.artist||'Unknown')+'</span>'+
@@ -417,7 +592,7 @@ function getSelectedTracks() {
 
 function trackHeaderHTML() {
   return '<div class="track-header">'+
-    '<span class="sortable" data-sort="tracknum">#<span class="sort-indicator"></span></span>'+
+    '<span class="sortable" data-sort="tracknum"><input type="checkbox" id="select-all-checkbox" title="Select all" style="cursor:pointer;accent-color:var(--accent);"><span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="title">Title<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="artist">Artist<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="album">Album<span class="sort-indicator"></span></span>'+
@@ -431,7 +606,7 @@ function sortTracks(tracks, field, dir) {
   sorted.sort(function(a, b) {
     var va, vb;
     switch (field) {
-      case 'tracknum': va = a.track_number || 0; vb = b.track_number || 0; break;
+      case 'tracknum': va = (a.disc_number||1) * 1000 + (a.track_number||0); vb = (b.disc_number||1) * 1000 + (b.track_number||0); break;
       case 'title': va = (a.title||'').toLowerCase(); vb = (b.title||'').toLowerCase(); break;
       case 'artist': va = (a.artist||'').toLowerCase(); vb = (b.artist||'').toLowerCase(); break;
       case 'album': va = (a.album||'').toLowerCase(); vb = (b.album||'').toLowerCase(); break;

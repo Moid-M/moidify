@@ -10,10 +10,17 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+cd "$(dirname "$0")"
+LOCAL_SRC="$(pwd)"
+
 echo "Updating Moidify..."
 
-# Try git pull first (for git-based installs)
-if [[ -d "$APP_DIR/.git" ]]; then
+# Use local sources if server.py is right here
+if [[ -f "$LOCAL_SRC/server.py" ]]; then
+  echo "Using local source files from $LOCAL_SRC"
+  rsync -a --delete --exclude=/venv "$LOCAL_SRC/" "$APP_DIR/"
+# Try git pull (for git-based installs)
+elif [[ -d "$APP_DIR/.git" ]]; then
   cd "$APP_DIR"
   git stash --include-untracked 2>/dev/null || true
   git pull
@@ -21,15 +28,18 @@ else
   # Download latest archive
   TMPDIR=$(mktemp -d)
   curl -sL "${REPO_URL}/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
-  rsync -a --delete "$TMPDIR/" "$APP_DIR/" 2>/dev/null || cp -r "$TMPDIR"/* "$APP_DIR/"
+  rsync -a --delete "$TMPDIR/" "$APP_DIR/"
   rm -rf "$TMPDIR"
+fi
+
+# Recreate venv if missing
+if [[ ! -f "$APP_DIR/venv/bin/pip" ]]; then
+  echo "Setting up virtual environment..."
+  python3 -m venv "$APP_DIR/venv"
 fi
 
 # Install any new Python deps
 "$APP_DIR/venv/bin/pip" install --quiet --no-cache-dir -r "$APP_DIR/requirements.txt"
-
-# Apply correct ownership
-chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
 
 # Restart service
 systemctl restart moidify.service

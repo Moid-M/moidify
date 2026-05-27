@@ -104,16 +104,17 @@ function renderQueuePanel() {
     list.innerHTML = '';
     var qIcon = iconShuffle();
     for (var si = state.shuffleIndex + 1; si < state.shuffleOrder.length; si++) {
-      var actualIndex = state.shuffleOrder[si];
-      var track = state.queue[actualIndex];
+      var track = state.queue[state.shuffleOrder[si]];
       if (!track) continue;
       var item = document.createElement('div');
-      item.className = 'qitem'; item.dataset.qi = actualIndex;
+      item.className = 'qitem'; item.dataset.qi = state.shuffleOrder[si];
       item.innerHTML = '<span class="qitem-drag" style="opacity:0.4;">'+qIcon+'</span>'+
         '<div class="qitem-info"><div class="qitem-title">'+esc(track.title||'')+'</div><div class="qitem-artist">'+esc(track.artist||'')+'</div></div>'+
-        '<button class="qitem-remove" data-qi="'+actualIndex+'" title="Remove">'+iconClose()+'</button>';
-      qs('.qitem-remove',item).addEventListener('click',function(e){e.stopPropagation();removeFromQueue(parseInt(this.dataset.qi));});
-      item.addEventListener('click',function(e){if(e.target.closest('.qitem-remove'))return;playFromQueue(state.queue,actualIndex);});
+        '<button class="qitem-remove" data-qi="'+state.shuffleOrder[si]+'" title="Remove">'+iconClose()+'</button>';
+      (function(idx) {
+        qs('.qitem-remove',item).addEventListener('click',function(e){e.stopPropagation();removeFromQueue(idx);});
+        item.addEventListener('click',function(e){if(e.target.closest('.qitem-remove'))return;playFromQueue(state.queue,idx);});
+      })(state.shuffleOrder[si]);
       list.appendChild(item);
     }
     return;
