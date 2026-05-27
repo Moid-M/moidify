@@ -26,7 +26,17 @@ function showModal(html) {
   overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
 }
 
-function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
+function closeModal() {
+  var overlay = document.getElementById('modal-overlay');
+  var modal = document.getElementById('modal');
+  if (modal) { modal.style.animation = 'modal-out 0.2s ease-in forwards'; }
+  if (overlay) { overlay.style.animation = 'overlay-out 0.2s ease-in forwards'; }
+  setTimeout(function() {
+    overlay.style.display = 'none';
+    if (modal) { modal.style.animation = ''; }
+    if (overlay) { overlay.style.animation = ''; }
+  }, 200);
+}
 
 function showToast(msg, type) {
   type = type || 'info';
@@ -42,36 +52,68 @@ function showToast(msg, type) {
 }
 
 function showSettings() {
-  var html =
-    '<div class="settings-layout">'+
-      '<div class="settings-sidebar">'+
-        '<div class="settings-sidebar-item active" data-tab="theme" data-i18n="settings.theme">Theme</div>'+
-        '<div class="settings-sidebar-item" data-tab="animations" data-i18n="settings.animations">Animations</div>'+
-        '<div class="settings-sidebar-item" data-tab="playback" data-i18n="settings.playback">Playback</div>'+
-        '<div class="settings-sidebar-item" data-tab="about" data-i18n="settings.about">About</div>'+
-      '</div>'+
-      '<div class="settings-main">'+
-        '<div class="settings-tab-content active" id="tab-theme"></div>'+
-        '<div class="settings-tab-content" id="tab-animations"></div>'+
-        '<div class="settings-tab-content" id="tab-playback"></div>'+
-        '<div class="settings-tab-content" id="tab-about"></div>'+
-      '</div>'+
-    '</div>';
-  showModal(html);
+  var tabs = [
+    { id:'theme', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>', label:'Theme' },
+    { id:'animations', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', label:'Animations' },
+    { id:'playback', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>', label:'Playback' },
+    { id:'about', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>', label:'About' },
+  ];
+
+  var sidebarHtml = tabs.map(function(t,i) {
+    return '<div class="settings-sidebar-item'+(i===0?' active':'')+'" data-tab="'+t.id+'">'+t.icon+'<span>'+t.label+'</span></div>';
+  }).join('');
+
+  var contentHtml = tabs.map(function(t,i) {
+    return '<div class="settings-tab-content'+(i===0?' active':'')+'" id="tab-'+t.id+'"></div>';
+  }).join('');
+
+  showModal('<div class="settings-layout"><div class="settings-sidebar">'+sidebarHtml+'<div class="settings-indicator"></div></div><div class="settings-main">'+contentHtml+'</div></div>');
   translateDOM(document.getElementById('modal'));
   renderThemeTab();
   renderAnimationsTab();
   renderPlaybackTab();
   renderAboutTab();
 
+  var sidebar = qs('.settings-sidebar');
+  var indicator = qs('.settings-indicator');
+
+  function moveIndicator(item) {
+    var idx = Array.from(sidebar.children).indexOf(item);
+    indicator.style.transform = 'translateY('+(idx * 36)+'px)';
+    indicator.style.opacity = '1';
+  }
+
   qsa('.settings-sidebar-item').forEach(function(el) {
     el.addEventListener('click', function() {
+      if (this.classList.contains('active')) return;
       qsa('.settings-sidebar-item').forEach(function(t){t.classList.remove('active');});
-      qsa('.settings-tab-content').forEach(function(t){t.classList.remove('active');});
       this.classList.add('active');
-      document.getElementById('tab-'+this.dataset.tab).classList.add('active');
+      moveIndicator(this);
+
+      var activeTab = qs('.settings-tab-content.active');
+      var newTab = document.getElementById('tab-'+this.dataset.tab);
+      if (activeTab && activeTab !== newTab) {
+        activeTab.classList.remove('active');
+        activeTab.style.opacity = '0';
+        activeTab.style.transform = 'translateX(-12px)';
+        setTimeout(function() {
+          activeTab.style.opacity = '';
+          activeTab.style.transform = '';
+        }, 300);
+      }
+      newTab.classList.add('active');
+      newTab.style.opacity = '0';
+      newTab.style.transform = 'translateX(12px)';
+      // Force reflow so the browser registers the starting state
+      newTab.offsetHeight;
+      newTab.style.opacity = '1';
+      newTab.style.transform = 'translateX(0)';
     });
   });
+
+  // Init indicator position
+  var first = qs('.settings-sidebar-item.active');
+  if (first) moveIndicator(first);
 }
 
 function renderThemeTab() {
