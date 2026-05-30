@@ -1,6 +1,6 @@
 <div align="center">
   <br>
-  <img src="https://raw.githubusercontent.com/Moid-M/moidify/main/static/placeholder-cover.svg" width="80" alt="Moidify">
+  <img src="static/logo.png" width="80" alt="Moidify">
   <h1 align="center">🎵 Moidify</h1>
   <p align="center">
     <strong>Your music. Anywhere. No strings attached.</strong>
@@ -23,7 +23,7 @@
   <p align="center">
     <img src="https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python">
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
-    <img src="https://img.shields.io/badge/version-1.4.0-purple?style=flat-square">
+    <img src="https://img.shields.io/badge/version-1.4.2-purple?style=flat-square">
     <img src="https://img.shields.io/badge/status-stable-brightgreen?style=flat-square">
   </p>
   <br>
@@ -38,6 +38,8 @@
 <td width="50%">
 
 **🎧 Streaming** — MP3, FLAC, OGG, M4A, WAV — everything just works
+
+**🪟 Pop-out Mini Player** — detach playback into a separate always-on-top window (desktop only; mobile uses the persistent bottom bar)
 
 **🔍 Full-text Search** — search tracks, albums, artists with diacritics support (`Beyonce` → `Beyoncé`)
 
@@ -159,7 +161,27 @@ Then open **http://localhost:8000**.
 
 ## ⚙️ Commands
 
-### Service management (installed mode)
+### CLI (`moidify`)
+
+After install, a `moidify` CLI is available globally:
+
+```bash
+moidify help          Show this help
+moidify start         Start the service
+moidify stop          Stop the service
+moidify restart       Restart the service
+moidify reload        Reload config and rescan library
+moidify status        Show service status
+moidify enable        Enable service on boot
+moidify disable       Disable service on boot
+moidify logs          Tail server logs
+moidify config        Print current configuration
+moidify version       Print version
+moidify url           Print server URL
+moidify update        Update to latest version
+```
+
+### Service management (direct)
 
 | Action | Command |
 |---|---|
@@ -266,20 +288,52 @@ moidify/
 │   ├── setup.html            # First-run setup wizard
 │   ├── shared.html           # Public shared playlist page
 │   ├── admin.html            # Admin dashboard
-│   ├── style.css             # All styles
-│   ├── placeholder-cover.svg
+│   ├── style.css             # @imports all CSS files
+│   ├── logo.png              # App logo
+│   ├── css/                  # Split CSS by feature
+│   │   ├── variables.css     # CSS vars, light mode overrides
+│   │   ├── layout.css        # App grid, html/body
+│   │   ├── sidebar.css       # Nav, playlists, pinned
+│   │   ├── main-content.css  # Album/artist grids, track rows
+│   │   ├── player.css        # Player bar, seek, volume
+│   │   ├── queue.css         # Queue panel
+│   │   ├── modal.css         # Overlay + modal
+│   │   ├── settings.css      # Settings layout, toggles, EQ
+│   │   ├── context-menu.css  # Right-click menu
+│   │   ├── nowplaying.css    # Now-playing overlay
+│   │   ├── overlays.css      # Fullscreen art, EQ panel, etc
+│   │   ├── animations.css    # All keyframes
+│   │   ├── features.css      # Misc feature styles
+│   │   ├── mini-player.css   # Mini player
+│   │   ├── toast.css         # Toast notifications
+│   │   └── responsive.css    # All @media queries
 │   └── js/
 │       ├── state.js          # App state + utility functions
 │       ├── icons.js          # SVG icon library
-│       ├── api.js            # API client + auth + favorites
+│       ├── api.js            # API client + auth + favorites + playlists
 │       ├── i18n.js           # Internationalization (English/German)
-│       ├── player.js         # Audio engine + EQ + transcoding quality
+│       ├── player.js         # Audio engine + EQ + transcoding
 │       ├── queue.js          # Queue management + shuffle
 │       ├── lyrics.js         # Lyrics fetching + synced display
 │       ├── animations.js     # Visual effects (vinyl spin, CD hole, glow)
-│       ├── ui.js             # Modals, settings, context menu, keyboard shortcuts
-│       ├── views.js          # All page renderers
-│       └── app.js            # Event binding + session persistence + init
+│       ├── app.js            # Event binding + session persistence + init
+│       ├── ui/               # Split UI helpers
+│       │   ├── toast.js
+│       │   ├── modal.js
+│       │   ├── settings.js
+│       │   ├── context-menu.js
+│       │   ├── eq-panel.js
+│       │   ├── sleep-timer.js
+│       │   └── search.js
+│       └── views/            # Split page renderers
+│           ├── home.js
+│           ├── albums.js
+│           ├── artists.js
+│           ├── tracks.js
+│           ├── playlists.js
+│           ├── genres.js
+│           ├── search.js
+│           └── navigate.js
 └── music/                    # Your music goes here (local dev)
 ```
 
@@ -287,13 +341,77 @@ moidify/
 
 ## 📸 Screenshots
 
-<details>
-<summary><b>Click to expand</b></summary>
-<br>
-
-> *Screenshots coming soon. The project is actively developed — expect visual polish in future releases.*
-
-</details>
+> *Screenshots coming soon.*
+> 
+> <details>
+> <summary><b>🖥️ Desktop (click to expand)</b></summary>
+> <br>
+> 
+> <div align="center">
+>   <img src="screenshots/desktop/screenshot-desktop-homepage.png" width="700" alt="Homepage">
+>   <br>
+>   <em>Home feed</em>
+>   <br><br>
+>   <img src="screenshots/desktop/screenshot-desktop-albums.png" width="700" alt="Albums">
+>   <br>
+>   <em>Album browser</em>
+>   <br><br>
+>   <img src="screenshots/desktop/screenshot-desktop-artists.png" width="700" alt="Artists">
+>   <br>
+>   <em>Artist grid</em>
+>   <br><br>
+>   <img src="screenshots/desktop/screenshot-desktop-all_tracks.png" width="700" alt="All Tracks">
+>   <br>
+>   <em>Track list with sortable columns</em>
+>   <br><br>
+>   <img src="screenshots/desktop/screenshot-desktop-genres.png" width="700" alt="Genres">
+>   <br>
+>   <em>Genre browsing</em>
+>   <br><br>
+>   <img src="screenshots/desktop/screenshot-desktop-lyrics.png" width="700" alt="Lyrics">
+>   <br>
+>   <em>Synced lyrics overlay</em>
+>   <br><br>
+>   <img src="screenshots/desktop/screenshot-desktop-settings.png" width="700" alt="Settings">
+>   <br>
+>   <em>Settings modal with equalizer</em>
+> </div>
+> </details>
+> 
+> <details>
+> <summary><b>📱 Mobile (click to expand)</b></summary>
+> <br>
+> 
+> <div align="center">
+>   <img src="screenshots/mobile/screenshot-mobile-homepage.jpg" width="320" alt="Homepage">
+>   <br>
+>   <em>Home feed</em>
+>   <br><br>
+>   <img src="screenshots/mobile/screenshot-mobile-albums.jpg" width="320" alt="Albums">
+>   <br>
+>   <em>Album browser</em>
+>   <br><br>
+>   <img src="screenshots/mobile/screenshot-mobile-artists.jpg" width="320" alt="Artists">
+>   <br>
+>   <em>Artist grid</em>
+>   <br><br>
+>   <img src="screenshots/mobile/screenshot-mobile-tracks.jpg" width="320" alt="Tracks">
+>   <br>
+>   <em>Track list</em>
+>   <br><br>
+>   <img src="screenshots/mobile/screenshot-mobile-genres.jpg" width="320" alt="Genres">
+>   <br>
+>   <em>Genre browsing</em>
+>   <br><br>
+>   <img src="screenshots/mobile/screenshot-mobile-lyrics.jpg" width="320" alt="Lyrics">
+>   <br>
+>   <em>Lyrics view</em>
+>   <br><br>
+>   <img src="screenshots/mobile/screenshot-mobile-media_player.jpg" width="320" alt="Now Playing">
+>   <br>
+>   <em>Now playing</em>
+> </div>
+> </details>
 
 ---
 

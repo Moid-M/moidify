@@ -43,7 +43,11 @@ def _stream_file(path: Path, quality: str):
     finally:
         if proc:
             proc.kill()
-            proc.wait(timeout=5)
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
 
 def _media_type_for(path: Path, quality: str) -> str:
@@ -117,17 +121,21 @@ def get_cover(track_id: int):
 
 @router.get("/api/download/album")
 def download_album(album: str = Query(...), artist: Optional[str] = Query(None)):
+    import io
+
     conn = get_connection()
-    if artist:
-        rows = conn.execute(
-            "SELECT * FROM tracks WHERE album = ? AND artist = ? ORDER BY track_number",
-            (album, artist),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM tracks WHERE album = ? ORDER BY track_number", (album,)
-        ).fetchall()
-    conn.close()
+    try:
+        if artist:
+            rows = conn.execute(
+                "SELECT * FROM tracks WHERE album = ? AND artist = ? ORDER BY track_number",
+                (album, artist),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM tracks WHERE album = ? ORDER BY track_number", (album,)
+            ).fetchall()
+    finally:
+        conn.close()
 
     if not rows:
         raise HTTPException(404, "No tracks found for this album")
@@ -136,24 +144,17 @@ def download_album(album: str = Query(...), artist: Optional[str] = Query(None))
     safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in album + suffix).strip()
     zip_name = safe_name + ".zip"
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
-    try:
-        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
-            for row in rows:
-                path = Path(row["file_path"])
-                if path.exists():
-                    prefix = f"{row['disc_number'] or 1}-{row['track_number'] or 0:02d}" if row['disc_number'] and row['disc_number'] > 1 else f"{row['track_number'] or 0:02d}"
-                    track_name = f"{prefix} - {row['title'] or path.stem}{path.suffix}"
-                    zf.write(str(path), track_name)
-        tmp.close()
-        return FileResponse(
-            tmp.name,
-            media_type="application/zip",
-            filename=zip_name,
-            headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
-        )
-    finally:
-        try:
-            os.unlink(tmp.name)
-        except Exception:
-            pass
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for row in rows:
+            path = Path(row["file_path"])
+            if path.exists():
+                prefix = f"{row['disc_number'] or 1}-{row['track_number'] or 0:02d}" if row['disc_number'] and row['disc_number'] > 1 else f"{row['track_number'] or 0:02d}"
+                track_name = f"{prefix} - {row['title'] or path.stem}{path.suffix}"
+                zf.write(str(path), track_name)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
+    )

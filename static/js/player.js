@@ -76,7 +76,6 @@ function updatePlayerUI(track) {
 
   checkFavoriteStatus(track.id);
   renderQueuePanel();
-  if (document.getElementById('mini-player').style.display !== 'none') updateMiniPlayer();
   updateBackdrop(track.id);
   updateMediaSession(track);
   applyEQ();
@@ -93,8 +92,6 @@ function updatePlayerUI(track) {
 function togglePlay() {
   if (audio.paused && audio.src) { audio.play(); qs('#play-btn').innerHTML = iconPause(); }
   else if (!audio.paused) { audio.pause(); qs('#play-btn').innerHTML = iconPlay(); }
-  var mp = document.getElementById('mini-player');
-  if (mp && mp.style.display !== 'none') updateMiniPlayer();
 }
 
 function fetchSimilarAndAppend(lastTrackId) {

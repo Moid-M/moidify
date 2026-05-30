@@ -10,15 +10,13 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-cd "$(dirname "$0")"
-LOCAL_SRC="$(pwd)"
-
 echo "Updating Moidify..."
 
-# Use local sources if server.py is right here
-if [[ -f "$LOCAL_SRC/server.py" ]]; then
-  echo "Using local source files from $LOCAL_SRC"
-  rsync -a --delete --exclude=/venv "$LOCAL_SRC/" "$APP_DIR/"
+# Use local sources if running from a dev copy (not the installed dir)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "$SCRIPT_DIR/server.py" && "$SCRIPT_DIR" != "$APP_DIR" ]]; then
+  echo "Using local source files from $SCRIPT_DIR"
+  rsync -a --delete --exclude=/venv "$SCRIPT_DIR/" "$APP_DIR/"
 # Try git pull (for git-based installs)
 elif [[ -d "$APP_DIR/.git" ]]; then
   cd "$APP_DIR"

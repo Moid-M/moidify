@@ -20,6 +20,8 @@ AUDIO_EXTENSIONS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.wma', '.aac'}
 
 SCAN_STATUS = {"last_scan": None, "files_found": 0, "files_imported": 0, "errors": []}
 SCAN_LOCK = threading.Lock()
+_SCAN_RUNNING = False
+_SCAN_RUNNING_LOCK = threading.Lock()
 _MAX_ERRORS = 100
 
 
@@ -210,11 +212,11 @@ def process_file(file_path, conn=None):
                     SCAN_STATUS["errors"] = SCAN_STATUS["errors"][-_MAX_ERRORS:]
             return
 
-        import hashlib
-
         cover_hash = None
         if metadata['cover_data']:
             cover_data = metadata['cover_data']
+            if not isinstance(cover_data, bytes):
+                cover_data = bytes(cover_data)
             if isinstance(cover_data, bytes):
                 if cover_data[:4] == b'\x89PNG':
                     ext = '.png'
@@ -268,44 +270,59 @@ def process_file(file_path, conn=None):
 
 
 def scan_existing():
-    global SCAN_STATUS
-    if not MUSIC_DIR.exists():
+    global SCAN_STATUS, _SCAN_RUNNING
+    with _SCAN_RUNNING_LOCK:
+        if _SCAN_RUNNING:
+            return
+        _SCAN_RUNNING = True
+    try:
+        if not MUSIC_DIR.exists():
+            with SCAN_LOCK:
+                SCAN_STATUS["last_scan"] = time.strftime('%Y-%m-%d %H:%M:%S')
+                SCAN_STATUS["errors"].append("Music directory does not exist")
+            return
+        with SCAN_LOCK:
+            SCAN_STATUS["errors"] = []
+            SCAN_STATUS["files_found"] = 0
+            SCAN_STATUS["files_imported"] = 0
+        conn = get_connection()
+        count = 0
+        try:
+            for root, _, files in os.walk(str(MUSIC_DIR)):
+                for f in files:
+                    if Path(f).suffix.lower() not in AUDIO_EXTENSIONS:
+                        continue
+                    with SCAN_LOCK:
+                        SCAN_STATUS["files_found"] += 1
+                        was = len(SCAN_STATUS["errors"])
+                    process_file(os.path.join(root, f), conn=conn)
+                    with SCAN_LOCK:
+                        if len(SCAN_STATUS["errors"]) == was:
+                            SCAN_STATUS["files_imported"] += 1
+                    count += 1
+                    if count % 50 == 0:
+                        conn.commit()
+            conn.commit()
+        except Exception as e:
+            with SCAN_LOCK:
+                SCAN_STATUS["errors"].append(f"Scan error: {e}")
+        finally:
+            conn.close()
         with SCAN_LOCK:
             SCAN_STATUS["last_scan"] = time.strftime('%Y-%m-%d %H:%M:%S')
-            SCAN_STATUS["errors"].append("Music directory does not exist")
-        return
-    with SCAN_LOCK:
-        SCAN_STATUS["errors"] = []
-        SCAN_STATUS["files_found"] = 0
-        SCAN_STATUS["files_imported"] = 0
-    conn = get_connection()
-    count = 0
-    try:
-        for root, _, files in os.walk(str(MUSIC_DIR)):
-            for f in files:
-                if Path(f).suffix.lower() not in AUDIO_EXTENSIONS:
-                    continue
-                with SCAN_LOCK:
-                    SCAN_STATUS["files_found"] += 1
-                    was = len(SCAN_STATUS["errors"])
-                process_file(os.path.join(root, f), conn=conn)
-                with SCAN_LOCK:
-                    if len(SCAN_STATUS["errors"]) == was:
-                        SCAN_STATUS["files_imported"] += 1
-                count += 1
-                if count % 50 == 0:
-                    conn.commit()
-        conn.commit()
-    except Exception:
-        pass
     finally:
-        conn.close()
-    with SCAN_LOCK:
-        SCAN_STATUS["last_scan"] = time.strftime('%Y-%m-%d %H:%M:%S')
+        with _SCAN_RUNNING_LOCK:
+            _SCAN_RUNNING = False
 
 
 class MusicFileHandler(FileSystemEventHandler):
+    def _is_scanning(self):
+        with _SCAN_RUNNING_LOCK:
+            return _SCAN_RUNNING
+
     def on_created(self, event):
+        if self._is_scanning():
+            return
         if event.is_directory:
             return
         if Path(event.src_path).suffix.lower() not in AUDIO_EXTENSIONS:
@@ -320,25 +337,49 @@ class MusicFileHandler(FileSystemEventHandler):
                 SCAN_STATUS["files_imported"] += 1
             SCAN_STATUS["last_scan"] = time.strftime('%Y-%m-%d %H:%M:%S')
 
-    def on_moved(self, event):
+    def on_deleted(self, event):
+        if self._is_scanning():
+            return
         if event.is_directory:
             return
-        if Path(event.dest_path).suffix.lower() not in AUDIO_EXTENSIONS:
+        if Path(event.src_path).suffix.lower() not in AUDIO_EXTENSIONS:
             return
-        with SCAN_LOCK:
-            SCAN_STATUS["files_found"] += 1
-            was = len(SCAN_STATUS["errors"])
-        process_file(event.dest_path)
-        with SCAN_LOCK:
-            if len(SCAN_STATUS["errors"]) == was:
-                SCAN_STATUS["files_imported"] += 1
-            SCAN_STATUS["last_scan"] = time.strftime('%Y-%m-%d %H:%M:%S')
+        conn = get_connection()
+        conn.execute("DELETE FROM tracks WHERE file_path = ?", (str(event.src_path),))
+        conn.commit()
+        conn.close()
+
+    def on_moved(self, event):
+        if self._is_scanning():
+            return
+        if event.is_directory:
+            return
+        src_ext = Path(event.src_path).suffix.lower()
+        dst_ext = Path(event.dest_path).suffix.lower()
+        src_is_audio = src_ext in AUDIO_EXTENSIONS
+        dst_is_audio = dst_ext in AUDIO_EXTENSIONS
+        if not dst_is_audio and not src_is_audio:
+            return
+        if src_is_audio:
+            conn = get_connection()
+            conn.execute("DELETE FROM tracks WHERE file_path = ?", (str(event.src_path),))
+            conn.commit()
+            conn.close()
+        if dst_is_audio:
+            with SCAN_LOCK:
+                SCAN_STATUS["files_found"] += 1
+                was = len(SCAN_STATUS["errors"])
+            process_file(event.dest_path)
+            with SCAN_LOCK:
+                if len(SCAN_STATUS["errors"]) == was:
+                    SCAN_STATUS["files_imported"] += 1
+                SCAN_STATUS["last_scan"] = time.strftime('%Y-%m-%d %H:%M:%S')
 
 
 
 def get_scan_status():
     with SCAN_LOCK:
-        return dict(SCAN_STATUS)
+        return {"last_scan": SCAN_STATUS["last_scan"], "files_found": SCAN_STATUS["files_found"], "files_imported": SCAN_STATUS["files_imported"], "errors": list(SCAN_STATUS["errors"])}
 
 
 def start_watcher():

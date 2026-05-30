@@ -11,7 +11,7 @@ from config import BASE_DIR, MUSIC_DIR, COVERS_DIR
 from database import get_connection
 from scanner import scan_existing, get_scan_status, process_file
 from routes.deps import (
-    _require_admin, _hash_password, _create_session,
+    _require_admin, _hash_password, _create_session, _validate_password,
     ScheduleBody, ToggleAdminBody, CreateUserBody, ChangePasswordBody,
 )
 
@@ -315,6 +315,7 @@ def admin_toggle_user(user_id: int, body: ToggleAdminBody, token: Optional[str] 
 @router.post("/api/admin/users")
 def admin_create_user(body: CreateUserBody, token: Optional[str] = Header(None)):
     _require_admin(token)
+    _validate_password(body.password)
     conn = get_connection()
     existing = conn.execute("SELECT id FROM users WHERE username = ?", (body.username,)).fetchone()
     if existing:
@@ -333,6 +334,7 @@ def admin_create_user(body: CreateUserBody, token: Optional[str] = Header(None))
 @router.post("/api/admin/users/{user_id}/password")
 def admin_change_password(user_id: int, body: ChangePasswordBody, token: Optional[str] = Header(None)):
     _require_admin(token)
+    _validate_password(body.password)
     conn = get_connection()
     target = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not target:
@@ -362,7 +364,6 @@ def admin_delete_user(user_id: int, token: Optional[str] = Header(None)):
     conn.execute("DELETE FROM shared_playlists WHERE playlist_id IN (SELECT id FROM playlists WHERE user_id = ?)", (user_id,))
     conn.execute("DELETE FROM playlist_tracks WHERE playlist_id IN (SELECT id FROM playlists WHERE user_id = ?)", (user_id,))
     conn.execute("DELETE FROM playlists WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM play_history WHERE track_id IN (SELECT id FROM tracks WHERE id IN (SELECT track_id FROM play_history))")
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
     conn.close()

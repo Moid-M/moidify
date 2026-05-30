@@ -1,0 +1,422 @@
+/* ---- Responsive ---- */
+
+/* Mobile sidebar toggle (hidden on desktop) */
+#sidebar-toggle { display: none; }
+
+body.sidebar-open #sidebar {
+  display: flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 260px;
+  height: 100vh;
+  z-index: 500;
+  box-shadow: 0 0 40px rgba(0,0,0,0.6);
+}
+
+/* ========== Tablet / small desktop (< 1024px) ========== */
+@media (max-width: 1024px) {
+  .settings-layout {
+    width: 100%;
+    min-width: 0;
+  }
+  .settings-main { width: 100%; }
+  #modal.settings-open {
+    width: 90vw;
+    height: 70vh;
+  }
+  .album-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ========== Mobile (< 768px) ========== */
+@media (max-width: 767px) {
+  /* --- Layout --- */
+  #sidebar-toggle { display: flex; }
+
+  #sidebar {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    height: 100vh;
+    z-index: 500;
+    overflow-y: auto;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
+    padding-bottom: 20px;
+  }
+  body.sidebar-open #sidebar { display: flex; }
+  body.sidebar-open::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 499;
+  }
+
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+  }
+  #app.has-queue { grid-template-columns: 1fr; }
+
+  /* --- Content area --- */
+  #content {
+    padding: 0 12px 88px;
+    margin-top: 56px;
+  }
+  .view-title { font-size: 20px; }
+
+  /* --- Top bar --- */
+  #top-bar {
+    padding: 0 10px;
+    gap: 6px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+  }
+  .top-bar-left { display: flex; align-items: center; gap: 4px; }
+  #auth-logged-out .top-auth-btn,
+  #auth-logged-in .top-auth-btn { font-size: 12px; padding: 4px 10px; }
+
+  /* --- Home feed --- */
+  .home-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .home-card-img { height: 140px; }
+  .home-card-title { font-size: 13px; }
+  .home-card-sub { font-size: 11px; }
+  .home-track-row {
+    padding: 8px 10px;
+    font-size: 13px;
+    gap: 8px;
+  }
+  .home-track-cover { width: 32px; height: 32px; }
+  .home-section-title { font-size: 16px; }
+
+  /* --- Player bar (fixed at bottom on mobile) --- */
+  #player-bar {
+    --player-h: 72px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .player-body {
+    grid-template-columns: auto 1fr auto;
+    padding: 0 8px;
+    gap: 4px;
+  }
+  .player-left #player-artist { display: none; }
+  .player-left {
+    min-width: 0;
+    overflow: hidden;
+    flex-shrink: 1;
+  }
+  .player-center { display: flex; }
+  .player-controls { gap: 2px; justify-content: center; }
+  .player-controls #shuffle-btn,
+  .player-controls #repeat-btn,
+  .player-controls #rewind-btn,
+  .player-controls #forward-btn,
+  .player-controls #speed-btn { display: none !important; }
+  .player-right {
+    gap: 1px;
+    flex-shrink: 0;
+  }
+  .volume-wrap { display: none; }
+  .player-seek-bar {
+    padding: 0 8px;
+    height: 16px;
+  }
+  .player-seek-bar span { font-size: 10px; min-width: 28px; }
+  .ctrl-btn { padding: 8px; min-width: auto; }
+  .ctrl-btn svg { width: 18px; height: 18px; }
+  #speed-btn { font-size: 10px !important; min-width: 26px !important; }
+  #player-cover { width: 36px; height: 36px; }
+  #player-title { font-size: 12px; }
+  #player-cover-expand { display: none; }
+  #queue-toggle-btn { display: flex; }
+  #eq-btn { display: flex; }
+  #lyrics-btn { display: flex; }
+  #mini-player-btn { display: flex; }
+
+  /* --- Queue panel --- */
+  #queue-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100% !important;
+    height: 100vh;
+    z-index: 400;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+  }
+  #app.has-queue { grid-template-columns: 1fr; }
+  #queue-drag { display: none; }
+
+  /* --- Settings modal (full screen on mobile) --- */
+  #modal.settings-open {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    padding: 16px;
+    overflow: hidden;
+  }
+
+  .settings-layout {
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    gap: 12px;
+  }
+  .settings-sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 4px;
+    padding: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  .settings-sidebar-item {
+    padding: 8px 12px;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    white-space: nowrap;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .settings-sidebar-item.active {
+    border-left: none;
+    border-bottom-color: var(--accent);
+  }
+  .settings-main {
+    width: 100%;
+    height: auto;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .settings-tab-content {
+    padding-bottom: 40px;
+  }
+  .settings-section h3 { font-size: 13px; }
+
+  /* --- Modals (general) --- */
+  #modal {
+    min-width: auto;
+    max-width: 100%;
+    width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    padding: 20px;
+    margin: 0;
+  }
+  #modal-overlay { align-items: flex-end; }
+
+  /* --- Track rows (flex layout, no grid alignment issues) --- */
+  .track-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    font-size: 10px;
+    gap: 8px;
+    border-bottom: 1px solid var(--player-border);
+  }
+  .track-header .sortable[data-sort="artist"],
+  .track-header .sortable[data-sort="album"],
+  .track-header .sortable[data-sort="rating"],
+  .track-header > span:last-child {
+    display: none;
+  }
+  .track-header .sortable[data-sort="tracknum"] { width: 28px; flex-shrink: 0; }
+  .track-header .sortable[data-sort="title"] { flex: 1; }
+  .track-header .sortable[data-sort="duration"] { width: 60px; text-align: right; }
+  .track-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .track-row .track-num { width: 20px; text-align: center; flex-shrink: 0; font-size: 11px; }
+  .track-row .track-cover { width: 24px; height: 24px; flex-shrink: 0; }
+  .track-row .track-title { flex: 1; min-width: 0; }
+  .track-row .track-artist,
+  .track-row .track-album,
+  .track-row .track-rating { display: none; }
+  .track-row .track-dur { flex-shrink: 0; font-size: 11px; }
+
+  /* --- Album grid --- */
+  .album-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .album-card { padding: 8px; }
+  .album-card img { height: 140px; }
+  .album-card .album-name { font-size: 13px; }
+  .album-card .album-artist { font-size: 11px; }
+
+  /* --- Artists --- */
+  .artist-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .artist-card-img { width: 80px; height: 80px; }
+  .artist-card-name { font-size: 14px; }
+  .artist-card-meta { font-size: 11px; }
+
+  /* --- Album detail --- */
+  .album-detail-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+  }
+  .album-detail-header img { width: 160px; height: 160px; }
+  .album-detail-meta .album-detail-title { font-size: 22px; max-width: 100%; }
+  .album-detail-meta .album-detail-artist { font-size: 15px; max-width: 100%; }
+
+  /* --- Context menu --- */
+  #context-menu {
+    position: fixed !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: auto !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  /* --- Selection bar --- */
+  #selection-bar {
+    left: 0;
+    right: 0;
+    bottom: 80px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #selection-bar .sel-count { font-size: 12px; width: 100%; }
+  #selection-bar .sel-actions button {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  /* --- Search --- */
+  .search-box {
+    width: 100%;
+  }
+  .search-box input {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  /* --- EQ panel --- */
+  #eq-panel {
+    min-width: auto;
+    max-width: 100%;
+    width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    padding: 16px;
+  }
+  #eq-overlay { align-items: flex-end; }
+  .eq-grid { gap: 3px; }
+  .eq-band input[type="range"] { height: 80px; }
+
+  /* --- Lyrics panel --- */
+  #lyrics-panel {
+    min-width: auto;
+    max-width: 100%;
+    width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    padding: 16px;
+  }
+  #lyrics-overlay { align-items: flex-end; }
+
+  /* --- Now playing --- */
+  #nowplaying-panel {
+    width: 100%;
+    height: 100vh;
+    max-width: none;
+    border-radius: 0;
+  }
+  #nowplaying-body { flex-direction: column; }
+  #np-art-section {
+    width: 100%;
+    padding: 20px;
+    gap: 10px;
+  }
+  #np-art-section img { width: 60%; max-width: 200px; }
+  #np-title { font-size: 18px; }
+  #np-artist { font-size: 13px; }
+  #np-controls { gap: 12px; }
+  #np-lyrics-section {
+    width: 100%;
+    padding: 20px;
+    max-height: 40vh;
+  }
+  #np-lyrics-content { font-size: 15px; }
+
+  /* --- Genres --- */
+  .genre-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .genre-card { padding: 24px 12px; }
+  .genre-card-name { font-size: 15px; }
+
+  /* --- Toast --- */
+  #toast-container {
+    right: 10px;
+    bottom: calc(72px + 8px);
+  }
+  #app.has-queue #toast-container { right: 10px; }
+
+  /* --- Misc --- */
+  .drag-handle { display: none; }
+  .pinned-item { padding: 8px 12px; font-size: 13px; }
+  .album-pin-btn { display: none; }
+
+  /* Search results on mobile */
+  .sr-full-artists { grid-template-columns: repeat(2, 1fr); }
+  .sr-full-artist { padding: 10px; }
+}
+
+/* ========== Very small phones (< 400px) ========== */
+@media (max-width: 400px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+  }
+  .album-grid {
+    grid-template-columns: 1fr;
+  }
+  .artist-grid {
+    grid-template-columns: 1fr;
+  }
+  .genre-grid {
+    grid-template-columns: 1fr;
+  }
+  .player-right .ctrl-btn { padding: 4px; }
+  .player-right .ctrl-btn svg { width: 16px; height: 16px; }
+}
+
+@media (max-width: 700px) {
+  #queue-panel { display: none !important; }
+}

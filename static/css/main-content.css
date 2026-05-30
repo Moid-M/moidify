@@ -1,0 +1,152 @@
+/* ---- Main Content ---- */
+#content {
+  flex: 1;
+  padding: 0 32px 24px;
+  overflow-y: auto;
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.view-title { font-size: 28px; font-weight: 700; }
+
+/* Album grid */
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.album-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.album-card:hover { background: var(--bg-hover); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(168,85,247,0.1); }
+
+.album-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.album-list-cover { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; display: block; }
+
+.album-card { position: relative; }
+.album-pin-btn {
+  background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;
+  display: inline-flex; align-items: center; transition: 0.15s; line-height: 1;
+}
+.album-pin-btn:hover { color: var(--accent); }
+.album-pin-btn.pinned { color: var(--accent); }
+.album-card .album-pin-btn {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  background: rgba(0,0,0,0.5); border-radius: 4px; padding: 3px;
+  opacity: 0; transition: opacity 0.15s;
+}
+.album-card:hover .album-pin-btn { opacity: 1; }
+.album-pin-btn.pinned { opacity: 1; }
+
+.album-card .album-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.album-card .album-artist { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+
+/* Artist list */
+.artist-list { display: flex; flex-direction: column; }
+.artist-item { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: var(--radius); cursor: pointer; transition: 0.15s; }
+.artist-item:hover { background: var(--bg-hover); }
+.artist-item .artist-name { font-weight: 500; flex: 1; }
+.artist-item .artist-meta { color: var(--text-secondary); font-size: 13px; }
+
+/* Track list */
+.track-list { display: flex; flex-direction: column; }
+
+.track-header {
+  display: grid;
+  grid-template-columns: 40px 3fr 2fr 1fr 80px 60px;
+  padding: 8px 16px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--player-border);
+}
+
+.track-row {
+  display: grid;
+  grid-template-columns: 28px 28px 3fr 2fr 1fr 64px 50px;
+  padding: 6px 14px;
+  align-items: center;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: 0.1s;
+  font-size: 13.5px;
+  user-select: none;
+}
+.track-row:hover { background: var(--bg-hover); }
+.track-row.playing { color: var(--accent); background: var(--accent-dim); }
+.track-row.selected { background: color-mix(in srgb, var(--accent-dim) 60%, var(--bg-card)); }
+.track-row.selected:hover { background: color-mix(in srgb, var(--accent-dim) 80%, var(--bg-hover)); }
+.track-row { user-select: none; }
+
+#selection-bar {
+  display: none; position: fixed; bottom: var(--player-h); left: var(--sidebar-w); right: 0;
+  background: var(--bg-elevated); border-top: 1px solid var(--player-border);
+  padding: 10px 20px; align-items: center; gap: 12px; z-index: 100;
+  backdrop-filter: blur(10px);
+}
+#selection-bar.visible { display: flex; }
+#selection-bar .sel-count { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+#selection-bar .sel-actions { display: flex; gap: 8px; margin-left: auto; }
+#selection-bar .sel-actions button {
+  padding: 6px 14px; border: none; border-radius: 20px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: 0.15s; white-space: nowrap;
+}
+#selection-bar .sel-actions .btn-primary { background: var(--accent); color: #000; }
+#selection-bar .sel-actions .btn-primary:hover { background: var(--accent-hover); }
+#selection-bar .sel-actions .sel-play-btn,
+#selection-bar .sel-actions .sel-queue-btn {
+  background: var(--accent);
+  color: #000;
+  padding: 8px 20px;
+  font-size: 14px;
+}
+#selection-bar .sel-actions .sel-play-btn:hover,
+#selection-bar .sel-actions .sel-queue-btn:hover { background: var(--accent-hover); }
+#selection-bar .sel-clear-btn {
+  background: transparent; color: var(--text-secondary);
+}
+#selection-bar .sel-clear-btn:hover { color: var(--text-primary); }
+#app.has-queue #selection-bar { right: var(--queue-w); }
+.track-row .track-cover { width: 28px; height: 28px; border-radius: 3px; object-fit: cover; justify-self: center; }
+.track-row .track-num { color: var(--text-muted); font-size: 12.5px; }
+.track-row .track-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-row .track-artist { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-row .track-album { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-row .track-dur { color: var(--text-muted); font-size: 13px; }
+
+
+/* Sortable headers */
+.sortable { cursor: pointer; user-select: none; }
+.sortable:hover { color: var(--text-primary); }
+.sort-indicator { display: inline-block; width: 14px; margin-left: 4px; font-size: 9px; opacity: 0.3; vertical-align: middle; }
+.sort-indicator.active { opacity: 1; color: var(--accent); }
+.sort-indicator.asc::after { content: '\25B2'; }
+.sort-indicator.desc::after { content: '\25BC'; }
+
+/* Drag-and-drop for playlist tracks */
+.track-row.dragging { opacity: 0.4; }
+.track-row.drag-over { border-top: 2px solid var(--accent); }
+
+/* Album detail */
+.album-detail-header { display: flex; gap: 24px; margin-bottom: 28px; align-items: flex-end; }
+.album-detail-header img { width: 200px; height: 200px; object-fit: cover; border-radius: 8px; background: var(--bg-elevated); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+body.light-mode .album-detail-header img { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+.album-detail-meta .album-detail-title { font-size: 32px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px; }
+.album-detail-meta .album-detail-artist { font-size: 18px; color: var(--text-secondary); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px; }
+.album-detail-meta .album-detail-year { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+

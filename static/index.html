@@ -4,13 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Moidify</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=1.4.2">
+  <link rel="icon" type="image/png" href="/static/logo.png">
 </head>
 <body>
   <div id="app">
     <aside id="sidebar">
       <div class="drag-handle" id="sidebar-drag"></div>
-      <div class="logo">Moidify</div>
+      <div class="logo"><img class="logo-img" src="/static/logo.png" alt="">Moidify</div>
 
       <div class="search-box">
         <input type="text" id="search" data-i18n="search.placeholder" placeholder="Search tracks, artists, albums..." autocomplete="off">
@@ -43,7 +44,7 @@
     <div id="main-area">
       <header id="top-bar">
         <div class="top-bar-left">
-          <button id="sidebar-toggle" class="icon-btn" title="Menu" style="display:none;">
+          <button id="sidebar-toggle" class="icon-btn" title="Menu">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <button id="settings-btn" class="icon-btn" title="Settings">
@@ -74,7 +75,7 @@
         </button>
       </div>
       <div class="queue-now-playing">
-        <div id="queue-cover-wrap" class="queue-cover-wrap"><img id="queue-cover" src="/static/placeholder-cover.svg" alt=""></div>
+        <div id="queue-cover-wrap" class="queue-cover-wrap"><img id="queue-cover" src="/static/logo.png" alt=""></div>
         <div class="queue-now-info">
           <span id="queue-title" class="queue-now-title"></span>
           <span id="queue-artist" class="queue-now-artist"></span>
@@ -121,7 +122,7 @@
       <div class="player-body">
           <div class="player-left">
             <div class="player-cover-wrap" style="position:relative;flex-shrink:0;">
-              <img id="player-cover" src="/static/placeholder-cover.svg" alt="">
+              <img id="player-cover" src="/static/logo.png" alt="">
               <button id="player-cover-expand" class="cover-expand-btn" title="Full-screen art">⛶</button>
             </div>
             <div class="player-eq eq-anim" style="display:none"><span></span><span></span><span></span><span></span><span></span></div>
@@ -204,7 +205,7 @@
 
   <div id="mini-player" style="display:none">
     <div id="mini-player-body">
-      <img id="mini-cover" src="/static/placeholder-cover.svg" alt="">
+      <img id="mini-cover" src="/static/logo.png" alt="">
       <div id="mini-meta">
         <span id="mini-title"></span>
         <span id="mini-artist"></span>
@@ -228,7 +229,7 @@
       </div>
       <div id="nowplaying-body">
         <div id="np-art-section">
-          <img id="np-cover" src="/static/placeholder-cover.svg" alt="">
+          <img id="np-cover" src="/static/logo.png" alt="">
           <div id="np-info">
             <span id="np-title"></span>
             <span id="np-artist"></span>
@@ -322,8 +323,21 @@
   <script src="/static/js/queue.js"></script>
   <script src="/static/js/lyrics.js"></script>
   <script src="/static/js/animations.js"></script>
-  <script src="/static/js/ui.js"></script>
-  <script src="/static/js/views.js"></script>
+  <script src="/static/js/ui/toast.js"></script>
+  <script src="/static/js/ui/modal.js"></script>
+  <script src="/static/js/ui/sleep-timer.js"></script>
+  <script src="/static/js/ui/settings.js"></script>
+  <script src="/static/js/ui/context-menu.js"></script>
+  <script src="/static/js/ui/eq-panel.js"></script>
+  <script src="/static/js/ui/search.js"></script>
+  <script src="/static/js/views/home.js"></script>
+  <script src="/static/js/views/albums.js"></script>
+  <script src="/static/js/views/artists.js"></script>
+  <script src="/static/js/views/tracks.js"></script>
+  <script src="/static/js/views/playlists.js"></script>
+  <script src="/static/js/views/genres.js"></script>
+  <script src="/static/js/views/search.js"></script>
+  <script src="/static/js/views/navigate.js"></script>
   <script src="/static/js/app.js"></script>
 </body>
 </html>

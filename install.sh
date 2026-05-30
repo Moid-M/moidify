@@ -158,6 +158,18 @@ if [[ $INTERACTIVE -eq 1 ]]; then
       warn "No password set — use setup wizard at http://<ip>:$PORT/setup"
       break
     fi
+    if [[ ${#ADMIN_PASS} -lt 8 ]]; then
+      err "Password must be at least 8 characters"; continue
+    fi
+    if ! [[ "$ADMIN_PASS" =~ [a-z] ]]; then
+      err "Password must contain a lowercase letter"; continue
+    fi
+    if ! [[ "$ADMIN_PASS" =~ [A-Z] ]]; then
+      err "Password must contain an uppercase letter"; continue
+    fi
+    if ! [[ "$ADMIN_PASS" =~ [0-9] ]]; then
+      err "Password must contain a digit"; continue
+    fi
     read -r -s -p "  Confirm password: " ADMIN_PASS2 </dev/tty
     echo ""
     if [[ "$ADMIN_PASS" == "$ADMIN_PASS2" ]]; then
@@ -236,6 +248,10 @@ else
   chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
   ok "Application files copied to $APP_DIR"
 fi
+
+# ─── CLI ──────────────────────────────────────────────────────────────────────
+install -m 755 "$APP_DIR/moidify" /usr/local/bin/moidify 2>/dev/null || true
+ok "CLI installed: /usr/local/bin/moidify"
 
 # ─── Virtual env + deps ──────────────────────────────────────────────────────
 info "Setting up Python virtual environment..."
@@ -320,10 +336,14 @@ echo -e "  ${YELLOW}Data:${NC}         $DATA_DIR"
 echo -e "  ${YELLOW}Logs:${NC}         journalctl -u moidify.service -f"
 echo ""
 echo -e "  ${YELLOW}Commands:${NC}"
-echo -e "    restart:  systemctl restart moidify"
-echo -e "    stop:     systemctl stop moidify"
-echo -e "    status:   systemctl status moidify"
-echo -e "    update:   ${APP_DIR}/update.sh"
+echo -e "    help:     moidify -h"
+echo -e "    start:    moidify start"
+echo -e "    stop:     moidify stop"
+echo -e "    restart:  moidify restart"
+echo -e "    status:   moidify status"
+echo -e "    logs:     moidify logs"
+echo -e "    config:   moidify config"
+echo -e "    update:   moidify update"
 echo -e "    uninstall: ${APP_DIR}/uninstall.sh"
 echo ""
 echo -e "  Drop music into your folder — files appear automatically."

@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="icon" type="image/png" href="/static/logo.png">
 <title>Set Up Moidify</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -147,7 +148,10 @@ async function createAdmin() {
   errEl.style.display = 'none';
 
   if (!username) { errEl.textContent = 'Username is required'; errEl.style.display = 'block'; return; }
-  if (!password || password.length < 3) { errEl.textContent = 'Password must be at least 3 characters'; errEl.style.display = 'block'; return; }
+  if (!password || password.length < 8) { errEl.textContent = 'Password must be at least 8 characters'; errEl.style.display = 'block'; return; }
+  if (!/[a-z]/.test(password)) { errEl.textContent = 'Password must contain a lowercase letter'; errEl.style.display = 'block'; return; }
+  if (!/[A-Z]/.test(password)) { errEl.textContent = 'Password must contain an uppercase letter'; errEl.style.display = 'block'; return; }
+  if (!/[0-9]/.test(password)) { errEl.textContent = 'Password must contain a digit'; errEl.style.display = 'block'; return; }
   if (password !== confirm) { errEl.textContent = 'Passwords do not match'; errEl.style.display = 'block'; return; }
 
   try {

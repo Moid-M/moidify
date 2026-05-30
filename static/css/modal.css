@@ -1,0 +1,71 @@
+/* ---- Modal ---- */
+#modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body.light-mode #modal-overlay { background: rgba(0,0,0,0.3); }
+#modal {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 28px;
+  min-width: 360px;
+  max-width: 480px;
+  animation: modal-in 0.25s ease-out;
+}
+#modal.settings-open {
+  overflow: hidden;
+  padding: 24px;
+  height: 480px;
+  display: flex;
+  flex-direction: column;
+}
+#modal.settings-open #modal-content {
+  flex: 1;
+  min-height: 0;
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+#modal-overlay {
+  animation: overlay-in 0.2s ease-out;
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.95) translateY(-8px); }
+}
+@keyframes overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+#modal h2 { margin-bottom: 16px; font-size: 20px; }
+#modal input[type="text"],
+#modal input[type="password"],
+#modal input[type="email"] {
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+#modal input:focus { background: var(--bg-hover); outline: 1px solid var(--accent-dim); }
+#modal .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+#modal .modal-actions button { padding: 8px 20px; border: none; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: 600; }
+.btn-primary { background: var(--accent); color: #000; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--text-muted); }
+.btn-secondary:hover { color: var(--text-primary); border-color: var(--text-primary); }
+

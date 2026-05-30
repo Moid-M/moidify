@@ -1,0 +1,159 @@
+/* ---- Queue Panel ---- */
+.queue-panel {
+  background: var(--sidebar-bg);
+  border-left: 1px solid var(--player-border);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  grid-row: 1 / 2;
+  position: relative;
+}
+
+.queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 16px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+}
+
+.queue-now-playing {
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px;
+  gap: 10px;
+}
+
+#queue-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.queue-now-title {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.queue-now-artist {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-mini-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#queue-seek {
+  width: 100%;
+  height: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-hover);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+#queue-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  transition: 0.1s;
+}
+#queue-seek:hover::-webkit-slider-thumb { opacity: 1; }
+#queue-seek::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  opacity: 0;
+}
+#queue-seek:hover::-moz-range-thumb { opacity: 1; }
+
+.queue-mini-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-divider {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 16px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--player-border);
+}
+
+#queue-list { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; padding: 4px 8px; }
+
+.qitem {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  padding: 8px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.1s;
+  gap: 8px;
+  align-items: center;
+}
+.qitem:hover { background: var(--bg-hover); }
+.qitem.dragging { opacity: 0.5; }
+.qitem.drag-over { border-top: 2px solid var(--accent); }
+
+.qitem .qitem-drag {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: 0.1s;
+}
+.qitem:hover .qitem-drag { opacity: 1; }
+.qitem .qitem-drag:active { cursor: grabbing; }
+.qitem .qitem-drag svg { width: 14px; height: 14px; }
+
+.qitem .qitem-info { min-width: 0; }
+.qitem .qitem-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qitem .qitem-artist { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qitem .qitem-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 4px; opacity: 0; transition: 0.1s; display: flex; align-items: center; }
+.qitem:hover .qitem-remove { opacity: 1; }
+.qitem .qitem-remove:hover svg { color: var(--danger); }
+.qitem .qitem-remove svg { width: 14px; height: 14px; }
+
+.queue-clear-btn {
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--player-border);
+  color: var(--text-muted);
+  padding: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: 0.15s;
+  text-align: center;
+}
+.queue-clear-btn:hover { color: var(--accent); background: var(--accent-dim); }

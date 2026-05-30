@@ -6,21 +6,23 @@ function navigate(view, data) {
     state._prevData = prevData;
   }
   state.currentView = view; state.currentData = data;
+  state._navId = (state._navId || 0) + 1;
+  var navId = state._navId;
   qsa('.nav-item').forEach(function(el) { el.classList.toggle('active', el.dataset.view === view); });
   qsa('.playlist-item').forEach(function(el) { el.classList.remove('active'); });
   switch (view) {
-    case 'home': renderHome(); break;
-    case 'albums': renderAlbums(); break;
-    case 'artists': renderArtists(); break;
-    case 'tracks': renderTracks(data || null); break;
-    case 'favorites': renderFavorites(); break;
-    case 'album': renderAlbumDetail(data); break;
-    case 'playlist': renderPlaylistDetail(data); break;
-    case 'artist-tracks': renderArtistTracks(data); break;
-    case 'genres': renderGenres(); break;
-    case 'genre-tracks': renderGenreTracks(data); break;
-    case 'search': renderSearchResults(data); break;
-    default: renderHome();
+    case 'home': renderHome(navId); break;
+    case 'albums': renderAlbums(navId); break;
+    case 'artists': renderArtists(navId); break;
+    case 'tracks': renderTracks(data || null, navId); break;
+    case 'favorites': renderFavorites(navId); break;
+    case 'album': renderAlbumDetail(data, navId); break;
+    case 'playlist': renderPlaylistDetail(data, navId); break;
+    case 'artist-tracks': renderArtistTracks(data, navId); break;
+    case 'genres': renderGenres(navId); break;
+    case 'genre-tracks': renderGenreTracks(data, navId); break;
+    case 'search': renderSearchResults(data, navId); break;
+    default: renderHome(navId);
   }
 }
 
@@ -81,11 +83,12 @@ function homePlayTrack(i) {
   playFromQueue(_homeData.recommended_tracks, i);
 }
 
-async function renderHome() {
+async function renderHome(navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="content-header"><div class="view-title">🏠 Home</div></div><div id="home-feed"></div>';
 
   apiJson('/api/home').then(function(data) {
+    if (state._navId !== navId) return;
     _homeData = data;
     var feed = document.getElementById('home-feed');
 
@@ -99,7 +102,7 @@ async function renderHome() {
         var card = document.createElement('div');
         card.className = 'home-card';
         card.dataset.idx = i;
-        card.innerHTML = '<img class="home-card-img" src="/api/cover/'+t.id+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><div class="home-card-title">'+esc(t.title||'')+'</div><div class="home-card-sub">'+esc(t.artist||'')+'</div>';
+        card.innerHTML = '<img class="home-card-img" src="/api/cover/'+t.id+'" loading="lazy" onerror="this.src=\'/static/logo.png\'"><div class="home-card-title">'+esc(t.title||'')+'</div><div class="home-card-sub">'+esc(t.artist||'')+'</div>';
         card.addEventListener('click', homeNavRecent);
         grid.appendChild(card);
       });
@@ -116,7 +119,7 @@ async function renderHome() {
         var card = document.createElement('div');
         card.className = 'home-card';
         card.dataset.idx = i;
-        card.innerHTML = '<img class="home-card-img home-card-img-album" src="/api/cover/'+a.cover_track_id+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><div class="home-card-title">'+esc(a.album||'')+'</div><div class="home-card-sub">'+esc(artistName)+'</div>';
+        card.innerHTML = '<img class="home-card-img home-card-img-album" src="/api/cover/'+a.cover_track_id+'" loading="lazy" onerror="this.src=\'/static/logo.png\'"><div class="home-card-title">'+esc(a.album||'')+'</div><div class="home-card-sub">'+esc(artistName)+'</div>';
         card.addEventListener('click', homeNavAlbum);
         grid.appendChild(card);
       });
@@ -132,7 +135,7 @@ async function renderHome() {
         var dur = formatTime(t.duration);
         var row = document.createElement('div');
         row.className = 'home-track-row';
-        row.innerHTML = '<span class="home-track-idx">'+(i+1)+'</span><img class="home-track-cover" src="/api/cover/'+t.id+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><span class="home-track-title">'+esc(t.title||'')+'</span><span class="home-track-artist">'+esc(t.artist||'')+'</span><span class="home-track-dur">'+dur+'</span>';
+        row.innerHTML = '<span class="home-track-idx">'+(i+1)+'</span><img class="home-track-cover" src="/api/cover/'+t.id+'" loading="lazy" onerror="this.src=\'/static/logo.png\'"><span class="home-track-title">'+esc(t.title||'')+'</span><span class="home-track-artist">'+esc(t.artist||'')+'</span><span class="home-track-dur">'+dur+'</span>';
         row.addEventListener('click', function() { homePlayTrack(i); });
         list.appendChild(row);
       });
@@ -147,7 +150,7 @@ async function renderHome() {
       data.recommended_artists.forEach(function(a) {
         var card = document.createElement('div');
         card.className = 'home-card';
-        card.innerHTML = '<img class="home-card-img home-card-artist" src="/api/cover/'+a.cover_track_id+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><div class="home-card-title">'+esc(a.artist||'')+'</div><div class="home-card-sub">'+a.track_count+' tracks</div>';
+        card.innerHTML = '<img class="home-card-img home-card-artist" src="/api/cover/'+a.cover_track_id+'" loading="lazy" onerror="this.src=\'/static/logo.png\'"><div class="home-card-title">'+esc(a.artist||'')+'</div><div class="home-card-sub">'+a.track_count+' tracks</div>';
         card.addEventListener('click', function() { navigate('artist-tracks', a.artist); });
         grid.appendChild(card);
       });
@@ -176,7 +179,7 @@ async function renderHome() {
   });
 }
 
-async function renderAlbums() {
+async function renderAlbums(navId) {
   var content = document.getElementById('content');
   var isGrid = state.viewMode === 'grid';
   var viewIcon = isGrid ? iconListView() : iconGridView();
@@ -185,6 +188,7 @@ async function renderAlbums() {
   var container = qs('.album-'+(isGrid?'grid':'list'));
   try {
     var albums = await apiJson('/api/albums');
+    if (state._navId !== navId) return;
     if (albums.length === 0) { content.innerHTML = '<div class="content-header"><div class="view-title">Albums</div></div><p style="color:#727272;padding:20px 0;">Drop music into the <strong>music/</strong> folder.</p>'; return; }
     albums.sort(function(a, b) {
       var aPinned = state.pinnedAlbums.indexOf(a.album) !== -1 ? 0 : 1;
@@ -235,12 +239,13 @@ async function renderAlbums() {
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
-async function renderAlbumDetail(data) {
+async function renderAlbumDetail(data, navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="view-title">Loading...</div>';
   try {
     var url = '/api/albums/tracks?album='+encodeURIComponent(data.album)+(data.artist?'&artist='+encodeURIComponent(data.artist):'');
     var albumTracks = await apiJson(url);
+    if (state._navId !== navId) return;
     var first = albumTracks[0]||{};
     var yearStr = first.year ? '<div class="album-detail-year">'+first.year+'</div>' : '';
     content.innerHTML = '<div class="album-detail-header"><img src="/api/cover/'+(first.id||0)+'" alt=""><div class="album-detail-meta"><div class="album-detail-title">'+esc(data.album)+'</div><div class="album-detail-artist">'+esc(data.artist||'Unknown Artist')+'</div>'+yearStr+'</div><div style="display:flex;gap:8px;align-items:center"><button class="shuffle-play-btn" id="album-shuffle-btn" title="Shuffle Album">'+iconShuffle()+' <span>Shuffle</span></button><button class="icon-btn" id="album-share-btn" title="Share album">'+iconShare()+'</button></div></div><div class="track-list">'+trackHeaderHTML()+'</div>';
@@ -289,11 +294,12 @@ function setupAlbumShare(album, artist) {
   });
 }
 
-async function renderArtists() {
+async function renderArtists(navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div>';
   try {
     var artists = await apiJson('/api/artists');
+    if (state._navId !== navId) return;
     if (artists.length===0) { content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div><p style="color:#727272;">No artists found.</p>'; return; }
     artists.sort(function(a, b) {
       var aPinned = state.pinnedArtists.indexOf(a.artist) !== -1 ? 0 : 1;
@@ -305,7 +311,7 @@ async function renderArtists() {
       if (!a.artist) return;
       var card = document.createElement('div');
       card.className = 'artist-card';
-      card.innerHTML = '<img class="artist-card-img" src="/api/artist-image/'+encodeURIComponent(a.artist)+'" loading="lazy" onerror="this.src=\'/static/placeholder-cover.svg\'"><div class="artist-card-name">'+esc(a.artist)+'</div><div class="artist-card-meta">'+a.track_count+' tracks, '+a.album_count+' albums</div>';
+      card.innerHTML = '<img class="artist-card-img" src="/api/artist-image/'+encodeURIComponent(a.artist)+'" loading="lazy" onerror="this.src=\'/static/logo.png\'"><div class="artist-card-name">'+esc(a.artist)+'</div><div class="artist-card-meta">'+a.track_count+' tracks, '+a.album_count+' albums</div>';
       card.addEventListener('click',function(){navigate('artist-tracks',a.artist);});
       card.addEventListener('contextmenu',function(e){e.preventDefault();showArtistContextMenu(e, a);});
       grid.appendChild(card);
@@ -314,11 +320,12 @@ async function renderArtists() {
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
-async function renderArtistTracks(artist) {
+async function renderArtistTracks(artist, navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="album-detail-header" style="margin-bottom:16px;"><img src="/api/artist-image/'+encodeURIComponent(artist)+'" alt="" style="width:80px;height:80px;border-radius:50%;object-fit:cover;"><div class="album-detail-meta"><div class="album-detail-title">'+esc(artist)+'</div></div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
   try {
     var filtered = await apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist));
+    if (state._navId !== navId) return;
     if (filtered.length===0) { content.innerHTML += '<p style="color:#727272;">No tracks found.</p>'; return; }
     var list = document.createElement('div'); list.className = 'track-list';
     list.id = 'current-track-list';
@@ -345,12 +352,13 @@ function filterTrackList(query) {
   });
 }
 
-async function renderTracks(searchQuery) {
+async function renderTracks(searchQuery, navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="content-header"><div class="view-title">'+(searchQuery?'Search Results':'All Tracks')+'</div></div>'+(searchQuery?'':'<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>');
   try {
     var url = searchQuery ? '/api/tracks?search='+encodeURIComponent(searchQuery) : '/api/tracks';
     var tracks = await apiJson(url);
+    if (state._navId !== navId) return;
     if (tracks.length===0) { content.innerHTML += '<p style="color:#727272;">'+(searchQuery?'No results for "'+esc(searchQuery)+'".':'No tracks yet.')+'</p>'; return; }
     var list = document.createElement('div'); list.className='track-list';
     list.id = searchQuery ? '' : 'current-track-list';
@@ -367,12 +375,13 @@ async function renderTracks(searchQuery) {
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
-async function renderFavorites() {
+async function renderFavorites(navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="content-header"><div class="view-title">Liked Songs</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
   if (!state.user) { content.innerHTML += '<p style="color:#727272;padding:20px 0;">Log in to see your liked songs.</p>'; return; }
   try {
     var tracks = await apiJson('/api/favorites');
+    if (state._navId !== navId) return;
     if (tracks.length===0) { content.innerHTML += '<div class="fav-empty">No liked songs yet. Click the heart on any track.</div>'; return; }
     var list = document.createElement('div'); list.className='track-list';
     list.id = 'current-track-list';
@@ -387,11 +396,12 @@ async function renderFavorites() {
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
-async function renderPlaylistDetail(playlistId) {
+async function renderPlaylistDetail(playlistId, navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="view-title">Loading...</div>';
   try {
     var tracks = await apiJson('/api/playlists/'+playlistId+'/tracks');
+    if (state._navId !== navId) return;
     var playlistName = state.playlists.find(function(p){return p.id===playlistId;});
     content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(playlistName?playlistName.name:'Playlist')+'</div>'+
       '<div style="display:flex;gap:8px"><button id="share-pl-btn" class="icon-btn" title="Share playlist">'+iconShare()+'</button><button id="export-pl-btn" class="icon-btn" title="Export playlist">'+iconDownload()+'</button></div></div>'+
@@ -688,11 +698,12 @@ function setupPlaylistDragDrop(trackList, tracks, playlistId) {
   });
 }
 
-async function renderGenres() {
+async function renderGenres(navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="content-header"><div class="view-title">Genres</div></div>';
   try {
     var genres = await apiJson('/api/genres');
+    if (state._navId !== navId) return;
     if (genres.length === 0) {
       content.innerHTML += '<p style="color:#727272;padding:20px 0;">No genre tags found in your music.</p>';
       return;
@@ -710,11 +721,12 @@ async function renderGenres() {
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
-async function renderGenreTracks(genre) {
+async function renderGenreTracks(genre, navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(genre)+'</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
   try {
     var tracks = await apiJson('/api/genres/tracks?genre='+encodeURIComponent(genre));
+    if (state._navId !== navId) return;
     if (tracks.length === 0) { content.innerHTML += '<p style="color:#727272;">No tracks found.</p>'; return; }
     var list = document.createElement('div'); list.className = 'track-list';
     list.id = 'current-track-list';
@@ -729,7 +741,7 @@ async function renderGenreTracks(genre) {
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
-async function renderSearchResults(query) {
+async function renderSearchResults(query, navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="content-header"><div class="view-title">Search: "'+esc(query)+'"</div></div><div class="sr-full-loading">Searching...</div>';
 
@@ -742,6 +754,7 @@ async function renderSearchResults(query) {
       apiJson('/api/albums'),
       apiJson('/api/artists'),
     ]);
+    if (state._navId !== navId) return;
 
     function matchField(val) {
       if (!val) return false;

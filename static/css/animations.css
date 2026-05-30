@@ -1,0 +1,115 @@
+/* ---- Vinyl Spin Animation ---- */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.vinyl-spin { animation: spin var(--vinyl-speed, 4s) linear infinite; }
+.vinyl-spin-slow { animation: spin 8s linear infinite; }
+#queue-cover.vinyl-spin, .queue-cover-wrap.vinyl-spin #queue-cover { border-radius: 50%; }
+/* CD disc appearance when spinning */
+.queue-cover-wrap.cd-hole {
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5), inset 0 0 30px rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+.queue-cover-wrap.cd-hole #queue-cover {
+  border-radius: 50%;
+  display: block;
+}
+.queue-cover-wrap.cd-hole::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.15) 0%,
+    rgba(255,255,255,0.05) 30%,
+    transparent 50%,
+    rgba(255,255,255,0.08) 70%,
+    rgba(255,255,255,0.02) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+.queue-cover-wrap.cd-hole::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 18%;
+  height: 18%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid rgba(255,255,255,0.15);
+  box-shadow: inset 0 0 4px rgba(0,0,0,0.5), 0 0 3px rgba(255,255,255,0.1);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---- Equalizer Visualizer ---- */
+@keyframes eq-bar {
+  0%, 100% { height: 3px; }
+  50% { height: 16px; }
+}
+.eq-anim {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 20px;
+  opacity: 0.7;
+}
+.eq-anim span {
+  display: block;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: eq-bar 0.5s ease-in-out infinite alternate;
+}
+.eq-anim span:nth-child(1) { animation-delay: 0s; }
+.eq-anim span:nth-child(2) { animation-delay: 0.1s; }
+.eq-anim span:nth-child(3) { animation-delay: 0.2s; }
+.eq-anim span:nth-child(4) { animation-delay: 0.3s; }
+.eq-anim span:nth-child(5) { animation-delay: 0.4s; }
+
+/* ---- Glow pulse on play button ---- */
+@keyframes glow-pulse {
+  0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.play-btn.playing { animation: glow-pulse 2s infinite; }
+
+/* ---- Cover zoom on hover ---- */
+@keyframes zoom-in { from { transform: scale(1); } to { transform: scale(1.05); } }
+.anim-cover-zoom .album-card:hover img { animation: zoom-in 0.2s ease forwards; }
+
+/* ---- Seek bar shimmer ---- */
+@keyframes thumb-glow {
+  0%, 100% { box-shadow: 0 0 2px var(--accent); }
+  50% { box-shadow: 0 0 10px var(--accent-glow); }
+}
+.anim-seek-shimmer #seek::-webkit-slider-thumb { animation: thumb-glow 1.5s ease-in-out infinite; }
+
+/* ---- Button bounce on click ---- */
+@keyframes btn-bounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.ctrl-btn:active svg, .play-btn:active svg { animation: btn-bounce 0.15s ease; }
+
+/* ---- Player EQ visualizer ---- */
+.player-eq { margin-left: -4px; margin-right: 2px; }
+.player-eq span { width: 2px; height: 12px; }
+
+/* ---- Animations controlled by settings ---- */
+.anim-disabled .album-card:hover { transform: none; box-shadow: none; }
+.anim-disabled .album-card:hover img { animation: none; transform: none; }
+.anim-disabled .track-row:hover { background: var(--bg-hover); }
+.anim-disabled #queue-panel { transition: none; }
+.anim-disabled #seek::-webkit-slider-thumb { animation: none; }
+.anim-disabled .eq-anim { display: none !important; }
+.anim-disabled .play-btn { animation: none; }

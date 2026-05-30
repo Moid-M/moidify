@@ -119,7 +119,6 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at)",
         "CREATE INDEX IF NOT EXISTS idx_playlists_user_id ON playlists(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)",
-        "CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)",
         "CREATE INDEX IF NOT EXISTS idx_shared_albums_album ON shared_albums(album)",
         "CREATE INDEX IF NOT EXISTS idx_tracks_cover_hash ON tracks(cover_hash)",
     ]:
@@ -160,6 +159,12 @@ def init_db():
                     print(f"Migration warning: {e}")
         else:
             pass  # column already exists
+
+    # index on migrated column
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)")
+    except sqlite3.OperationalError:
+        pass
 
     # ensure the "admin" user has is_admin=1
     for attempt in range(3):

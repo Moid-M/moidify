@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="icon" type="image/png" href="/static/logo.png">
 <title>Moidify Admin</title>
 <script>
 var accent = localStorage.getItem('moidify_accent') || '#a855f7';
@@ -858,7 +859,10 @@ async function toggleAdmin(userId, makeAdmin) {
 
 async function changePassword() {
   var pw = document.getElementById('pw-password').value;
-  if (!pw || pw.length < 3) { alert('Password must be at least 3 characters'); return; }
+  if (!pw || pw.length < 8) { alert('Password must be at least 8 characters'); return; }
+  if (!/[a-z]/.test(pw)) { alert('Password must contain a lowercase letter'); return; }
+  if (!/[A-Z]/.test(pw)) { alert('Password must contain an uppercase letter'); return; }
+  if (!/[0-9]/.test(pw)) { alert('Password must contain a digit'); return; }
   try {
     var r = await api('/api/admin/users/'+contextUserId+'/password', { method:'POST', body: { password: pw } });
     if (!r.ok) { var e = await r.json(); alert(e.detail||'Error'); return; }
@@ -886,7 +890,10 @@ async function createUser() {
   var password = document.getElementById('create-password').value;
   var isAdmin = document.getElementById('create-admin').checked;
   if (!username) { alert('Username is required'); return; }
-  if (!password || password.length < 3) { alert('Password must be at least 3 characters'); return; }
+  if (!password || password.length < 8) { alert('Password must be at least 8 characters'); return; }
+  if (!/[a-z]/.test(password)) { alert('Password must contain a lowercase letter'); return; }
+  if (!/[A-Z]/.test(password)) { alert('Password must contain an uppercase letter'); return; }
+  if (!/[0-9]/.test(password)) { alert('Password must contain a digit'); return; }
   try {
     var r = await api('/api/admin/users', { method:'POST', body: { username: username, password: password, is_admin: isAdmin } });
     if (!r.ok) { var e = await r.json(); alert(e.detail||'Error'); return; }

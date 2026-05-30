@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import HTTPException, Header
-from pydantic import BaseModel
+import re
+from pydantic import BaseModel, field_validator
 
 from config import BASE_DIR, MUSIC_DIR, COVERS_DIR
 from database import get_connection
@@ -81,6 +82,17 @@ def _require_admin(token: Optional[str] = Header(None)):
         raise HTTPException(403, "Admin access required")
     return user
 
+
+def _validate_password(pwd: str) -> str:
+    if len(pwd) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
+    if not re.search(r'[a-z]', pwd):
+        raise HTTPException(400, "Password must contain a lowercase letter")
+    if not re.search(r'[A-Z]', pwd):
+        raise HTTPException(400, "Password must contain an uppercase letter")
+    if not re.search(r'[0-9]', pwd):
+        raise HTTPException(400, "Password must contain a digit")
+    return pwd
 
 def _safe_name(s: str) -> str:
     return "".join(c if c.isalnum() or c in " _-" else "_" for c in s).strip()

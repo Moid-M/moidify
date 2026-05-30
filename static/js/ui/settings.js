@@ -1,0 +1,450 @@
+function showSettings() {
+  var tabs = [
+    { id:'theme', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>', label:'Theme' },
+    { id:'animations', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', label:'Animations' },
+    { id:'playback', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>', label:'Playback' },
+    { id:'about', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>', label:'About' },
+  ];
+
+  var sidebarHtml = tabs.map(function(t,i) {
+    return '<div class="settings-sidebar-item'+(i===0?' active':'')+'" data-tab="'+t.id+'">'+t.icon+'<span>'+t.label+'</span></div>';
+  }).join('');
+
+  var contentHtml = tabs.map(function(t,i) {
+    return '<div class="settings-tab-content'+(i===0?' active':'')+'" id="tab-'+t.id+'"></div>';
+  }).join('');
+
+  showModal('<div class="settings-layout"><div class="settings-sidebar">'+sidebarHtml+'</div><div class="settings-main">'+contentHtml+'</div></div>');
+  var settingsModal = document.getElementById('modal');
+  if (settingsModal) settingsModal.classList.add('settings-open');
+  translateDOM(settingsModal);
+  renderThemeTab();
+  renderAnimationsTab();
+  renderPlaybackTab();
+  renderAboutTab();
+
+  qsa('.settings-sidebar-item').forEach(function(el) {
+    el.addEventListener('click', function() {
+      if (this.classList.contains('active')) return;
+      qsa('.settings-sidebar-item').forEach(function(t){t.classList.remove('active');});
+      this.classList.add('active');
+
+      var activeTab = qs('.settings-tab-content.active');
+      var newTab = document.getElementById('tab-'+this.dataset.tab);
+      if (activeTab && activeTab !== newTab) {
+        activeTab.classList.remove('active');
+      }
+      if (newTab) newTab.classList.add('active');
+    });
+  });
+}
+
+function renderThemeTab() {
+  var container = document.getElementById('tab-theme');
+  var colors = ['#a855f7','#ef4444','#f97316','#eab308','#1db954','#3b82f6','#14b8a6'];
+  var swatches = '';
+  colors.forEach(function(c) {
+    swatches += '<div class="color-swatch'+(c===state.accentColor?' active':'')+'" data-color="'+c+'" style="background:'+c+';"></div>';
+  });
+
+  var lightChecked = state.lightMode ? ' checked' : '';
+  var autoChecked = state.autoTheme ? ' checked' : '';
+  var currentLang = getLanguage();
+  var langOpts = Object.keys(TRANSLATIONS).map(function(code) {
+    var label = code === 'en' ? 'English' : (code === 'de' ? 'Deutsch' : code);
+    return '<option value="'+code+'"'+(currentLang===code?' selected':'')+'>'+label+'</option>';
+  }).join('');
+
+  var bgBrightness = localStorage.getItem('moidify_bg_brightness') || '100';
+  var fontSize = localStorage.getItem('moidify_font_size') || 'normal';
+  var fontSizeOpts = [
+    {value:'small', label:'Small'},
+    {value:'normal', label:'Normal'},
+    {value:'large', label:'Large'},
+  ];
+
+  container.innerHTML =
+    '<div class="settings-section" data-i18n-section="themeColor"><h3 data-i18n="settings.themeColor">Theme Color</h3><div class="color-grid">'+swatches+'</div>'+
+    '<div class="color-custom-wrap"><input type="color" id="custom-color" value="'+state.accentColor+'"><span style="color:var(--text-muted);font-size:13px;">Custom</span></div></div>'+
+    '<div class="settings-section"><h3 data-i18n="settings.appearance">Appearance</h3>'+
+    '<label class="toggle-row" data-i18n-row="light"><span data-i18n="settings.lightMode">Light Mode</span><input type="checkbox" id="light-toggle"'+lightChecked+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row" data-i18n-row="autoTheme"><span data-i18n="settings.autoTheme">Follow system theme</span><input type="checkbox" id="auto-theme-toggle"'+autoChecked+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3>Background Brightness</h3>'+
+    '<div class="crossfade-wrap"><span style="font-size:12px;color:var(--text-muted);min-width:30px;" id="bg-brightness-label">'+bgBrightness+'%</span>'+
+    '<input type="range" id="bg-brightness-slider" min="50" max="150" step="5" value="'+bgBrightness+'"><span style="font-size:12px;color:var(--text-muted);">150%</span></div></div>'+
+    '<div class="settings-section"><h3>Font Size</h3>'+
+    '<div class="anim-speed-wrap" id="font-size-wrap">'+
+    fontSizeOpts.map(function(f){return '<button class="anim-speed-btn'+(fontSize===f.value?' active':'')+'" data-size="'+f.value+'">'+f.label+'</button>';}).join('')+
+    '</div></div>'+
+    '<div class="settings-section"><h3 data-i18n="settings.language">Language</h3><select class="lang-select" id="lang-select">'+langOpts+'</select></div>';
+
+  qsa('.color-swatch', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      qsa('.color-swatch', container).forEach(function(s){s.classList.remove('active');});
+      this.classList.add('active');
+      applyAccent(this.dataset.color);
+      var cc = document.getElementById('custom-color');
+      if (cc) cc.value = this.dataset.color;
+    });
+  });
+
+  var cc = document.getElementById('custom-color');
+  if (cc) {
+    cc.addEventListener('input', function() {
+      qsa('.color-swatch', container).forEach(function(s){s.classList.remove('active');});
+      applyAccent(this.value);
+    });
+  }
+
+  var lt = document.getElementById('light-toggle');
+  if (lt) {
+    lt.addEventListener('change', function() {
+      state.lightMode = this.checked;
+      applyTheme();
+    });
+  }
+
+  var at = document.getElementById('auto-theme-toggle');
+  if (at) {
+    at.addEventListener('change', function() {
+      state.autoTheme = this.checked;
+      if (state.autoTheme) {
+        document.getElementById('light-toggle').disabled = true;
+      } else {
+        document.getElementById('light-toggle').disabled = false;
+      }
+      applyTheme();
+    });
+    if (state.autoTheme) document.getElementById('light-toggle').disabled = true;
+  }
+
+  var ls = document.getElementById('lang-select');
+  if (ls) {
+    ls.addEventListener('change', function() {
+      setLanguage(this.value);
+    });
+  }
+
+  var bgSlider = document.getElementById('bg-brightness-slider');
+  if (bgSlider) {
+    bgSlider.addEventListener('input', function() {
+      var val = parseInt(this.value);
+      document.getElementById('bg-brightness-label').textContent = val + '%';
+      localStorage.setItem('moidify_bg_brightness', val);
+      document.documentElement.style.setProperty('--bg-brightness', val + '%');
+      applyBgBrightness(val);
+    });
+  }
+
+  qsa('#font-size-wrap .anim-speed-btn', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      qsa('#font-size-wrap .anim-speed-btn', container).forEach(function(s){s.classList.remove('active');});
+      this.classList.add('active');
+      var size = this.dataset.size;
+      localStorage.setItem('moidify_font_size', size);
+      applyFontSize(size);
+    });
+  });
+}
+
+function applyBgBrightness(val) {
+  var ratio = val / 100;
+  var isLight = document.body.classList.contains('light-mode');
+  var baseR = isLight ? 245 : 13;
+  var baseG = isLight ? 245 : 13;
+  var baseB = isLight ? 245 : 13;
+  var r = Math.min(255, Math.round(baseR * ratio));
+  var g = Math.min(255, Math.round(baseG * ratio));
+  var b = Math.min(255, Math.round(baseB * ratio));
+  var bgColor = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+  if (!isLight) document.documentElement.style.setProperty('--bg', bgColor);
+}
+
+function applyFontSize(size) {
+  var sizes = {small: '13px', normal: '14px', large: '16px'};
+  document.documentElement.style.setProperty('--font-size-base', sizes[size] || '14px');
+}
+
+function renderAnimationsTab() {
+  var container = document.getElementById('tab-animations');
+  var animEnabled = state.animations;
+  var allOn = Object.values(animEnabled).every(function(v) { return v === true; });
+  var speeds = ['slow','normal','fast','off'];
+  var speedLabels = {slow:'Slow',normal:'Normal',fast:'Fast',off:'Off'};
+
+  var vizStyles = ['bars', 'wave', 'blend'];
+  var vizStyleLabels = {bars:'Bars', wave:'Wave', blend:'Blend'};
+
+  container.innerHTML =
+    '<div class="settings-section">'+
+      '<div class="anim-toggle-row" style="border-bottom:1px solid var(--accent-dim);padding-bottom:12px;margin-bottom:12px;">'+
+        '<span style="font-weight:600;color:var(--text-primary);">All animations</span>'+
+        '<button class="toggle-switch'+(allOn?' on':'')+'" id="anim-toggle-all"></button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="settings-section"><h3>Elements</h3>'+
+    '<div class="anim-toggle-row"><span>Card hover lift</span><button class="toggle-switch'+(animEnabled.cards?' on':'')+'" data-anim="cards"></button></div>'+
+    '<div class="anim-toggle-row"><span>Cover zoom on hover</span><button class="toggle-switch'+(animEnabled.coverZoom?' on':'')+'" data-anim="coverZoom"></button></div>'+
+    '<div class="anim-toggle-row"><span>Track row actions fade</span><button class="toggle-switch'+(animEnabled.rows?' on':'')+'" data-anim="rows"></button></div>'+
+    '<div class="anim-toggle-row"><span>View transitions</span><button class="toggle-switch'+(animEnabled.transitions?' on':'')+'" data-anim="transitions"></button></div>'+
+    '</div>'+
+    '<div class="settings-section"><h3>Player</h3>'+
+    '<div class="anim-toggle-row"><span>Vinyl spin on album art</span><button class="toggle-switch'+(animEnabled.vinylSpin?' on':'')+'" data-anim="vinylSpin"></button></div>'+
+    '<div id="vinyl-extras"'+(animEnabled.vinylSpin?'':' style="display:none"')+'>'+
+    '<div class="anim-toggle-row"><span>CD hole in center</span><button class="toggle-switch'+(animEnabled.cdHole?' on':'')+'" data-anim="cdHole"></button></div>'+
+    '<div class="anim-toggle-row" style="flex-wrap:wrap;"><span>Vinyl spin speed</span><input type="range" id="vinyl-speed-slider" min="2" max="10" step="1" value="'+state.vinylSpinSpeed+'" style="width:100px;height:4px;"><span style="font-size:12px;color:var(--text-muted);min-width:20px;">'+state.vinylSpinSpeed+'s</span></div>'+
+    '</div>'+
+    '<div class="anim-toggle-row"><span>Glow pulse on play button</span><button class="toggle-switch'+(animEnabled.glowPulse?' on':'')+'" data-anim="glowPulse"></button></div>'+
+    '<div class="anim-toggle-row"><span>Visualizer bars</span><button class="toggle-switch'+(animEnabled.eqAnim?' on':'')+'" data-anim="eqAnim"></button></div>'+
+    '<div class="anim-toggle-row"><span>Seek bar shimmer effect</span><button class="toggle-switch'+(animEnabled.seekShimmer?' on':'')+'" data-anim="seekShimmer"></button></div>'+
+    '<div class="anim-toggle-row"><span>Queue slide animation</span><button class="toggle-switch'+(animEnabled.queueSlide?' on':'')+'" data-anim="queueSlide"></button></div>'+
+    '<div class="anim-toggle-row"><span>Lyrics fade effect</span><button class="toggle-switch'+(animEnabled.lyricsFade?' on':'')+'" data-anim="lyricsFade"></button></div>'+
+    '</div>'+
+    '<div class="settings-section"><h3>Speed</h3><div class="anim-speed-wrap">'+
+    speeds.map(function(s){return '<button class="anim-speed-btn'+(state.animSpeed===s?' active':'')+'" data-speed="'+s+'">'+speedLabels[s]+'</button>';}).join('')+
+    '</div></div>'+
+    '<div class="settings-section"><h3>Visualizer</h3>'+
+    '<div class="anim-toggle-row"><span>Bar count</span><div style="display:flex;align-items:center;gap:8px;"><input type="range" id="viz-bars-slider" min="8" max="128" step="8" value="'+state.vizBars+'" style="width:80px;height:4px;"><span id="viz-bars-label" style="font-size:12px;color:var(--text-muted);min-width:20px;">'+state.vizBars+'</span></div></div>'+
+    '<div class="anim-toggle-row"><span>Mirror mode</span><button class="toggle-switch'+(state.vizMirror?' on':'')+'" id="toggle-viz-mirror"></button></div>'+
+    '<div class="anim-toggle-row" style="flex-wrap:wrap;"><span>Style</span><div class="anim-speed-wrap" style="margin:0;">'+
+    vizStyles.map(function(s){return '<button class="anim-speed-btn viz-style-btn'+(state.vizStyle===s?' active':'')+'" data-style="'+s+'">'+vizStyleLabels[s]+'</button>';}).join('')+
+    '</div></div>'+
+    '</div>'+
+    '<div class="settings-section"><h3>Performance</h3>'+
+    '<div class="anim-toggle-row"><span>Smooth seek (60fps)</span><button class="toggle-switch'+(state.smoothSeek?' on':'')+'" id="toggle-smooth-seek"></button></div>'+
+    '<div class="anim-toggle-row"><span>Track cover thumbnails</span><button class="toggle-switch'+(state.showTrackCovers?' on':'')+'" id="toggle-track-covers"></button></div>'+
+    '</div>';
+
+  qsa('.toggle-switch', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      var key = this.dataset.anim;
+      if (key) {
+        state.animations[key] = !state.animations[key];
+        this.classList.toggle('on');
+        localStorage.setItem('moidify_animations', JSON.stringify(state.animations));
+        applyAnimationSettings();
+        applyAnimations();
+        if (key === 'vinylSpin') {
+          var extras = document.getElementById('vinyl-extras');
+          if (extras) extras.style.display = state.animations.vinylSpin ? '' : 'none';
+        }
+      }
+    });
+  });
+
+  document.getElementById('anim-toggle-all').addEventListener('click', function() {
+    var val = !Object.values(state.animations).every(function(v) { return v === true; });
+    Object.keys(state.animations).forEach(function(k) { state.animations[k] = val; });
+    localStorage.setItem('moidify_animations', JSON.stringify(state.animations));
+    qsa('.toggle-switch', container).forEach(function(t) { t.classList.toggle('on', val); });
+    this.classList.toggle('on', val);
+    applyAnimationSettings();
+    applyAnimations();
+    var extras = document.getElementById('vinyl-extras');
+    if (extras) extras.style.display = state.animations.vinylSpin ? '' : 'none';
+  });
+
+  qsa('.anim-speed-btn', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      qsa('.anim-speed-btn', container).forEach(function(s){s.classList.remove('active');});
+      this.classList.add('active');
+      state.animSpeed = this.dataset.speed;
+      localStorage.setItem('moidify_anim_speed', state.animSpeed);
+      applyAnimationSettings();
+    });
+  });
+
+  var smoothToggle = document.getElementById('toggle-smooth-seek');
+  if (smoothToggle) {
+    smoothToggle.addEventListener('click', function() {
+      state.smoothSeek = !state.smoothSeek;
+      this.classList.toggle('on');
+      localStorage.setItem('moidify_smooth_seek', state.smoothSeek);
+    });
+  }
+
+  var coversToggle = document.getElementById('toggle-track-covers');
+  if (coversToggle) {
+    coversToggle.addEventListener('click', function() {
+      state.showTrackCovers = !state.showTrackCovers;
+      this.classList.toggle('on');
+      localStorage.setItem('moidify_show_track_covers', state.showTrackCovers);
+      applyTrackCovers();
+    });
+  }
+
+  var vinylSpeed = document.getElementById('vinyl-speed-slider');
+  if (vinylSpeed) {
+    vinylSpeed.addEventListener('input', function() {
+      state.vinylSpinSpeed = parseInt(this.value);
+      localStorage.setItem('moidify_vinyl_speed', this.value);
+      var label = this.parentElement.querySelector('span:last-child');
+      if (label) label.textContent = this.value + 's';
+      applyVinylSpeed();
+    });
+  }
+
+  var mirrorToggle = document.getElementById('toggle-viz-mirror');
+  if (mirrorToggle) {
+    mirrorToggle.addEventListener('click', function() {
+      state.vizMirror = !state.vizMirror;
+      this.classList.toggle('on');
+      localStorage.setItem('moidify_viz_mirror', state.vizMirror);
+    });
+  }
+
+  var vizBarsSlider = document.getElementById('viz-bars-slider');
+  if (vizBarsSlider) {
+    vizBarsSlider.addEventListener('input', function() {
+      var val = parseInt(this.value);
+      state.vizBars = val;
+      localStorage.setItem('moidify_viz_bars', val);
+      var label = document.getElementById('viz-bars-label');
+      if (label) label.textContent = val;
+    });
+  }
+
+  qsa('.viz-style-btn', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      qsa('.viz-style-btn', container).forEach(function(s){s.classList.remove('active');});
+      this.classList.add('active');
+      state.vizStyle = this.dataset.style;
+      localStorage.setItem('moidify_viz_style', state.vizStyle);
+    });
+  });
+}
+
+function renderPlaybackTab() {
+  var container = document.getElementById('tab-playback');
+  var freqs = [32,64,125,250,500,'1K','2K','4K','8K','16K'];
+  var eqValues = state.eq || EQ_PRESETS[state.eqPreset] || EQ_PRESETS['Normal'];
+  var bands = '';
+  eqValues.forEach(function(v,i) {
+    bands += '<div class="eq-band"><input type="range" min="-12" max="12" step="1" value="'+v+'" data-band="'+i+'"><span class="eq-label">'+freqs[i]+'</span></div>';
+  });
+
+  var presetHtml = '';
+  Object.keys(EQ_PRESETS).forEach(function(name) {
+    presetHtml += '<button class="eq-preset-btn'+(state.eqPreset===name?' active':'')+'" data-preset="'+name+'">'+name+'</button>';
+  });
+
+  var qualityLabels = {original:'Original (passthrough)', high:'High (192k Opus)', medium:'Medium (128k Opus)', low:'Low (96k Opus)', voice:'Voice (64k Opus)'};
+  var qualityBtns = Object.keys(qualityLabels).map(function(k) {
+    return '<button class="eq-preset-btn'+(state.streamQuality===k?' active':'')+'" data-quality="'+k+'">'+qualityLabels[k]+'</button>';
+  }).join('');
+
+  var gaplessChecked = state.gapless ? ' checked' : '';
+  var autoplayChecked = state.autoplay ? ' checked' : '';
+  var volumeNormChecked = state.volumeNorm ? ' checked' : '';
+
+  container.innerHTML =
+    '<div class="settings-section"><h3>Equalizer</h3><div class="eq-presets">'+presetHtml+'</div><div class="eq-grid">'+bands+'</div></div>'+
+    '<div class="settings-section"><h3>Stream Quality</h3>'+
+    '<div class="eq-presets">'+qualityBtns+'</div>'+
+    '<p style="font-size:12px;color:var(--text-muted);margin-top:4px">Requires ffmpeg on the server for transcoding. Otherwise plays original.</p></div>'+
+    '<div class="settings-section"><h3>Gapless Playback</h3>'+
+    '<label class="toggle-row"><span>Preload and crossfade next track</span><input type="checkbox" id="gapless-toggle"'+gaplessChecked+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3>Autoplay / Radio</h3>'+
+    '<label class="toggle-row"><span>Auto-play similar tracks when queue ends</span><input type="checkbox" id="autoplay-toggle"'+autoplayChecked+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3>Volume Normalization</h3>'+
+    '<label class="toggle-row"><span>Apply ReplayGain volume normalization</span><input type="checkbox" id="volume-norm-toggle"'+volumeNormChecked+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3>Crossfade</h3>'+
+    '<div class="crossfade-wrap"><span style="font-size:12px;color:var(--text-muted);min-width:30px;">'+state.crossfade+'s</span>'+
+    '<input type="range" id="crossfade-slider" min="0" max="12" step="1" value="'+state.crossfade+'"><span style="font-size:12px;color:var(--text-muted);">12s</span></div></div>'+
+    '<div class="settings-section"><h3>Sleep Timer</h3>'+
+    '<p style="color:var(--text-secondary);font-size:13px;margin-bottom:8px;">'+(state.sleepTimer?'Timer is active ('+SLEEP_OPTIONS.find(function(o){return o.value===state.sleepTimer.value})?.label+')':'No timer active')+'</p>'+
+    '<button onclick="showSleepTimerPicker()" class="btn-secondary" style="padding:6px 16px;font-size:13px;border-radius:20px;border:1px solid var(--text-muted);background:transparent;color:var(--text-secondary);cursor:pointer;">'+(state.sleepTimer?'Change Timer':'Set Timer')+'</button>'+
+    (state.sleepTimer?' <button onclick="cancelSleepTimer()" class="btn-secondary" style="padding:6px 16px;font-size:13px;border-radius:20px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer;">Cancel</button>':'')+
+    '</div>';
+
+  qsa('.eq-preset-btn', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      qsa('.eq-preset-btn', container).forEach(function(s){s.classList.remove('active');});
+      this.classList.add('active');
+      var name = this.dataset.preset;
+      setEQPreset(name);
+      var values = EQ_PRESETS[name];
+      qsa('.eq-band input', container).forEach(function(input, i) {
+        input.value = values[i];
+      });
+    });
+  });
+
+  qsa('.eq-band input', container).forEach(function(el) {
+    el.addEventListener('input', function() {
+      var i = parseInt(this.dataset.band);
+      setEQBand(i, parseFloat(this.value));
+      qsa('.eq-preset-btn', container).forEach(function(s){s.classList.remove('active');});
+    });
+  });
+
+  qsa('[data-quality]', container).forEach(function(el) {
+    el.addEventListener('click', function() {
+      qsa('[data-quality]', container).forEach(function(s){s.classList.remove('active');});
+      this.classList.add('active');
+      state.streamQuality = this.dataset.quality;
+      localStorage.setItem('moidify_stream_quality', state.streamQuality);
+    });
+  });
+
+  var cf = document.getElementById('crossfade-slider');
+  if (cf) {
+    cf.addEventListener('input', function() {
+      state.crossfade = parseFloat(this.value);
+      localStorage.setItem('moidify_crossfade', this.value);
+      var label = this.parentElement.querySelector('span:first-child');
+      if (label) label.textContent = this.value + 's';
+    });
+  }
+
+  var gaplessToggle = document.getElementById('gapless-toggle');
+  if (gaplessToggle) {
+    gaplessToggle.addEventListener('change', function() {
+      state.gapless = this.checked;
+      localStorage.setItem('moidify_gapless', state.gapless);
+    });
+  }
+
+  var autoplayToggle = document.getElementById('autoplay-toggle');
+  if (autoplayToggle) {
+    autoplayToggle.addEventListener('change', function() {
+      state.autoplay = this.checked;
+      localStorage.setItem('moidify_autoplay', state.autoplay);
+    });
+  }
+
+  var volumeNormToggle = document.getElementById('volume-norm-toggle');
+  if (volumeNormToggle) {
+    volumeNormToggle.addEventListener('change', function() {
+      state.volumeNorm = this.checked;
+      localStorage.setItem('moidify_volume_norm', state.volumeNorm);
+    });
+  }
+}
+
+function renderAboutTab() {
+  var container = document.getElementById('tab-about');
+  var verEl = document.createElement('div');
+  verEl.className = 'about-row';
+  verEl.innerHTML = '<span>Version</span><span class="about-val" id="app-version">...</span>';
+  fetch('/api/version').then(function(r){return r.json();}).then(function(d){
+    document.getElementById('app-version').textContent = d.version || '?';
+  }).catch(function(){document.getElementById('app-version').textContent='?';});
+  container.innerHTML =
+    '<div class="about-section"><h3>Moidify</h3>'+
+    verEl.outerHTML +
+    '<div class="about-row"><span>Database</span><span class="about-val">SQLite</span></div>'+
+    '<div class="about-row"><span>Music folder</span><span class="about-val" style="font-size:11px;">music/</span></div>'+
+    '<div class="about-row"><span>Admin</span><span class="about-val"><a href="/admin" style="color:var(--accent);text-decoration:none;font-size:13px;">Open &rarr;</a></span></div>'+
+    '</div>'+
+    '<div class="about-section"><h3>Keyboard Shortcuts</h3>'+
+    '<div class="about-row"><span>Play/Pause</span><span class="about-val"><kbd>Space</kbd></span></div>'+
+    '<div class="about-row"><span>Seek -10s / +10s</span><span class="about-val"><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span></div>'+
+    '<div class="about-row"><span>Volume</span><span class="about-val"><kbd>&uarr;</kbd> <kbd>&darr;</kbd></span></div>'+
+    '<div class="about-row"><span>Next / Previous</span><span class="about-val"><kbd>N</kbd> <kbd>P</kbd></span></div>'+
+    '<div class="about-row"><span>Like</span><span class="about-val"><kbd>L</kbd></span></div>'+
+    '<div class="about-row"><span>Cycle Repeat</span><span class="about-val"><kbd>R</kbd></span></div>'+
+    '<div class="about-row"><span>Search</span><span class="about-val"><kbd>S</kbd></span></div>'+
+    '<div class="about-row"><span>Close modals</span><span class="about-val"><kbd>Esc</kbd></span></div>'+
+    '</div>';
+}

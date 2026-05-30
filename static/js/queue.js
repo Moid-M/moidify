@@ -49,7 +49,7 @@ function clearQueue() {
   renderQueuePanel(); clearAnimations();
   document.getElementById('player-title').textContent='';
   document.getElementById('player-artist').textContent='';
-  document.getElementById('player-cover').src='/static/placeholder-cover.svg';
+  document.getElementById('player-cover').src='/static/logo.png';
   var bd=document.getElementById('backdrop'); bd.classList.remove('visible'); bd.style.background='';
 }
 
@@ -89,7 +89,7 @@ function renderQueuePanel() {
     qTitle.textContent = cur.title||'';
     qArtist.textContent = (cur.artist||'')+(cur.album?'  '+cur.album:'');
   } else {
-    cover.src = '/static/placeholder-cover.svg';
+    cover.src = '/static/logo.png';
     qTitle.textContent = 'Nothing playing'; qArtist.textContent = '';
   }
 

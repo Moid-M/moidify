@@ -26,16 +26,14 @@ function showModal(html) {
   overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
 }
 
+var modalCloseTimer = null;
 function closeModal() {
   var overlay = document.getElementById('modal-overlay');
   var modal = document.getElementById('modal');
-  if (modal) { modal.style.animation = 'modal-out 0.2s ease-in forwards'; }
-  if (overlay) { overlay.style.animation = 'overlay-out 0.2s ease-in forwards'; }
-  setTimeout(function() {
-    overlay.style.display = 'none';
-    if (modal) { modal.style.animation = ''; }
-    if (overlay) { overlay.style.animation = ''; }
-  }, 200);
+  if (!overlay) return;
+  overlay.style.display = 'none';
+  if (modal) { modal.style.animation = ''; }
+  if (overlay) { overlay.style.animation = ''; }
 }
 
 function showToast(msg, type) {
@@ -68,7 +66,9 @@ function showSettings() {
   }).join('');
 
   showModal('<div class="settings-layout"><div class="settings-sidebar">'+sidebarHtml+'<div class="settings-indicator"></div></div><div class="settings-main">'+contentHtml+'</div></div>');
-  translateDOM(document.getElementById('modal'));
+  var settingsModal = document.getElementById('modal');
+  if (settingsModal) settingsModal.classList.add('settings-open');
+  translateDOM(settingsModal);
   renderThemeTab();
   renderAnimationsTab();
   renderPlaybackTab();
@@ -94,20 +94,8 @@ function showSettings() {
       var newTab = document.getElementById('tab-'+this.dataset.tab);
       if (activeTab && activeTab !== newTab) {
         activeTab.classList.remove('active');
-        activeTab.style.opacity = '0';
-        activeTab.style.transform = 'translateX(-12px)';
-        setTimeout(function() {
-          activeTab.style.opacity = '';
-          activeTab.style.transform = '';
-        }, 300);
       }
-      newTab.classList.add('active');
-      newTab.style.opacity = '0';
-      newTab.style.transform = 'translateX(12px)';
-      // Force reflow so the browser registers the starting state
-      newTab.offsetHeight;
-      newTab.style.opacity = '1';
-      newTab.style.transform = 'translateX(0)';
+      if (newTab) newTab.classList.add('active');
     });
   });
 
@@ -874,6 +862,7 @@ function showContextMenu(event, track, queue, index) {
 function hideContextMenu() {
   var menu = document.getElementById('context-menu');
   menu.style.display = 'none'; menu.innerHTML = '';
+  document.removeEventListener('click', hideContextMenuOnce);
 }
 
 function hideContextMenuOnce(e) {

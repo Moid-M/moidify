@@ -3,7 +3,7 @@ from typing import Optional
 
 from database import get_connection
 from routes.deps import (
-    _hash_password, _create_session, _get_user_from_token,
+    _hash_password, _create_session, _get_user_from_token, _validate_password,
     RegisterBody, LoginBody, SetupInitBody,
 )
 
@@ -18,8 +18,7 @@ def get_version():
 
 @router.post("/api/auth/register")
 def register(body: RegisterBody):
-    if len(body.password) < 8:
-        raise HTTPException(400, "Password must be at least 8 characters")
+    _validate_password(body.password)
     if len(body.username) < 1:
         raise HTTPException(400, "Username is required")
     conn = get_connection()
@@ -76,6 +75,7 @@ def setup_status():
 
 @router.post("/api/setup/init")
 def setup_init(body: SetupInitBody):
+    _validate_password(body.password)
     conn = get_connection()
     admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
     if admin_count > 0:

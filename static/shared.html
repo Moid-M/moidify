@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="icon" type="image/png" href="/static/logo.png">
 <title>Shared Playlist — Moidify</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0d0d0d;--bg-el:#131313;--bg-hover:#1f1f1f;--card:#1a1a1a;--text:#fff;--text2:#b3b3b3;--text3:#6a6a6a;--accent:#a855f7;--accent-dim:rgba(168,85,247,.15);--radius:8px}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
-.wrap{max-width:700px;margin:0 auto;padding:40px 20px}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;padding-bottom:90px}
+.wrap{max-width:700px;margin:0 auto;padding:40px 20px 20px}
 .header{margin-bottom:32px;text-align:center}
 .header h1{font-size:24px;color:var(--accent);margin-bottom:4px}
 .header .by{font-size:14px;color:var(--text3)}
@@ -16,6 +17,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .track-list{display:flex;flex-direction:column;gap:2px}
 .track-row{display:grid;grid-template-columns:32px 1fr 1fr 60px;gap:12px;align-items:center;padding:10px 14px;border-radius:var(--radius);background:var(--bg-el);transition:.15s;cursor:pointer}
 .track-row:hover{background:var(--bg-hover)}
+.track-row.active{background:var(--accent-dim)}
 .track-row .num{color:var(--text3);font-size:13px;text-align:center}
 .track-row .title{color:var(--text);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .track-row .artist{color:var(--text2);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -25,6 +27,23 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .error{text-align:center;padding:40px;color:#e74c3c}
 .footer{text-align:center;margin-top:32px;font-size:13px;color:var(--text3)}
 .footer a{color:var(--accent);text-decoration:none}
+/* player bar */
+.player-bar{position:fixed;bottom:0;left:0;right:0;background:var(--bg-el);border-top:1px solid rgba(255,255,255,.05);padding:10px 20px;display:none;align-items:center;gap:14px;z-index:100}
+.player-bar .p-info{flex:1;min-width:0;font-size:13px;line-height:1.3}
+.player-bar .p-info .p-title{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.player-bar .p-info .p-artist{color:var(--text3)}
+.player-bar .p-controls{display:flex;align-items:center;gap:8px}
+.player-bar .p-btn{background:none;border:none;color:var(--text2);cursor:pointer;padding:4px;font-size:18px;line-height:1;transition:.15s;border-radius:4px;display:flex;align-items:center}
+.player-bar .p-btn:hover{color:var(--text);background:var(--bg-hover)}
+.player-bar .p-btn.play-btn{font-size:24px;color:var(--accent)}
+.player-bar .p-btn.play-btn:hover{color:#c084fc}
+.player-bar .p-progress{flex:0 0 180px;height:4px;background:var(--bg-hover);border-radius:2px;cursor:pointer;position:relative}
+.player-bar .p-progress .p-fill{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width .1s linear}
+@media(max-width:600px){
+  .player-bar{flex-wrap:wrap;gap:8px;padding:8px 12px}
+  .player-bar .p-progress{flex:1 1 100%;order:3}
+  .player-bar .p-info{flex:1 1 auto}
+}
 </style>
 </head>
 <body>
@@ -41,8 +60,76 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 </div>
 
+<div class="player-bar" id="player-bar">
+  <div class="p-info">
+    <div class="p-title" id="p-title">—</div>
+    <div class="p-artist" id="p-artist">—</div>
+  </div>
+  <div class="p-progress" id="p-progress">
+    <div class="p-fill" id="p-fill"></div>
+  </div>
+  <div class="p-controls">
+    <button class="p-btn" id="p-prev" title="Previous">⏮</button>
+    <button class="p-btn play-btn" id="p-play" title="Play">▶</button>
+    <button class="p-btn" id="p-next" title="Next">⏭</button>
+  </div>
+</div>
+
 <script>
 var token = window.location.pathname.split('/').pop();
+var tracks = [];
+var currentIndex = -1;
+var audio = null;
+
+function playTrack(i) {
+  if (i < 0 || i >= tracks.length) return;
+  if (audio) { audio.pause(); audio.src = ''; }
+  currentIndex = i;
+  var t = tracks[i];
+  document.getElementById('p-title').textContent = t.title || 'Unknown';
+  document.getElementById('p-artist').textContent = t.artist || 'Unknown';
+  document.getElementById('player-bar').style.display = 'flex';
+  document.getElementById('p-play').textContent = '⏸';
+
+  qsa('.track-row.active').forEach(function(r){r.classList.remove('active')});
+  var rows = qsa('.track-row');
+  if (rows[i]) rows[i].classList.add('active');
+
+  audio = new Audio('/api/stream/'+t.id+'?quality=low');
+  audio.play();
+  audio.addEventListener('timeupdate', updateProgress);
+  audio.addEventListener('ended', function() {
+    audio.src = '';
+    nextTrack();
+  });
+}
+
+function togglePlay() {
+  if (!audio) { if (tracks.length) playTrack(0); return; }
+  if (audio.paused) {
+    audio.play();
+    document.getElementById('p-play').textContent = '⏸';
+  } else {
+    audio.pause();
+    document.getElementById('p-play').textContent = '▶';
+  }
+}
+
+function nextTrack() { playTrack(currentIndex + 1); }
+function prevTrack() { playTrack(currentIndex - 1); }
+
+function updateProgress() {
+  if (!audio || !audio.duration) return;
+  var pct = (audio.currentTime / audio.duration) * 100;
+  document.getElementById('p-fill').style.width = pct + '%';
+}
+
+function seek(e) {
+  if (!audio || !audio.duration) return;
+  var rect = e.currentTarget.getBoundingClientRect();
+  var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  audio.currentTime = pct * audio.duration;
+}
 
 fetch('/api/shared/' + token).then(function(r) {
   if (!r.ok) throw new Error('Playlist not found');
@@ -58,9 +145,10 @@ fetch('/api/shared/' + token).then(function(r) {
     return;
   }
 
+  tracks = data.tracks;
   var list = document.createElement('div');
   list.className = 'track-list';
-  data.tracks.forEach(function(t, i) {
+  tracks.forEach(function(t, i) {
     var dur = t.duration ? Math.floor(t.duration/60)+':'+String(Math.floor(t.duration%60)).padStart(2,'0') : '?';
     var row = document.createElement('div');
     row.className = 'track-row';
@@ -69,10 +157,7 @@ fetch('/api/shared/' + token).then(function(r) {
       '<span class="title">'+esc(t.title||'Unknown')+'</span>'+
       '<span class="artist">'+esc(t.artist||'Unknown')+'</span>'+
       '<span class="dur">'+dur+'</span>';
-    row.addEventListener('click', function() {
-      var a = new Audio('/api/stream/'+t.id+'?quality=low');
-      a.play();
-    });
+    row.addEventListener('click', function() { playTrack(i); });
     list.appendChild(row);
   });
   container.appendChild(list);
@@ -82,12 +167,24 @@ fetch('/api/shared/' + token).then(function(r) {
   document.getElementById('track-container').innerHTML = '<div class="error">'+e.message+'</div>';
 });
 
+document.getElementById('p-play').addEventListener('click', togglePlay);
+document.getElementById('p-next').addEventListener('click', nextTrack);
+document.getElementById('p-prev').addEventListener('click', prevTrack);
+document.getElementById('p-progress').addEventListener('click', seek);
+
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+});
+
 function esc(s) {
   if (!s) return '';
   var d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
 }
+
+function qsa(s) { return document.querySelectorAll(s); }
 </script>
 </body>
 </html>
