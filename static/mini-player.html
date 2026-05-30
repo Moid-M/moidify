@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moidify Mini Player</title>
+  <link rel="icon" type="image/png" href="/static/logo.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #111;
+      color: #fff;
+      overflow: hidden;
+      user-select: none;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      height: 100dvh;
+    }
+    #player {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      width: 100%;
+      max-width: 420px;
+    }
+    #cover {
+      width: 56px;
+      height: 56px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #222;
+      flex-shrink: 0;
+    }
+    #info {
+      flex: 1;
+      min-width: 0;
+    }
+    #title {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #artist {
+      font-size: 12px;
+      color: #999;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+    #controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    button {
+      background: none;
+      border: none;
+      color: #ccc;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    button:hover { background: #222; color: #fff; }
+    button svg { display: block; }
+    #close-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      color: #666;
+      font-size: 18px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    #close-btn:hover { color: #fff; background: #222; }
+    #empty {
+      display: none;
+      text-align: center;
+      color: #666;
+      font-size: 13px;
+      padding: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div id="player">
+    <img id="cover" src="/static/logo.png" alt="">
+    <div id="info">
+      <div id="title">Not playing</div>
+      <div id="artist"></div>
+    </div>
+    <div id="controls">
+      <button id="prev-btn" title="Previous">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="2" height="16" rx="1"/></svg>
+      </button>
+      <button id="play-btn" title="Play">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>
+      </button>
+      <button id="next-btn" title="Next">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="5,20 15,12 5,4"/><rect x="17" y="4" width="2" height="16" rx="1"/></svg>
+      </button>
+    </div>
+  </div>
+    <button id="close-btn" title="Close">✕</button>
+  <div id="empty">Open a track in Moidify to control playback here.</div>
+
+  <script>
+    var cover = document.getElementById('cover');
+    var title = document.getElementById('title');
+    var artist = document.getElementById('artist');
+    var playBtn = document.getElementById('play-btn');
+    var prevBtn = document.getElementById('prev-btn');
+    var nextBtn = document.getElementById('next-btn');
+    var closeBtn = document.getElementById('close-btn');
+    var player = document.getElementById('player');
+    var empty = document.getElementById('empty');
+
+    function update() {
+      try {
+        var w = window.opener || window.parent;
+        if (!w || !w.state || !w.state.queue || !w.state.queue.length) {
+          player.style.display = 'none';
+          empty.style.display = 'block';
+          return;
+        }
+        player.style.display = 'flex';
+        empty.style.display = 'none';
+        var track = w.state.queue[w.state.currentIndex];
+        if (!track) { player.style.display = 'none'; empty.style.display = 'block'; return; }
+        cover.src = '/api/cover/' + track.id;
+        cover.onerror = function() { this.src = '/static/logo.png'; };
+        title.textContent = track.title || 'Unknown';
+        artist.textContent = track.artist || '';
+        var paused = w.audio ? w.audio.paused : true;
+        playBtn.innerHTML = paused
+          ? '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+      } catch(e) {
+        player.style.display = 'none';
+        empty.style.display = 'block';
+        empty.textContent = 'Connection to main window lost.';
+      }
+    }
+
+    function callOpener(fn) {
+      try {
+        var w = window.opener || window.parent;
+        if (w && typeof w[fn] === 'function') w[fn]();
+      } catch(e) {}
+    }
+
+    playBtn.addEventListener('click', function() { callOpener('togglePlay'); setTimeout(update, 60); });
+    prevBtn.addEventListener('click', function() { callOpener('prevTrack'); setTimeout(update, 60); });
+    nextBtn.addEventListener('click', function() { callOpener('nextTrack'); setTimeout(update, 60); });
+    closeBtn.addEventListener('click', function() { window.close(); });
+
+    setInterval(update, 500);
+    update();
+
+    document.addEventListener('keydown', function(e) {
+      if (e.code === 'Space') { e.preventDefault(); playBtn.click(); }
+      if (e.code === 'ArrowLeft') prevBtn.click();
+      if (e.code === 'ArrowRight') nextBtn.click();
+    });
+  </script>
+</body>
+</html>
