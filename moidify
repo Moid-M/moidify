@@ -185,6 +185,14 @@ case "${1:-}" in
   url)
     echo "$(url)"
     ;;
+  update)
+    if [[ -f "$APP_DIR/update.sh" ]]; then
+      exec "$APP_DIR/update.sh"
+    else
+      err "Update script not found at $APP_DIR/update.sh"
+      exit 1
+    fi
+    ;;
   download)
     # Join all remaining args in case URL has unquoted & or other shell metacharacters
     URL=""
