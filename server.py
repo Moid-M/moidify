@@ -1,10 +1,14 @@
 import threading
+import sys
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+sys.path.insert(0, str(Path(__file__).parent / "extra-pkgs"))
 
 from config import BASE_DIR, PORT, STATIC_DIR
 from database import init_db

@@ -187,6 +187,16 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
     </div>
 
     <div class="tab" id="tab-songs">
+      <div class="chart-card" style="margin-bottom:24px;">
+        <h3 style="margin-bottom:12px">Import from URL</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:8px;">Download from YouTube, SoundCloud, Bandcamp, etc.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="text" id="import-url-input" placeholder="https://youtube.com/watch?v=..." style="flex:1;min-width:200px;padding:8px 12px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg-el);color:var(--text);font-size:14px;outline:none;">
+          <button onclick="submitImportUrl()" class="admin-btn" style="padding:8px 16px">Download</button>
+        </div>
+        <div id="import-status" style="display:none;margin-top:8px;font-size:13px;color:var(--text2);"></div>
+      </div>
+
       <h2>Upload Music</h2>
       <div class="upload-zone" id="drop-zone">
         <p>Drop files here or click to browse</p>
@@ -526,6 +536,54 @@ async function setSchedule() {
     loadSchedule();
     showToast('Schedule updated', 'success');
   } catch(e) { alert('Error: '+e.message); }
+}
+
+// --- Import from URL ---
+var importPollTimer = null;
+
+async function submitImportUrl() {
+  var input = document.getElementById('import-url-input');
+  var url = input.value.trim();
+  if (!url) { showToast('Enter a URL', 'error'); return; }
+  var statusEl = document.getElementById('import-status');
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = 'Submitting...';
+  input.disabled = true;
+  try {
+    var r = await api('/api/admin/import-url', {method:'POST', body:{url: url}});
+    if (!r.ok) { var e = await r.json(); statusEl.innerHTML = '<span style="color:var(--danger)">'+(e.detail||'Error')+'</span>'; input.disabled = false; return; }
+    var d = await r.json();
+    statusEl.innerHTML = 'Queued. Job ID: '+d.job_id;
+    var poll = function() {
+      importPollTimer = setTimeout(async function() {
+        try {
+          var pr = await api('/api/admin/import-status/'+d.job_id);
+          if (!pr.ok) { statusEl.innerHTML = '<span style="color:var(--danger)">Failed to check status</span>'; input.disabled = false; return; }
+          var ps = await pr.json();
+          if (ps.status === 'done') {
+            statusEl.innerHTML = '<span style="color:var(--accent)">Complete!</span>';
+            input.value = '';
+            input.disabled = false;
+            loadStats();
+            loadTracks();
+          } else if (ps.status === 'error') {
+            statusEl.innerHTML = '<span style="color:var(--danger)">Error: '+esc(ps.error||'Unknown')+'</span>';
+            input.disabled = false;
+          } else if (ps.status === 'importing') {
+            statusEl.innerHTML = 'Importing to library...';
+            poll();
+          } else if (ps.status === 'downloading') {
+            statusEl.innerHTML = 'Downloading: '+ps.progress+'%';
+            poll();
+          } else {
+            statusEl.innerHTML = 'Status: '+ps.status;
+            poll();
+          }
+        } catch(e) { statusEl.innerHTML = '<span style="color:var(--danger)">Error: '+e.message+'</span>'; input.disabled = false; }
+      }, 2000);
+    };
+    poll();
+  } catch(e) { statusEl.innerHTML = '<span style="color:var(--danger)">Error: '+e.message+'</span>'; input.disabled = false; }
 }
 
 function showToast(msg, type) {

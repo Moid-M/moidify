@@ -25,7 +25,7 @@
   <p align="center">
     <img src="https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python">
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
-    <img src="https://img.shields.io/badge/version-1.5-purple?style=flat-square">
+    <img src="https://img.shields.io/badge/version-1.6-purple?style=flat-square">
     <img src="https://img.shields.io/badge/status-stable-brightgreen?style=flat-square">
   </p>
   <br>
@@ -67,6 +67,8 @@
 **💿 Vinyl Animation** — spinning disc with CD hole effect on the queue cover art (toggle in settings)
 
 **🛡️ Admin Dashboard** — rescan library, manage users, view play stats, upload files via drag-and-drop
+
+**📥 YouTube / SoundCloud Import** — download any audio URL via the admin panel or `moidify download <url>` CLI command (uses yt-dlp, converts to 192kbps MP3)
 
 **📤 Configurable Upload Limit** — default 2.5 GB, changeable via config file, env var (`MOIDIFY_MAX_UPLOAD_SIZE`), or browser setup wizard
 
@@ -189,6 +191,7 @@ moidify config        Print current configuration
 moidify version       Print version
 moidify url           Print server URL
 moidify update        Update to latest version
+moidify download <url>  Download and import audio from YouTube/SoundCloud/etc
 ```
 
 ### Service management (direct)

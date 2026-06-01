@@ -2,6 +2,7 @@ import json
 import os
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -14,6 +15,56 @@ from routes.deps import (
     _require_admin, _hash_password, _create_session, _validate_password,
     ScheduleBody, ToggleAdminBody, CreateUserBody, ChangePasswordBody,
 )
+from pydantic import BaseModel
+
+DOWNLOAD_JOBS = {}
+DOWNLOAD_LOCK = threading.Lock()
+
+class ImportUrlBody(BaseModel):
+    url: str
+
+def _download_worker(job_id: str, url: str):
+    try:
+        import yt_dlp
+        output_template = str(MUSIC_DIR / "%(title)s.%(ext)s")
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': output_template,
+            'quiet': True,
+            'no_warnings': True,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'progress_hooks': [_make_progress_hook(job_id)],
+        }
+        with DOWNLOAD_LOCK:
+            DOWNLOAD_JOBS[job_id]["status"] = "downloading"
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            title = info.get("title", "Unknown")
+        with DOWNLOAD_LOCK:
+            DOWNLOAD_JOBS[job_id]["title"] = title
+            DOWNLOAD_JOBS[job_id]["status"] = "importing"
+        # Trigger a scan to pick up the new file
+        scan_existing()
+        with DOWNLOAD_LOCK:
+            DOWNLOAD_JOBS[job_id]["status"] = "done"
+    except Exception as e:
+        with DOWNLOAD_LOCK:
+            DOWNLOAD_JOBS[job_id]["status"] = "error"
+            DOWNLOAD_JOBS[job_id]["error"] = str(e)
+
+def _make_progress_hook(job_id: str):
+    def hook(d):
+        if d.get('status') == 'downloading':
+            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
+            downloaded = d.get('downloaded_bytes', 0)
+            pct = (downloaded / total * 100) if total else 0
+            with DOWNLOAD_LOCK:
+                DOWNLOAD_JOBS[job_id]["progress"] = round(pct, 1)
+    return hook
 
 router = APIRouter(tags=["admin"])
 
@@ -381,3 +432,23 @@ def admin_delete_user(user_id: int, token: Optional[str] = Header(None)):
     conn.commit()
     conn.close()
     return {"ok": True, "username": target["username"]}
+
+
+@router.post("/api/admin/import-url")
+def import_from_url(body: ImportUrlBody, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    job_id = uuid.uuid4().hex[:12]
+    with DOWNLOAD_LOCK:
+        DOWNLOAD_JOBS[job_id] = {"status": "queued", "progress": 0, "title": None, "error": None}
+    threading.Thread(target=_download_worker, args=(job_id, body.url), daemon=True).start()
+    return {"job_id": job_id, "status": "queued"}
+
+
+@router.get("/api/admin/import-status/{job_id}")
+def get_import_status(job_id: str, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    with DOWNLOAD_LOCK:
+        job = DOWNLOAD_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return job

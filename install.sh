@@ -279,6 +279,17 @@ else
 fi
 ok "Python dependencies installed."
 
+# ─── yt-dlp (for URL imports) ────────────────────────────────────────────────
+info "Installing yt-dlp for YouTube/SoundCloud imports..."
+mkdir -p "$APP_DIR/extra-pkgs"
+if "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --no-cache-dir yt-dlp 2>/dev/null; then
+  ok "yt-dlp installed."
+else
+  warn "yt-dlp installation failed (URL import won't work). Install manually:"
+  warn "  sudo $PYTHON -m pip install --target=$APP_DIR/extra-pkgs yt-dlp"
+fi
+chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/extra-pkgs" 2>/dev/null || true
+
 # ─── Config ──────────────────────────────────────────────────────────────────
 cat > "$CONFIG_DIR/config.json" <<CONF
 {
