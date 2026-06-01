@@ -186,11 +186,18 @@ case "${1:-}" in
     echo "$(url)"
     ;;
   download)
-    URL="${2:-}"
+    # Join all remaining args in case URL has unquoted & or other shell metacharacters
+    URL=""
+    for arg in "${@:2}"; do
+      URL="${URL}${URL:+ }${arg}"
+    done
     if [[ -z "$URL" ]]; then
       err "Usage: moidify download <url>"
       echo ""
       echo "Download a song from YouTube/SoundCloud/etc and import it into your library."
+      echo ""
+      echo -e "${YELLOW}Tip:${NC} Quote the URL if it contains ${YELLOW}&${NC} or other special characters:"
+      echo -e "  moidify download ${YELLOW}'${NC}https://...${YELLOW}'${NC}"
       exit 1
     fi
     # Use an API token from the CLI config for admin access
