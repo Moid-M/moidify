@@ -353,8 +353,6 @@ moidify/
 
 ## 📸 Screenshots
 
-> *Screenshots coming soon.*
-> 
 > <details>
 > <summary><b>🖥️ Desktop (click to expand)</b></summary>
 > <br>
