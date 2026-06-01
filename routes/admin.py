@@ -26,6 +26,10 @@ class ImportUrlBody(BaseModel):
 def _download_worker(job_id: str, url: str):
     try:
         import yt_dlp
+        import urllib.request
+        from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, TDRC, TCON, TRCK
+        from mutagen.mp3 import MP3
+
         output_template = str(MUSIC_DIR / "%(title)s.%(ext)s")
         ydl_opts = {
             'format': 'bestaudio/best',
@@ -44,8 +48,57 @@ def _download_worker(job_id: str, url: str):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             title = info.get("title", "Unknown")
+            artist = info.get("uploader") or info.get("channel") or info.get("artist") or "Unknown"
+            album = info.get("album") or ""
+            year = str(info.get("release_year") or info.get("year") or "")
+            genre = info.get("genre") or ""
+            track_num = str(info.get("track_number") or info.get("playlist_index") or "")
+            thumbnail_url = info.get("thumbnail") or ""
+
+        # Find the output file
+        outfile = None
+        for f in MUSIC_DIR.iterdir():
+            if f.suffix.lower() == ".mp3" and f.name.startswith(info.get("title", "")[:40]):
+                outfile = f
+                break
+        if not outfile:
+            for f in MUSIC_DIR.iterdir():
+                if f.suffix.lower() == ".mp3":
+                    outfile = f
+                    break
+
+        if outfile:
+            try:
+                tags = ID3(outfile)
+            except Exception:
+                tags = ID3()
+            tags["TIT2"] = TIT2(encoding=3, text=title)
+            tags["TPE1"] = TPE1(encoding=3, text=artist)
+            if album:
+                tags["TALB"] = TALB(encoding=3, text=album)
+            if year:
+                tags["TDRC"] = TDRC(encoding=3, text=year)
+            if genre:
+                tags["TCON"] = TCON(encoding=3, text=genre)
+            if track_num:
+                tags["TRCK"] = TRCK(encoding=3, text=track_num)
+            # Download and embed cover art
+            if thumbnail_url:
+                try:
+                    req = urllib.request.Request(thumbnail_url, headers={"User-Agent": "Mozilla/5.0"})
+                    img_data = urllib.request.urlopen(req, timeout=15).read()
+                    mime = "image/jpeg"
+                    if thumbnail_url.endswith(".png"):
+                        mime = "image/png"
+                    if thumbnail_url.endswith(".webp"):
+                        mime = "image/webp"
+                    tags["APIC"] = APIC(encoding=3, mime=mime, type=3, desc="Cover", data=img_data)
+                except Exception:
+                    pass
+            tags.save(outfile)
+
         with DOWNLOAD_LOCK:
-            DOWNLOAD_JOBS[job_id]["title"] = title
+            DOWNLOAD_JOBS[job_id]["title"] = f"{title} — {artist}"
             DOWNLOAD_JOBS[job_id]["status"] = "importing"
         # Trigger a scan to pick up the new file
         scan_existing()
