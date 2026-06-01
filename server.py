@@ -53,12 +53,14 @@ from routes.tracks import router as tracks_router
 from routes.streaming import router as streaming_router
 from routes.playlists import router as playlists_router
 from routes.admin import router as admin_router
+from routes.player import router as player_router
 
 app.include_router(auth_router)
 app.include_router(tracks_router)
 app.include_router(streaming_router)
 app.include_router(playlists_router)
 app.include_router(admin_router)
+app.include_router(player_router)
 
 
 # Static pages

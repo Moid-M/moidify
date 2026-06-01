@@ -2,6 +2,7 @@ import os
 import time
 import re
 import hashlib
+import logging
 import threading
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from watchdog.events import FileSystemEventHandler
 
 from database import get_connection
 from config import MUSIC_DIR, COVERS_DIR
+
+logger = logging.getLogger(__name__)
 
 AUDIO_EXTENSIONS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.wma', '.aac'}
 
@@ -160,6 +163,7 @@ def extract_metadata(file_path):
         return info
 
     except Exception as e:
+        logger.warning("Failed to extract metadata from %s: %s", file_path, e)
         return None
 
 

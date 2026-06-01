@@ -11,7 +11,7 @@
   <div id="app">
     <aside id="sidebar">
       <div class="drag-handle" id="sidebar-drag"></div>
-      <div class="logo"><img class="logo-img" src="/static/logo.png" alt="">Moidify</div>
+      <div class="logo"><img class="logo-img" src="/static/logo.png" alt="Moidify logo"></div>
 
       <div class="search-box">
         <input type="text" id="search" data-i18n="search.placeholder" placeholder="Search tracks, artists, albums..." autocomplete="off">
@@ -75,7 +75,7 @@
         </button>
       </div>
       <div class="queue-now-playing">
-        <div id="queue-cover-wrap" class="queue-cover-wrap"><img id="queue-cover" src="/static/logo.png" alt=""></div>
+        <div id="queue-cover-wrap" class="queue-cover-wrap"><img id="queue-cover" src="/static/logo.png" alt="Cover art"></div>
         <div class="queue-now-info">
           <span id="queue-title" class="queue-now-title"></span>
           <span id="queue-artist" class="queue-now-artist"></span>
@@ -98,9 +98,9 @@
           <span>Sleep Timer</span>
           <span id="sleep-timer-display"></span>
         </div>
-        <div class="queue-mini-progress" style="padding:0 8px;">
+        <div class="queue-mini-progress">
           <input type="range" id="sleep-timer-progress" min="0" max="100" value="0">
-          <div class="queue-mini-times" style="padding:0;">
+          <div class="queue-mini-times">
             <span id="sleep-timer-label"></span>
             <button id="sleep-timer-cancel" class="sleep-cancel-btn">Cancel</button>
           </div>
@@ -121,8 +121,8 @@
       </div>
       <div class="player-body">
           <div class="player-left">
-            <div class="player-cover-wrap" style="position:relative;flex-shrink:0;">
-              <img id="player-cover" src="/static/logo.png" alt="">
+            <div class="player-cover-wrap">
+              <img id="player-cover" src="/static/logo.png" alt="Current track cover">
               <button id="player-cover-expand" class="cover-expand-btn" title="Full-screen art">⛶</button>
             </div>
             <div class="player-eq eq-anim" style="display:none"><span></span><span></span><span></span><span></span><span></span></div>
@@ -154,7 +154,7 @@
             <button id="repeat-btn" class="ctrl-btn" title="Repeat: Off" data-i18n-title="player.repeat_off">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
             </button>
-            <button id="speed-btn" class="ctrl-btn" title="Playback Speed" style="font-size:11px;font-weight:600;letter-spacing:0.5px;min-width:32px;">1x</button>
+            <button id="speed-btn" class="ctrl-btn" title="Playback Speed">1x</button>
           </div>
         </div>
         <div class="player-right">
@@ -174,7 +174,7 @@
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1.5"/><circle cx="4" cy="12" r="1.5"/><circle cx="4" cy="18" r="1.5"/></svg>
             <span id="queue-badge" class="badge" style="display:none">0</span>
           </button>
-          <button id="mini-player-btn" class="ctrl-btn" title="Mini Player" style="position:relative;">
+          <button id="mini-player-btn" class="ctrl-btn" title="Mini Player">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           </button>
         </div>
@@ -205,7 +205,7 @@
 
   <div id="mini-player" style="display:none">
     <div id="mini-player-body">
-      <img id="mini-cover" src="/static/logo.png" alt="">
+      <img id="mini-cover" src="/static/logo.png" alt="Mini player cover">
       <div id="mini-meta">
         <span id="mini-title"></span>
         <span id="mini-artist"></span>
@@ -229,7 +229,7 @@
       </div>
       <div id="nowplaying-body">
         <div id="np-art-section">
-          <img id="np-cover" src="/static/logo.png" alt="">
+          <img id="np-cover" src="/static/logo.png" alt="Now playing cover">
           <div id="np-info">
             <span id="np-title"></span>
             <span id="np-artist"></span>

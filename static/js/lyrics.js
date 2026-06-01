@@ -61,33 +61,13 @@ async function fetchLyrics(track) {
         var data = await res.json();
         if (data.lyrics && data.lyrics.trim()) {
           lyricsText = data.lyrics;
-          source = 'Embedded';
         }
       }
     } catch(e) {}
   }
 
   if (!lyricsText) {
-    try {
-      var params = new URLSearchParams({
-        artist_name: track.artist || '',
-        track_name: track.title || '',
-        album_name: track.album || '',
-      });
-      var controller = new AbortController();
-      var timeoutId = setTimeout(function() { controller.abort(); }, 8000);
-      var res = await fetch('https://lrclib.net/api/get?' + params.toString(), { signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        var data = await res.json();
-        lyricsText = data.syncedLyrics || data.plainLyrics;
-        source = data.syncedLyrics ? 'LRCLIB' : 'LRCLIB';
-      }
-    } catch(e) {}
-  }
-
-  if (!lyricsText) {
-    content.innerHTML = '<div class="lyrics-placeholder"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><p>No lyrics found</p><p style="font-size:13px;color:var(--text-muted);">Try a different track or check your connection</p></div>';
+    content.innerHTML = '<div class="lyrics-placeholder"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><p>No lyrics found</p><p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Click retry to search again</p><button onclick="fetchLyrics(state.queue[state.currentIndex])" class="btn-secondary" style="margin-top:12px;">Retry</button></div>';
     return;
   }
 
@@ -117,6 +97,7 @@ async function fetchLyrics(track) {
       content.appendChild(div);
     });
     window.currentLyrics = syncedLyrics;
+    window.currentLyricsText = null;
     if (syncedLyrics.length === 0) {
       content.innerHTML = '<div class="lyrics-placeholder"><p>No lyrics available</p></div>';
     }
@@ -124,6 +105,8 @@ async function fetchLyrics(track) {
     content.innerHTML = '<div class="lyrics-plain">' + esc(lyricsText).split('\n').map(function(p) {
       return '<p>' + esc(p) + '</p>';
     }).join('') + '</div>';
+    window.currentLyrics = [];
+    window.currentLyricsText = lyricsText;
   }
 }
 

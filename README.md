@@ -8,6 +8,8 @@
     A self-hosted music server that streams your collection to any browser.
     <br>
     Drop files. Listen instantly. No accounts required. No algorithms. No ads.
+    <br>
+    <strong>🔒 No telemetry. No tracking. Everything stays yours.</strong>
   </p>
   <p align="center">
     <a href="#-quick-install">🚀 Quick Install</a>
@@ -23,7 +25,7 @@
   <p align="center">
     <img src="https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python">
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
-    <img src="https://img.shields.io/badge/version-1.4.2-purple?style=flat-square">
+    <img src="https://img.shields.io/badge/version-1.5-purple?style=flat-square">
     <img src="https://img.shields.io/badge/status-stable-brightgreen?style=flat-square">
   </p>
   <br>
@@ -66,6 +68,8 @@
 
 **🛡️ Admin Dashboard** — rescan library, manage users, view play stats, upload files via drag-and-drop
 
+**📤 Configurable Upload Limit** — default 2.5 GB, changeable via config file, env var (`MOIDIFY_MAX_UPLOAD_SIZE`), or browser setup wizard
+
 **🔧 Setup Wizard** — first-run wizard at `/setup` creates admin account and guides configuration
 
 **🐳 Docker Support** — Dockerfile + docker-compose.yml for containerized deployment
@@ -83,6 +87,12 @@
 **📱 Responsive** — works on desktop and mobile browsers
 
 **🎚️ Track Rating** — rate songs 1-5 stars from the track list or context menu
+
+**🔒 No Telemetry** — zero tracking, zero external calls (except optional LRCLIB for lyrics), everything stays on your server
+
+**👤 Dedicated System User** — runs as `moidify` user, not root; isolated and sandboxed by design
+
+**🔐 Optional Auth** — anonymous browsing by default, opt-in user accounts with admin roles; no sign-up wall
 
 </td>
 </tr>
@@ -109,10 +119,11 @@ curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sud
 | 3 | Copies the app to `/opt/moidify` |
 | 4 | Sets up a Python virtual environment |
 | 5 | Installs Python dependencies (FastAPI, uvicorn, mutagen, watchdog) |
-| 6 | **Asks for port number** (default **8000**) |
-| 7 | **Asks for your music folder location** |
-| 8 | **Asks to create an admin account** (optional — skip to use the browser setup wizard later) |
-| 9 | Writes config to `/etc/moidify/config.json` |
+| 6 | **Asks for max upload size** (default **2.5 GB**) |
+| 7 | **Asks for port number** (default **8000**) |
+| 8 | **Asks for your music folder location** |
+| 9 | **Asks to create an admin account** (optional — skip to use the browser setup wizard later) |
+| 10 | Writes config to `/etc/moidify/config.json` |
 | 10 | Installs a systemd service |
 | 11 | Starts the server immediately |
 </details>
@@ -122,10 +133,9 @@ curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sud
 > After installation, open **http://your-server-ip:8000** in any browser. If no admin account exists yet, you'll be guided through the **setup wizard** at `/setup`. Drop music into your folder — files appear automatically.
 
 > [!NOTE]
-> **Moidify is 100% vibecoded.**  
-> Every line was written through natural language prompts — no copy-paste, no templates, just pure AI-generated code.
-> If something breaks (and it might), please [open an issue](https://github.com/Moid-M/moidify/issues).  
-> It'll get fixed, and the AI will learn from it.
+> **Moidify is built with AI-assisted coding.**  
+> Most of the code was written through natural language prompts rather than manual typing.  
+> If something feels off, please [open an issue](https://github.com/Moid-M/moidify/issues) — it helps make things better.
 
 ---
 
@@ -211,6 +221,7 @@ Moidify checks three places for settings, in order of priority:
 | `MOIDIFY_COVERS_DIR` | `./covers` | Cover art cache location |
 | `MOIDIFY_DB_PATH` | `./data/music.db` | SQLite database path |
 | `MOIDIFY_PORT` | `8000` | Server port (systemd mode uses ExecStart directly) |
+| `MOIDIFY_MAX_UPLOAD_SIZE` | `2684354560` (2.5 GB) | Max total upload size in bytes |
 
 ### Config file
 
@@ -221,7 +232,8 @@ When installed, settings live in `/etc/moidify/config.json`:
   "music_dir": "/path/to/your/music",
   "covers_dir": "/var/lib/moidify/covers",
   "db_path": "/var/lib/moidify/music.db",
-  "port": 8000
+  "port": 8000,
+  "max_upload_size": 2684354560
 }
 ```
 

@@ -64,6 +64,18 @@
 
 /* Track list */
 .track-list { display: flex; flex-direction: column; }
+.track-list.virtual { flex: 1; min-height: 0; }
+
+.virtual-viewport {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  min-height: 0;
+}
+.virtual-spacer {
+  pointer-events: none;
+}
+.track-list-header { flex-shrink: 0; }
 
 .track-header {
   display: grid;

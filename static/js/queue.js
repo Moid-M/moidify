@@ -27,7 +27,7 @@ function addMultipleToQueue(trackIds) {
 
 function removeFromQueue(index) {
   if (index<0||index>=state.queue.length) return;
-  if (index===state.currentIndex) { nextTrack(); return; }
+  if (index===state.currentIndex) { nextTrack(); renderQueuePanel(); return; }
   state.queue.splice(index,1);
   if (index<state.currentIndex) state.currentIndex--;
   renderQueuePanel();
@@ -40,6 +40,14 @@ function moveInQueue(fromIndex, toIndex) {
   if (fromIndex===state.currentIndex) state.currentIndex=toIndex;
   else if (fromIndex<state.currentIndex && toIndex>=state.currentIndex) state.currentIndex--;
   else if (fromIndex>state.currentIndex && toIndex<=state.currentIndex) state.currentIndex++;
+  // Rebuild shuffle order after manual reorder
+  if (state.shuffle && state.shuffleOrder.length) {
+    state.shuffleOrder = generateShuffleOrder(state.queue.length);
+    state.shuffleIndex = 0;
+    for (var si = 0; si < state.shuffleOrder.length; si++) {
+      if (state.shuffleOrder[si] === state.currentIndex) { state.shuffleIndex = si; break; }
+    }
+  }
   renderQueuePanel();
 }
 

@@ -157,3 +157,6 @@
   text-align: center;
 }
 .queue-clear-btn:hover { color: var(--accent); background: var(--accent-dim); }
+
+#sleep-timer-section .queue-mini-progress { padding: 0 8px; }
+#sleep-timer-section .queue-mini-times { padding: 0; }

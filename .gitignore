@@ -4,6 +4,7 @@ covers/
 __pycache__/
 *.pyc
 venv/
+.venv/
 .env
 *.db
 *.db-journal
@@ -11,3 +12,8 @@ venv/
 *.db-shm
 start.sh
 /tmp/
+.idea/
+.vscode/
+*.egg-info/
+dist/
+AGENTS.md

@@ -85,6 +85,16 @@ def setup_init(body: SetupInitBody):
     if existing:
         conn.close()
         raise HTTPException(400, "Username already taken")
+    if body.music_dir:
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            ("music_dir", body.music_dir),
+        )
+    if body.max_upload_size is not None:
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            ("max_upload_size", str(body.max_upload_size)),
+        )
     pwd_hash, salt = _hash_password(body.password)
     cursor = conn.execute(
         "INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, 1)",

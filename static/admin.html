@@ -946,13 +946,14 @@ async function handleFiles(files) {
   try {
     var r = await api('/api/admin/upload', { method:'POST', body: formData });
     bar.value = 1;
+    if (!r.ok) { var d; try { d = await r.json(); } catch(e) {} msg.textContent = 'Error: ' + ((d && d.detail) || r.statusText); return; }
     var d = await r.json();
     msg.textContent = 'Imported: ' + (d.imported ? d.imported.join(', ') : 'none');
-    loadTracks();
-    loadStats();
   } catch(e) {
     msg.textContent = 'Error: '+e.message;
   }
+  loadTracks();
+  loadStats();
 }
 
 document.getElementById('track-filter').addEventListener('input', filterTracks);

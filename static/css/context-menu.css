@@ -8,8 +8,14 @@
   z-index: 200;
   min-width: 210px;
   max-width: 280px;
+  max-height: min(80vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
+.context-menu::-webkit-scrollbar { width: 6px; }
+.context-menu::-webkit-scrollbar-track { background: transparent; }
+.context-menu::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
 body.light-mode #context-menu { box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
 
 .context-menu-item {

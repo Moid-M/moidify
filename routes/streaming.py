@@ -14,6 +14,16 @@ from routes.deps import TRANSCODE_MAP, FFMPEG_PATH
 
 router = APIRouter(tags=["streaming"])
 
+MUSIC_DIR_RESOLVED = Path(MUSIC_DIR).resolve(strict=False)
+
+
+def _within_music_dir(path: Path) -> bool:
+    try:
+        path.resolve().relative_to(MUSIC_DIR_RESOLVED)
+        return True
+    except ValueError:
+        return False
+
 
 def _transcode_stream(file_path: str, quality: str):
     if not FFMPEG_PATH or quality == "original" or quality not in TRANSCODE_MAP:
@@ -77,8 +87,11 @@ def stream_track(track_id: int, quality: Optional[str] = Query("high")):
     if not path.exists():
         raise HTTPException(404, "File not found on disk")
 
-    music_dir = Path(MUSIC_DIR).resolve()
-    if not str(path).startswith(str(music_dir)):
+    path = Path(row["file_path"]).resolve()
+    if not path.exists():
+        raise HTTPException(404, "File not found on disk")
+
+    if not _within_music_dir(path):
         raise HTTPException(403, "Forbidden")
 
     if quality != "original" and quality in TRANSCODE_MAP and FFMPEG_PATH:
@@ -151,7 +164,8 @@ def download_album(album: str = Query(...), artist: Optional[str] = Query(None))
             if path.exists():
                 prefix = f"{row['disc_number'] or 1}-{row['track_number'] or 0:02d}" if row['disc_number'] and row['disc_number'] > 1 else f"{row['track_number'] or 0:02d}"
                 track_name = f"{prefix} - {row['title'] or path.stem}{path.suffix}"
-                zf.write(str(path), track_name)
+                safe_name = "".join(c if c.isalnum() or c in " ._-" else "_" for c in track_name)
+                zf.write(str(path), safe_name)
     buf.seek(0)
     return StreamingResponse(
         buf,

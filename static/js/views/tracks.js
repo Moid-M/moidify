@@ -1,16 +1,30 @@
 function filterTrackList(query) {
   var list = document.getElementById('current-track-list');
-  if (!list) return;
+  if (!list || !list._vlist) return;
+  var vlist = list._vlist;
+  var allTracks = state._allTracks || [];
   var q = query.toLowerCase().trim();
-  qsa('.track-row', list).forEach(function(row) {
-    var title = (qs('.track-title', row) || {}).textContent || '';
-    var artist = (qs('.track-artist', row) || {}).textContent || '';
-    var album = (qs('.track-album', row) || {}).textContent || '';
-    row.style.display = (!q || title.toLowerCase().indexOf(q) !== -1 || artist.toLowerCase().indexOf(q) !== -1 || album.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
+  if (!q) {
+    vlist.update(allTracks);
+    state.currentQueue = allTracks;
+    state.currentTracks = allTracks;
+    return;
+  }
+  if (list._mergeAll) {
+    showToast('Please wait, tracks are still loading...', 'info');
+    return;
+  }
+  var filtered = allTracks.filter(function(t) {
+    return (t.title || '').toLowerCase().indexOf(q) !== -1 ||
+           (t.artist || '').toLowerCase().indexOf(q) !== -1 ||
+           (t.album || '').toLowerCase().indexOf(q) !== -1;
   });
+  vlist.update(filtered);
+  state.currentQueue = filtered;
+  state.currentTracks = filtered;
 }
 
-function createTrackRow(track, index, queue, isFaved) {
+function createTrackRow(track, index, queue) {
   var row = document.createElement('div');
   row.className = 'track-row';
   row.dataset.trackId = track.id;
@@ -19,7 +33,7 @@ function createTrackRow(track, index, queue, isFaved) {
   if (state.queue===queue && state.currentIndex===index) row.classList.add('playing');
   if (state.selectedTrackIds.indexOf(track.id) !== -1) row.classList.add('selected');
   var dur = formatTime(track.duration);
-  var isFav = isFaved||false;
+  var isFav = state._favedFlag||false;
   var rating = track.rating || 0;
   var stars = '';
   for (var s = 1; s <= 5; s++) {
@@ -42,6 +56,7 @@ function createTrackRow(track, index, queue, isFaved) {
     }
   });
   row.addEventListener('contextmenu',function(e){e.preventDefault();showContextMenu(e,track,queue,index);});
+  setupLongPress(row, function(e) { showContextMenu({ clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY }, track, queue, index); });
   qsa('.star-rating-star', row).forEach(function(el) {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -62,14 +77,14 @@ function createTrackRow(track, index, queue, isFaved) {
 }
 
 function trackHeaderHTML() {
-  return '<div class="track-header">'+
+  return '<div class="track-list-header"><div class="track-header">'+
     '<span class="sortable" data-sort="tracknum"><input type="checkbox" id="select-all-checkbox" title="Select all" style="cursor:pointer;accent-color:var(--accent);"><span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="title">Title<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="artist">Artist<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="album">Album<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="rating">Rating<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="duration">Duration<span class="sort-indicator"></span></span>'+
-    '<span></span></div>';
+    '<span></span></div></div>';
 }
 
 function sortTracks(tracks, field, dir) {
@@ -100,9 +115,18 @@ function setupTrackSorting(trackList, tracks) {
       if (state.sortBy === field) dir = state.sortDir === 'asc' ? 'desc' : 'asc';
       state.sortBy = field;
       state.sortDir = dir;
-      var sorted = sortTracks(tracks, field, dir);
-      qsa('.track-row', trackList).forEach(function(r) { r.remove(); });
-      sorted.forEach(function(t, i) { trackList.appendChild(createTrackRow(t, i, sorted, state._favedFlag)); });
+      var allTracks = tracks;
+      if (trackList._mergeAll) {
+        showToast('Please wait, tracks are still loading...', 'info');
+        return;
+      }
+      var sorted = sortTracks(allTracks, field, dir);
+      if (trackList._vlist) {
+        trackList._vlist.update(sorted);
+      } else {
+        qsa('.track-row', trackList).forEach(function(r) { r.remove(); });
+        sorted.forEach(function(t, i) { trackList.appendChild(createTrackRow(t, i, sorted)); });
+      }
       qsa('.sort-indicator', trackList).forEach(function(s) { s.className = 'sort-indicator'; });
       var indicator = qs('.sortable[data-sort="'+field+'"] .sort-indicator', trackList);
       if (indicator) indicator.className = 'sort-indicator active ' + dir;
@@ -172,40 +196,83 @@ function getSelectedTracks() {
 
 async function renderTracks(searchQuery, navId) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">'+(searchQuery?'Search Results':'All Tracks')+'</div></div>'+(searchQuery?'':'<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>');
+  content.innerHTML = '<div class="content-header"><div class="view-title">'+(searchQuery?'Search Results':'All Tracks')+'</div></div>'+(searchQuery?'':'<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>')+'<div class="loading-spinner"></div>';
   try {
-    var url = searchQuery ? '/api/tracks?search='+encodeURIComponent(searchQuery) : '/api/tracks';
-    var tracks = await apiJson(url);
+    var url = searchQuery ? '/api/tracks?search='+encodeURIComponent(searchQuery) : '/api/tracks?limit=200';
+    var data = await apiJson(url);
     if (state._navId !== navId) return;
+    var tracks = Array.isArray(data) ? data : data.tracks;
+    var total = Array.isArray(data) ? tracks.length : data.total;
     if (tracks.length===0) { content.innerHTML += '<p style="color:#727272;">'+(searchQuery?'No results for "'+esc(searchQuery)+'".':'No tracks yet.')+'</p>'; return; }
-    var list = document.createElement('div'); list.className='track-list';
+    var spinner = qs('.loading-spinner', content);
+    if (spinner) spinner.remove();
+    var list = document.createElement('div'); list.className='track-list virtual';
     list.id = searchQuery ? '' : 'current-track-list';
     list.innerHTML = trackHeaderHTML();
-    tracks.forEach(function(t,i){list.appendChild(createTrackRow(t,i,tracks));});
+    var vlist = VirtualList.create(list, tracks, function(t, i, arr) { return createTrackRow(t, i, arr); });
     content.appendChild(list);
+    list._vlist = vlist;
+    state._allTracks = tracks;
     state.currentTracks = tracks; state.currentQueue = tracks; state._favedFlag = false;
     setupTrackSorting(list, tracks);
     if (!searchQuery) {
       addShuffleButton(tracks, 'All Tracks');
       var filterInput = document.getElementById('track-filter-input');
       if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
+      // Load remaining pages in background
+      if (!Array.isArray(data) && total > tracks.length) {
+        var loadMore = document.createElement('div');
+        loadMore.className = 'load-more-bar';
+        loadMore.textContent = 'Loading ' + (total - tracks.length) + ' more tracks...';
+        content.appendChild(loadMore);
+        (function() {
+          var allTracks = tracks.slice();
+          var page = 1;
+          var PAGE_SIZE = 200;
+          function fetchNext() {
+            var offset = page * PAGE_SIZE;
+            if (offset >= total) { loadMore.remove(); return; }
+            apiJson('/api/tracks?limit=' + PAGE_SIZE + '&offset=' + offset).then(function(d) {
+              if (state._navId !== navId) return;
+              var chunk = Array.isArray(d) ? d : d.tracks;
+              allTracks = allTracks.concat(chunk);
+              page++;
+              loadMore.textContent = 'Loading ' + (total - allTracks.length) + ' more tracks...';
+              fetchNext();
+            }).catch(function() { loadMore.textContent = 'Failed to load more tracks'; });
+          }
+          fetchNext();
+          // Expose merge function for sort/filter to use
+          list._mergeAll = function() {
+            loadMore.remove();
+            state._allTracks = allTracks;
+            state.currentTracks = allTracks;
+            state.currentQueue = allTracks;
+            vlist.update(allTracks);
+          };
+        })();
+      }
     }
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
 }
 
 async function renderFavorites(navId) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">Liked Songs</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">Liked Songs</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div><div class="loading-spinner"></div>';
   if (!state.user) { content.innerHTML += '<p style="color:#727272;padding:20px 0;">Log in to see your liked songs.</p>'; return; }
   try {
     var tracks = await apiJson('/api/favorites');
     if (state._navId !== navId) return;
     if (tracks.length===0) { content.innerHTML += '<div class="fav-empty">No liked songs yet. Click the heart on any track.</div>'; return; }
-    var list = document.createElement('div'); list.className='track-list';
+    var spinner = qs('.loading-spinner', content);
+    if (spinner) spinner.remove();
+    var list = document.createElement('div'); list.className='track-list virtual';
     list.id = 'current-track-list';
     list.innerHTML = trackHeaderHTML();
-    tracks.forEach(function(t,i){list.appendChild(createTrackRow(t,i,tracks,true));});
+    var vlist = VirtualList.create(list, tracks, function(t, i, arr) { return createTrackRow(t, i, arr, true); });
     content.appendChild(list);
+    list._vlist = vlist;
+    state._allTracks = tracks;
     state.currentTracks = tracks; state.currentQueue = tracks; state._favedFlag = true;
     setupTrackSorting(list, tracks);
     addShuffleButton(tracks, 'Liked Songs');

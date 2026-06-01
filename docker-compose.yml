@@ -4,7 +4,7 @@ services:
     container_name: moidify
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${MOIDIFY_PORT:-8000}:8000"
     volumes:
       - ./music:/app/music
       - ./data:/app/data
@@ -13,3 +13,10 @@ services:
       - MOIDIFY_MUSIC_DIR=/app/music
       - MOIDIFY_COVERS_DIR=/app/covers
       - MOIDIFY_DB_PATH=/app/data/music.db
+      - MOIDIFY_PORT=8000
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/home')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

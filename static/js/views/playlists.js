@@ -56,7 +56,7 @@ function setupPlaylistShare(playlistId) {
           btn.classList.remove('active');
         }).catch(function() {});
       });
-    }).catch(function(e) { console.error(e); });
+    }).catch(function(e) { showToast('Failed to load playlist', 'error'); });
   });
 }
 
@@ -136,6 +136,6 @@ function setupPlaylistDragDrop(trackList, tracks, playlistId) {
     ids.splice(toIdx, 0, fromId);
     api('/api/playlists/'+playlistId+'/tracks/reorder', { method:'PUT', body:{ order: ids } }).then(function() {
       renderPlaylistDetail(playlistId);
-    }).catch(function(err) { console.error('Reorder failed', err); });
+    }).catch(function(err) { showToast('Reorder failed', 'error'); });
   });
 }

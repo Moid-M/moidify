@@ -418,5 +418,5 @@ body.sidebar-open #sidebar {
 }
 
 @media (max-width: 700px) {
-  #queue-panel { display: none !important; }
+  #queue-panel { display: none; }
 }

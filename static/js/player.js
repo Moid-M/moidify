@@ -16,7 +16,7 @@ function playFromQueue(queue, index) {
   if (!track) return;
 
   audio.src = '/api/stream/' + track.id + '?quality=' + (state.streamQuality || 'high');
-  audio.play();
+  audio.play().catch(function() {});
   fetch('/api/play/' + track.id, {method:'POST'});
 
   updatePlayerUI(track);
@@ -40,12 +40,12 @@ function loadAndPlay(track, queue, index, startTime) {
   if (!track) return;
 
   updatePlayerUI(track);
-  audio.src = '/api/stream/' + track.id + '?quality=' + (state.streamQuality || 'high');
   audio.addEventListener('loadedmetadata', function onMeta() {
     audio.removeEventListener('loadedmetadata', onMeta);
     audio.currentTime = startTime || 0;
-    audio.play();
+    audio.play().catch(function() {});
   });
+  audio.src = '/api/stream/' + track.id + '?quality=' + (state.streamQuality || 'high');
   fetch('/api/play/' + track.id, {method:'POST'});
 }
 
@@ -90,7 +90,7 @@ function updatePlayerUI(track) {
 }
 
 function togglePlay() {
-  if (audio.paused && audio.src) { audio.play(); qs('#play-btn').innerHTML = iconPause(); }
+  if (audio.paused && audio.src) { audio.play().catch(function() {}); qs('#play-btn').innerHTML = iconPause(); }
   else if (!audio.paused) { audio.pause(); qs('#play-btn').innerHTML = iconPlay(); }
 }
 
@@ -106,7 +106,7 @@ function fetchSimilarAndAppend(lastTrackId) {
 function nextTrack() {
   if (state.queue.length===0) return;
   if (state.repeatMode === 'one' && state.currentIndex >= 0) {
-    audio.currentTime = 0; audio.play(); return;
+    audio.currentTime = 0; audio.play().catch(function() {}); return;
   }
 
   if (state.currentIndex >= 0) state.playHistory.push(state.currentIndex);
@@ -349,7 +349,7 @@ function renderNowPlayingLyrics() {
       return '<div class="lyrics-line' + (l.active ? ' active' : '') + '">' + esc(l.text || l) + '</div>';
     }).join('');
   } else if (window.currentLyricsText) {
-    container.innerHTML = '<div class="lyrics-line">' + window.currentLyricsText.replace(/\n/g, '<br>') + '</div>';
+    container.innerHTML = '<div class="lyrics-line">' + esc(window.currentLyricsText).replace(/\n/g, '<br>') + '</div>';
   } else {
     container.innerHTML = '<div class="lyrics-line" style="color:var(--text-muted);">Loading lyrics...</div>';
     fetchLyrics(track).then(function() { renderNowPlayingLyrics(); });
@@ -459,7 +459,7 @@ function gaplessCrossfadeToNext() {
       audio.src = nextAudio.src;
       audio.currentTime = nextAudio.currentTime;
       audio.volume = targetVol;
-      audio.play();
+      audio.play().catch(function() {});
       nextAudio.remove();
       updatePlayerUI(nextTrack);
       isCrossfading = false;

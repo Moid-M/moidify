@@ -9,7 +9,7 @@
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
-body.light-mode #np-overlay { box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
+body.light-mode #nowplaying-overlay { box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
 #np-overlay {
   padding: 8px;
   backdrop-filter: blur(12px);

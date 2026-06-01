@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 
 from database import get_connection
 from config import COVERS_DIR
-from routes.deps import _normalize, _get_user_from_token, RatingBody
+from routes.deps import _normalize, _get_user_from_token, _fetch_lyrics_from_lrclib, RatingBody
 
 router = APIRouter(tags=["tracks"])
 
@@ -17,35 +17,46 @@ def _escape_like(s: str) -> str:
 
 
 @router.get("/api/tracks")
-def list_tracks(search: Optional[str] = None):
+def list_tracks(
+    search: Optional[str] = None,
+    limit: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0),
+):
     conn = get_connection()
+    limit_clause = ""
+    if limit > 0:
+        limit_clause = " LIMIT ? OFFSET ?"
     if search:
         safe = _escape_like(search)
         normalized = _normalize(search)
         like_pattern = f"%{safe}%"
         norm_pattern = f"%{_escape_like(normalized)}%"
+        base_sql = "SELECT * FROM tracks WHERE"
         if normalized.lower() != search.lower():
             rows = conn.execute(
-                """SELECT DISTINCT * FROM tracks
-                   WHERE title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\'
-                      OR title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\'
-                   ORDER BY COALESCE(NULLIF(album_artist,''), artist), album, disc_number, track_number""",
+                f"""{base_sql} title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\'
+                   OR title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\'
+                   ORDER BY COALESCE(NULLIF(album_artist,''), artist), album, disc_number, track_number{limit_clause}""",
                 (like_pattern, like_pattern, like_pattern,
-                 norm_pattern, norm_pattern, norm_pattern),
+                 norm_pattern, norm_pattern, norm_pattern) + ((limit, offset) if limit > 0 else ()),
             ).fetchall()
         else:
             rows = conn.execute(
-                """SELECT * FROM tracks
-                   WHERE title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\'
-                   ORDER BY COALESCE(NULLIF(album_artist,''), artist), album, disc_number, track_number""",
-                (like_pattern, like_pattern, like_pattern),
+                f"""{base_sql} title LIKE ? ESCAPE '\\' OR artist LIKE ? ESCAPE '\\' OR album LIKE ? ESCAPE '\\'
+                   ORDER BY COALESCE(NULLIF(album_artist,''), artist), album, disc_number, track_number{limit_clause}""",
+                (like_pattern, like_pattern, like_pattern) + ((limit, offset) if limit > 0 else ()),
             ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM tracks ORDER BY COALESCE(NULLIF(album_artist,''), artist), album, disc_number, track_number"
+            f"""SELECT * FROM tracks
+                ORDER BY COALESCE(NULLIF(album_artist,''), artist), album, disc_number, track_number{limit_clause}"""
         ).fetchall()
+    total = conn.execute("SELECT COUNT(*) as c FROM tracks").fetchone()["c"]
     conn.close()
-    return [dict(r) for r in rows]
+    result = [dict(r) for r in rows]
+    if limit > 0:
+        return {"tracks": result, "total": total, "limit": limit, "offset": offset}
+    return result
 
 
 @router.get("/api/tracks/{track_id}")
@@ -105,11 +116,18 @@ def get_track_gain(track_id: int):
 @router.get("/api/tracks/{track_id}/lyrics")
 def get_track_lyrics(track_id: int):
     conn = get_connection()
-    row = conn.execute("SELECT lyrics FROM tracks WHERE id = ?", (track_id,)).fetchone()
-    conn.close()
+    row = conn.execute("SELECT lyrics, artist, title, album FROM tracks WHERE id = ?", (track_id,)).fetchone()
     if row is None:
+        conn.close()
         raise HTTPException(404, "Track not found")
-    return {"lyrics": row["lyrics"]}
+    lyrics = row["lyrics"]
+    if not lyrics:
+        lyrics = _fetch_lyrics_from_lrclib(row["artist"] or "", row["title"] or "", row["album"] or "")
+        if lyrics:
+            conn.execute("UPDATE tracks SET lyrics = ? WHERE id = ?", (lyrics, track_id))
+            conn.commit()
+    conn.close()
+    return {"lyrics": lyrics}
 
 @router.put("/api/tracks/{track_id}/lyrics")
 def update_track_lyrics(track_id: int, body: dict):

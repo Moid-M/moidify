@@ -7,7 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Header, UploadFile, File
 
-from config import BASE_DIR, MUSIC_DIR, COVERS_DIR
+from config import BASE_DIR, MUSIC_DIR, COVERS_DIR, MAX_UPLOAD_SIZE
 from database import get_connection
 from scanner import scan_existing, get_scan_status, process_file
 from routes.deps import (
@@ -50,6 +50,8 @@ def admin_stats(token: Optional[str] = Header(None)):
 async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str] = Header(None)):
     _require_admin(token)
     imported = []
+    total = 0
+    limit_gb = MAX_UPLOAD_SIZE / (1024 * 1024 * 1024)
     for f in files:
         if not f.filename:
             continue
@@ -58,11 +60,22 @@ async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str]
             continue
         dest = MUSIC_DIR / Path(f.filename).name
         content = await f.read()
-        dest.write_bytes(content)
+        total += len(content)
+        if total > MAX_UPLOAD_SIZE:
+            raise HTTPException(413, f"Upload too large (max {limit_gb:.1f} GB total)")
         try:
+            if dest.exists():
+                dest.unlink()
+            dest.write_bytes(content)
+            conn = get_connection()
+            conn.execute("DELETE FROM tracks WHERE file_path = ?", (str(dest),))
+            conn.commit()
+            conn.close()
             process_file(str(dest))
             imported.append(f.filename)
         except Exception as e:
+            if dest.exists():
+                dest.unlink()
             imported.append(f"{f.filename}: error - {e}")
     return {"imported": imported}
 

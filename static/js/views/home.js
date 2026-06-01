@@ -25,12 +25,13 @@ function homePlayTrack(i) {
 
 async function renderHome(navId) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">\uD83C\uDFE0 Home</div></div><div id="home-feed"></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">\uD83C\uDFE0 Home</div></div><div id="home-feed"><div class="loading-spinner"></div></div>';
 
   apiJson('/api/home').then(function(data) {
     if (state._navId !== navId) return;
     _homeData = data;
     var feed = document.getElementById('home-feed');
+    feed.innerHTML = '';
 
     if (data.recently_played && data.recently_played.length) {
       var section = document.createElement('div');

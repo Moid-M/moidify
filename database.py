@@ -108,6 +108,26 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
         );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS player_state (
+            user_id INTEGER PRIMARY KEY,
+            queue TEXT NOT NULL DEFAULT '[]',
+            current_index INTEGER NOT NULL DEFAULT -1,
+            current_time REAL NOT NULL DEFAULT 0,
+            shuffle INTEGER NOT NULL DEFAULT 0,
+            repeat_mode TEXT NOT NULL DEFAULT 'off',
+            playback_speed REAL NOT NULL DEFAULT 1.0,
+            volume REAL NOT NULL DEFAULT 0.7,
+            shuffle_order TEXT NOT NULL DEFAULT '[]',
+            shuffle_index INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
     """)
 
     # Indexes for performance

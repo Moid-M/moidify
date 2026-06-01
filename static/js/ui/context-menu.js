@@ -19,6 +19,11 @@ function showAlbumContextMenu(event, album) {
   menu.style.display = 'block';
   var mw = Math.min(260, menu.offsetWidth||220);
   var mh = menu.offsetHeight||300;
+  var spaceBelow = window.innerHeight - y - 10;
+  var spaceAbove = y - 10;
+  if (mh > spaceBelow && spaceAbove > spaceBelow) {
+    y = Math.max(10, y - mh);
+  }
   if (x+mw>window.innerWidth) x=window.innerWidth-mw-10;
   if (y+mh>window.innerHeight) y=window.innerHeight-mh-10;
   if (x<10)x=10; if(y<10)y=10;
@@ -30,7 +35,7 @@ function showAlbumContextMenu(event, album) {
       if (action === 'album-play') {
         apiJson('/api/albums/tracks?album='+encodeURIComponent(album.album)+(album.artist?'&artist='+encodeURIComponent(album.artist):'')).then(function(tracks) {
           playFromQueue(tracks, 0);
-        });
+        }).catch(function() { showToast('Failed to load album', 'error'); });
       } else if (action === 'album-shuffle') {
         apiJson('/api/albums/tracks?album='+encodeURIComponent(album.album)+(album.artist?'&artist='+encodeURIComponent(album.artist):'')).then(function(tracks) {
           var shuffled = tracks.slice();
@@ -39,11 +44,11 @@ function showAlbumContextMenu(event, album) {
             var tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
           }
           playFromQueue(shuffled, 0);
-        });
+        }).catch(function() { showToast('Failed to load album', 'error'); });
       } else if (action === 'album-add-queue') {
         apiJson('/api/albums/tracks?album='+encodeURIComponent(album.album)+(album.artist?'&artist='+encodeURIComponent(album.artist):'')).then(function(tracks) {
           tracks.forEach(function(t) { addTrackToQueueEnd(t); });
-        });
+        }).catch(function() { showToast('Failed to load album', 'error'); });
       } else if (action === 'album-go-artist') {
         navigate('artist-tracks', album.artist);
       } else if (action === 'album-download') {
@@ -83,6 +88,11 @@ function showArtistContextMenu(event, artist) {
   menu.style.display = 'block';
   var mw = Math.min(260, menu.offsetWidth||220);
   var mh = menu.offsetHeight||200;
+  var spaceBelow = window.innerHeight - y - 10;
+  var spaceAbove = y - 10;
+  if (mh > spaceBelow && spaceAbove > spaceBelow) {
+    y = Math.max(10, y - mh);
+  }
   if (x+mw>window.innerWidth) x=window.innerWidth-mw-10;
   if (y+mh>window.innerHeight) y=window.innerHeight-mh-10;
   if (x<10)x=10; if(y<10)y=10;
@@ -94,7 +104,7 @@ function showArtistContextMenu(event, artist) {
       if (action === 'artist-play') {
         apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist.artist)).then(function(tracks) {
           playFromQueue(tracks, 0);
-        });
+        }).catch(function() { showToast('Failed to load artist tracks', 'error'); });
       } else if (action === 'artist-shuffle') {
         apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist.artist)).then(function(tracks) {
           var shuffled = tracks.slice();
@@ -103,11 +113,11 @@ function showArtistContextMenu(event, artist) {
             var tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
           }
           playFromQueue(shuffled, 0);
-        });
+        }).catch(function() { showToast('Failed to load artist tracks', 'error'); });
       } else if (action === 'artist-add-queue') {
         apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist.artist)).then(function(tracks) {
           tracks.forEach(function(t) { addTrackToQueueEnd(t); });
-        });
+        }).catch(function() { showToast('Failed to load artist tracks', 'error'); });
       }
       hideContextMenu();
     });
@@ -165,6 +175,11 @@ function showContextMenu(event, track, queue, index) {
   menu.style.display = 'block';
   var mw = Math.min(280, menu.offsetWidth||220);
   var mh = menu.offsetHeight||400;
+  var spaceBelow = window.innerHeight - y - 10;
+  var spaceAbove = y - 10;
+  if (mh > spaceBelow && spaceAbove > spaceBelow) {
+    y = Math.max(10, y - mh);
+  }
   if (x+mw>window.innerWidth) x=window.innerWidth-mw-10;
   if (y+mh>window.innerHeight) y=window.innerHeight-mh-10;
   if (x<10)x=10; if(y<10)y=10;
@@ -235,4 +250,20 @@ function hideContextMenuOnce(e) {
     hideContextMenu();
     document.removeEventListener('click', hideContextMenuOnce);
   }
+}
+
+var longPressTimer = null;
+function setupLongPress(el, callback) {
+  el.addEventListener('touchstart', function(e) {
+    longPressTimer = setTimeout(function() {
+      longPressTimer = null;
+      callback(e);
+    }, 500);
+  });
+  el.addEventListener('touchend', function() {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  });
+  el.addEventListener('touchmove', function() {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  });
 }

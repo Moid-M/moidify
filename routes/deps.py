@@ -98,6 +98,25 @@ def _safe_name(s: str) -> str:
     return "".join(c if c.isalnum() or c in " _-" else "_" for c in s).strip()
 
 
+def _fetch_lyrics_from_lrclib(artist: str, title: str, album: str) -> Optional[str]:
+    import json, urllib.request, urllib.parse
+    params = urllib.parse.urlencode({
+        "artist_name": artist,
+        "track_name": title,
+        "album_name": album,
+    })
+    req = urllib.request.Request(
+        f"https://lrclib.net/api/get?{params}",
+        headers={"User-Agent": "Moidify/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        return data.get("syncedLyrics") or data.get("plainLyrics") or None
+    except Exception:
+        return None
+
+
 # Shared Pydantic models
 
 class RegisterBody(BaseModel):
@@ -134,6 +153,7 @@ class SetupInitBody(BaseModel):
     username: str
     password: str
     music_dir: Optional[str] = None
+    max_upload_size: Optional[int] = None
 
 class ScheduleBody(BaseModel):
     interval_hours: float
@@ -148,3 +168,15 @@ class CreateUserBody(BaseModel):
 
 class ChangePasswordBody(BaseModel):
     password: str
+
+
+class PlayerStateBody(BaseModel):
+    queue: list = []
+    current_index: int = -1
+    current_time: float = 0
+    shuffle: bool = False
+    repeat_mode: str = "off"
+    playback_speed: float = 1.0
+    volume: float = 0.7
+    shuffle_order: list = []
+    shuffle_index: int = 0

@@ -144,6 +144,15 @@ else
   chown "$SERVICE_USER":"$SERVICE_USER" "$MUSIC_DIR_INPUT"
 fi
 
+# ─── Upload size limit ────────────────────────────────────────────────────────
+MAX_UPLOAD_SIZE_GB="2.5"
+if [[ $INTERACTIVE -eq 1 ]]; then
+  read -r -p "  Max upload size in GB [2.5]: " MAX_UPLOAD_SIZE_GB_INPUT </dev/tty
+  MAX_UPLOAD_SIZE_GB="${MAX_UPLOAD_SIZE_GB_INPUT:-$MAX_UPLOAD_SIZE_GB}"
+fi
+# Convert to bytes
+MAX_UPLOAD_SIZE_BYTES=$(python3 -c "print(int(float('$MAX_UPLOAD_SIZE_GB') * 1024 * 1024 * 1024))")
+
 # ─── Admin account prompt ────────────────────────────────────────────────────
 if [[ $INTERACTIVE -eq 1 ]]; then
   read -r -p "  Admin username [admin]: " ADMIN_USER </dev/tty
@@ -250,8 +259,12 @@ else
 fi
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
-install -m 755 "$APP_DIR/moidify" /usr/local/bin/moidify 2>/dev/null || true
-ok "CLI installed: /usr/local/bin/moidify"
+if install -m 755 "$APP_DIR/moidify" /usr/local/bin/moidify 2>/dev/null; then
+  ok "CLI installed: /usr/local/bin/moidify"
+else
+  warn "Could not install CLI to /usr/local/bin/moidify"
+  warn "Run manually: sudo install -m 755 $APP_DIR/moidify /usr/local/bin/moidify"
+fi
 
 # ─── Virtual env + deps ──────────────────────────────────────────────────────
 info "Setting up Python virtual environment..."
@@ -272,7 +285,8 @@ cat > "$CONFIG_DIR/config.json" <<CONF
   "music_dir": "$MUSIC_DIR_INPUT",
   "covers_dir": "$DATA_DIR/covers",
   "db_path": "$DATA_DIR/music.db",
-  "port": $PORT
+  "port": $PORT,
+  "max_upload_size": $MAX_UPLOAD_SIZE_BYTES
 }
 CONF
 
@@ -287,14 +301,16 @@ chown "$SERVICE_USER":"$SERVICE_USER" "$DATA_DIR/music.db" 2>/dev/null || true
 # ─── Create admin user ───────────────────────────────────────────────────────
 if [[ -n "${ADMIN_SALT:-}" && -n "${ADMIN_HASH:-}" ]]; then
   info "Creating admin user '$ADMIN_USER'..."
-  "$APP_DIR/venv/bin/python" -c "
-import sys; sys.path.insert(0, '$APP_DIR')
+  ADMIN_USER="$ADMIN_USER" ADMIN_HASH="$ADMIN_HASH" ADMIN_SALT="$ADMIN_SALT" "$APP_DIR/venv/bin/python" -c "
+import os, sys; sys.path.insert(0, '$APP_DIR')
 from database import get_connection
 conn = get_connection()
-existing = conn.execute('SELECT id FROM users WHERE username = ?', ('$ADMIN_USER',)).fetchone()
+u = os.environ['ADMIN_USER']
+h = os.environ['ADMIN_HASH']
+s = os.environ['ADMIN_SALT']
+existing = conn.execute('SELECT id FROM users WHERE username = ?', (u,)).fetchone()
 if not existing:
-    conn.execute('INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, 1)',
-                 ('$ADMIN_USER', '$ADMIN_HASH', '$ADMIN_SALT'))
+    conn.execute('INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, 1)', (u, h, s))
     conn.commit()
     print('Admin user created.')
 else:
@@ -331,6 +347,7 @@ echo -e "  ${GREEN}${APP_NAME} v${VERSION}${NC} running at:"
 echo -e "  ${CYAN}http://${IP}:${PORT}${NC}"
 echo ""
 echo -e "  ${YELLOW}Music folder:${NC}  $MUSIC_DIR_INPUT"
+echo -e "  ${YELLOW}Upload limit:${NC}  ${MAX_UPLOAD_SIZE_GB} GB"
 echo -e "  ${YELLOW}Config:${NC}       $CONFIG_DIR/config.json"
 echo -e "  ${YELLOW}Data:${NC}         $DATA_DIR"
 echo -e "  ${YELLOW}Logs:${NC}         journalctl -u moidify.service -f"

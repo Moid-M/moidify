@@ -13,7 +13,7 @@ function updateBackdrop(trackId) {
       var bd = document.getElementById('backdrop');
       bd.style.background = 'radial-gradient(ellipse at 50% 0%, '+color+' 0%, transparent 70%)';
       bd.classList.add('visible');
-    } catch(e) { console.error(e); }
+    } catch(e) {}
   };
 }
 

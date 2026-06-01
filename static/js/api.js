@@ -34,6 +34,12 @@ async function login(username, password) {
   var data = await apiJson('/api/auth/login', { method:'POST', body:{ username, password } });
   state.token = data.token; localStorage.setItem('moidify_token', data.token);
   state.user = data.user; closeModal(); renderAuth(); loadPlaylists();
+  // Load server state after login, then navigate
+  var hadServerState = await loadStateFromServer();
+  if (!hadServerState) {
+    // Sync local state to server
+    syncStateToServer();
+  }
   if (state.currentView) navigate(state.currentView, state.currentData);
 }
 
@@ -43,6 +49,7 @@ async function register(username, password, email) {
 }
 
 function logout() {
+  api('/api/player/state', { method: 'DELETE' }).catch(function() {});
   state.token = null; localStorage.removeItem('moidify_token'); state.user = null;
   renderAuth(); navigate('albums'); qs('#playlist-list').innerHTML = '';
   document.getElementById('pinned-section').style.display = 'none';
@@ -76,7 +83,7 @@ async function toggleFavorite(trackId) {
     var isFav = state.favedTracks[trackId];
     if (isFav) { await api('/api/favorites/'+trackId,{method:'DELETE'}); state.favedTracks[trackId] = false; showToast('Removed from Liked Songs', 'success'); }
     else { await api('/api/favorites/'+trackId,{method:'POST'}); state.favedTracks[trackId] = true; showToast('Added to Liked Songs', 'success'); }
-  } catch(e) { console.error(e); }
+  } catch(e) { showToast('Failed to toggle favorite', 'error'); }
 }
 
 async function loadPlaylists() {
@@ -146,7 +153,7 @@ async function loadPlaylists() {
     uncategorized.forEach(function(pl) {
       list.appendChild(createPlaylistItem(pl));
     });
-  } catch(e) { console.error(e); }
+  } catch(e) { showToast('Failed to load playlists', 'error'); }
 }
 
 function createPlaylistItem(pl) {
@@ -167,31 +174,104 @@ function createPlaylistItem(pl) {
 function showPlaylistFolderMenu(event, playlistId) {
   hideContextMenu();
   var menu = document.getElementById('context-menu');
+  var playlistName = '';
+  var pl = state.playlists.find(function(p) { return p.id === playlistId; });
+  if (pl) playlistName = pl.name;
+  var html = '';
+  html += '<div class="context-menu-item" data-action="playlist-play"><span class="cmi-icon">'+iconPlay()+'</span> Play</div>';
+  html += '<div class="context-menu-item" data-action="playlist-play-next"><span class="cmi-icon">'+iconForward()+'</span> Play Next</div>';
+  html += '<div class="context-menu-item" data-action="playlist-add-queue"><span class="cmi-icon">'+iconQueue()+'</span> Add to Queue</div>';
+  html += '<div class="context-menu-divider"></div>';
+  html += '<div class="context-menu-item" data-action="playlist-share"><span class="cmi-icon">'+iconShare()+'</span> Share</div>';
+  html += '<div class="context-menu-item" data-action="playlist-export-m3u"><span class="cmi-icon">'+iconDownload()+'</span> Export M3U</div>';
+  html += '<div class="context-menu-item" data-action="playlist-export-json"><span class="cmi-icon">'+iconDownload()+'</span> Export JSON</div>';
+  html += '<div class="context-menu-divider"></div>';
+  html += '<div class="context-menu-item" style="cursor:default;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px;">Move to folder</div>';
+  html += '<div class="context-menu-item" data-action="move-folder" data-folder="">None</div>';
+  menu.innerHTML = html;
+  // Load folders and append
   apiJson('/api/playlist-folders').then(function(folders) {
-    var html = '<div class="context-menu-item" style="cursor:default;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px;">Move to folder</div>';
-    html += '<div class="context-menu-item" data-action="move-folder" data-folder="">None</div>';
     folders.forEach(function(f) {
-      html += '<div class="context-menu-item" data-action="move-folder" data-folder="'+f.id+'">'+esc(f.name)+'</div>';
+      var el = document.createElement('div');
+      el.className = 'context-menu-item';
+      el.dataset.action = 'move-folder';
+      el.dataset.folder = f.id;
+      el.innerHTML = '<span class="cmi-icon"></span>'+esc(f.name);
+      menu.appendChild(el);
     });
-    menu.innerHTML = html;
-    menu.style.display = 'block';
-    var x = event.clientX, y = event.clientY;
-    var mw = Math.min(220, menu.offsetWidth||220);
-    if (x+mw>window.innerWidth) x=window.innerWidth-mw-10;
-    if (y+200>window.innerHeight) y=window.innerHeight-200-10;
-    if (x<10)x=10; if(y<10)y=10;
-    menu.style.left=x+'px'; menu.style.top=y+'px';
-    qsa('.context-menu-item', menu).forEach(function(el) {
+    // Re-attach listeners on new items
+    qsa('.context-menu-item[data-action="move-folder"]', menu).forEach(function(el) {
       el.addEventListener('click', function() {
         var folderId = this.dataset.folder;
         api('/api/playlists/'+playlistId+'/folder', { method:'PUT', body:{ folder_id: folderId ? parseInt(folderId) : null } }).then(function() {
           loadPlaylists();
-        }).catch(function(e) { console.error(e); });
+        }).catch(function() { showToast('Failed to move playlist', 'error'); });
         hideContextMenu();
       });
     });
-    document.addEventListener('click', hideContextMenuOnce);
-  }).catch(function(e) { console.error(e); });
+  }).catch(function() {});
+  menu.style.display = 'block';
+  var x = event.clientX, y = event.clientY;
+  var mw = Math.min(240, menu.offsetWidth || 240);
+  if (x + mw > window.innerWidth) x = window.innerWidth - mw - 10;
+  if (y + 300 > window.innerHeight) y = window.innerHeight - 300 - 10;
+  if (x < 10) x = 10; if (y < 10) y = 10;
+  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  // Attach action handlers
+  qsa('.context-menu-item', menu).forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      var action = this.dataset.action;
+      if (action === 'playlist-play') {
+        apiJson('/api/playlists/' + playlistId + '/tracks').then(function(tracks) {
+          if (tracks.length) playFromQueue(tracks, 0);
+        }).catch(function() { showToast('Failed to load playlist', 'error'); });
+        hideContextMenu();
+      } else if (action === 'playlist-play-next') {
+        apiJson('/api/playlists/' + playlistId + '/tracks').then(function(tracks) {
+          tracks.slice().reverse().forEach(function(t) { addTrackToQueueNext(t); });
+          showToast('Added ' + tracks.length + ' tracks to play next', 'info');
+        }).catch(function() { showToast('Failed to load playlist', 'error'); });
+        hideContextMenu();
+      } else if (action === 'playlist-add-queue') {
+        apiJson('/api/playlists/' + playlistId + '/tracks').then(function(tracks) {
+          tracks.forEach(function(t) { addTrackToQueueEnd(t); });
+          showToast('Added ' + tracks.length + ' tracks to queue', 'info');
+        }).catch(function() { showToast('Failed to load playlist', 'error'); });
+        hideContextMenu();
+      } else if (action === 'playlist-share') {
+        apiJson('/api/playlists/' + playlistId + '/share', { method: 'POST' }).then(function(d) {
+          var link = window.location.origin + '/s/' + d.token;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(link).then(function() {
+              showToast('Share link copied!', 'success');
+            }).catch(function() {
+              prompt('Share link:', link);
+            });
+          } else {
+            prompt('Share link:', link);
+          }
+        }).catch(function() { showToast('Failed to share playlist', 'error'); });
+        hideContextMenu();
+      } else if (action === 'playlist-export-m3u') {
+        exportPlaylist(playlistId, 'm3u');
+        hideContextMenu();
+      } else if (action === 'playlist-export-json') {
+        exportPlaylist(playlistId, 'json');
+        hideContextMenu();
+      }
+    });
+  });
+  document.addEventListener('click', hideContextMenuOnce);
+}
+
+function exportPlaylist(playlistId, format) {
+  var link = '/api/playlists/' + playlistId + '/export?format=' + format;
+  var a = document.createElement('a');
+  a.href = link;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 async function deletePlaylistFolder(folderId) {

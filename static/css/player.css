@@ -158,7 +158,9 @@
 
 .player-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 
-#fav-btn.faved svg { fill: var(--accent); stroke: var(--accent); }
+.player-cover-wrap { position: relative; flex-shrink: 0; }
+#speed-btn { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; min-width: 32px; }
+#mini-player-btn { position: relative; }
 
 .volume-wrap { display: flex; align-items: center; gap: 6px; }
 #volume-btn svg { width: 18px; height: 18px; display: block; }

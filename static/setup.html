@@ -73,6 +73,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <input type="password" id="setup-password" placeholder="At least 3 characters">
       <label>Confirm Password</label>
       <input type="password" id="setup-password-confirm" placeholder="Repeat password">
+      <label>Max upload size (GB)</label>
+      <input type="number" id="setup-max-upload" value="2.5" min="0.1" step="0.1">
+      <div class="hint">Largest single file size allowed when uploading through the browser (default: 2.5 GB)</div>
       <div class="error-msg" id="step2-error"></div>
       <div class="btn-row">
         <button class="btn" onclick="goStep(1)">Back</button>
@@ -158,7 +161,11 @@ async function createAdmin() {
     var r = await fetch('/api/setup/init', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ username: username, password: password }),
+      body: JSON.stringify({
+        username: username,
+        password: password,
+        max_upload_size: Math.round(parseFloat(document.getElementById('setup-max-upload').value || '2.5') * 1024 * 1024 * 1024),
+      }),
     });
     if (!r.ok) { var e = await r.json(); errEl.textContent = e.detail || 'Error'; errEl.style.display = 'block'; return; }
     var d = await r.json();
@@ -205,6 +212,7 @@ async function handleFiles(files) {
       body: formData,
     });
     bar.value = 1;
+    if (!r.ok) { var d; try { d = await r.json(); } catch(e) {} msg.textContent = 'Error: ' + ((d && d.detail) || r.statusText); return; }
     var d = await r.json();
     msg.textContent = 'Imported: ' + (d.imported ? d.imported.join(', ') : 'none');
   } catch(e) {
