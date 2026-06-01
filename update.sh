@@ -41,7 +41,7 @@ fi
 
 # Install yt-dlp for URL imports
 mkdir -p "$APP_DIR/extra-pkgs"
-python3 -m pip install --target="$APP_DIR/extra-pkgs" --no-cache-dir yt-dlp 2>/dev/null || true
+python3 -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp 2>/dev/null || true
 
 # Reinstall CLI binary
 install -m 755 "$APP_DIR/moidify" /usr/local/bin/moidify 2>/dev/null || true
