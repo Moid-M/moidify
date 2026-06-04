@@ -31,6 +31,12 @@
   <br>
 </div>
 
+<div align="center">
+  <img src="screenshots/desktop/screenshot-desktop-homepage.png" width="800" alt="Moidify Screenshot">
+  <br>
+  <br>
+</div>
+
 ---
 
 ## ✨ Features
@@ -43,38 +49,24 @@
 
 **🪟 Pop-out Mini Player** — detach playback into a separate always-on-top window (desktop only; mobile uses the persistent bottom bar)
 
-**🔍 Full-text Search** — search tracks, albums, artists with diacritics support (`Beyonce` → `Beyoncé`)
-
 **📂 Browse by Album / Artist / Genre** — grid or list view with cover art
 
-**📋 Sortable Columns** — click any column header to sort A–Z, Z–A, or by duration
-
 **📝 Playlists** — create, pin, reorder by drag-and-drop
-
-</td>
-<td width="50%">
 
 **🎛️ 10-Band Equalizer** — presets included (Rock, Jazz, Dance, Classical…)
 
 **📜 Lyrics** — auto-fetched from LRCLIB, synced scrolling
 
-**⏱️ Sleep Timer** — stop after this track, end of queue, or in X minutes
-
-**🔀 Smart Queue** — crossfade, shuffle, repeat (all/one/off)
-
-**💾 Session Persistence** — close or reload the tab and pick up exactly where you left off (position, queue, shuffle mode all saved)
-
-**💿 Vinyl Animation** — spinning disc with CD hole effect on the queue cover art (toggle in settings)
-
 **🛡️ Admin Dashboard** — rescan library, manage users, view play stats, upload files via drag-and-drop
 
 **📥 YouTube / SoundCloud Import** — download any audio URL via the admin panel or `moidify download <url>` CLI command (uses yt-dlp, converts to 192kbps MP3)
 
-**📤 Configurable Upload Limit** — default 2.5 GB, changeable via config file, env var (`MOIDIFY_MAX_UPLOAD_SIZE`), or browser setup wizard
+**🐳 Docker Support** — Dockerfile + docker-compose.yml for containerized deployment
 
 **🔧 Setup Wizard** — first-run wizard at `/setup` creates admin account and guides configuration
 
-**🐳 Docker Support** — Dockerfile + docker-compose.yml for containerized deployment
+</td>
+<td width="50%">
 
 **🔗 Shareable Playlists** — generate a public link anyone can open and listen to (no account needed)
 
@@ -88,8 +80,6 @@
 
 **📱 Responsive** — works on desktop and mobile browsers
 
-**🎚️ Track Rating** — rate songs 1-5 stars from the track list or context menu
-
 **🔒 No Telemetry** — zero tracking, zero external calls (except optional LRCLIB for lyrics), everything stays on your server
 
 **👤 Dedicated System User** — runs as `moidify` user, not root; isolated and sandboxed by design
@@ -102,16 +92,18 @@
 
 ---
 
-## 🚀 Quick Install
+## 🚀 Installation
 
-One line, works on any Linux distro with systemd:
+<details>
+<summary><b>Quick Install — one-liner (Linux with systemd)</b></summary>
+<br>
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sudo bash
 ```
 
 <details>
-<summary><b>📦 What the installer does (click to expand)</b></summary>
+<summary><b>📦 What the installer does</b></summary>
 <br>
 
 | Step | What happens |
@@ -128,8 +120,8 @@ curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sud
 | 10 | Writes config to `/etc/moidify/config.json` |
 | 10 | Installs a systemd service |
 | 11 | Starts the server immediately |
+
 </details>
-<br>
 
 > [!TIP]
 > After installation, open **http://your-server-ip:8000** in any browser. If no admin account exists yet, you'll be guided through the **setup wizard** at `/setup`. Drop music into your folder — files appear automatically.
@@ -139,9 +131,11 @@ curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sud
 > Most of the code was written through natural language prompts rather than manual typing.  
 > If something feels off, please [open an issue](https://github.com/Moid-M/moidify/issues) — it helps make things better.
 
----
+</details>
 
-## 🐳 Docker
+<details>
+<summary><b>🐳 Docker</b></summary>
+<br>
 
 ```bash
 git clone https://github.com/Moid-M/moidify.git
@@ -154,9 +148,11 @@ Then open **http://localhost:8000**. Music goes in `./music`, data in `./data`, 
 > [!TIP]
 > After starting, visit the **setup wizard** at `/setup` to create your admin account.
 
-## 🖥️ Manual Install
+</details>
 
-For development or non-systemd systems:
+<details>
+<summary><b>🖥️ Manual Install (dev / non-systemd)</b></summary>
+<br>
 
 ```bash
 git clone https://github.com/Moid-M/moidify.git
@@ -169,6 +165,8 @@ python3 server.py
 
 Then open **http://localhost:8000**.
 
+</details>
+
 ---
 
 ## ⚙️ Commands
@@ -176,6 +174,10 @@ Then open **http://localhost:8000**.
 ### CLI (`moidify`)
 
 After install, a `moidify` CLI is available globally:
+
+<details>
+<summary><b>⚙️ CLI commands (click to expand)</b></summary>
+<br>
 
 ```bash
 moidify help          Show this help
@@ -194,7 +196,11 @@ moidify update        Update to latest version
 moidify download <url>  Download and import audio from YouTube/SoundCloud/etc
 ```
 
-### Service management (direct)
+</details>
+
+<details>
+<summary><b>🛠️ Service management (click to expand)</b></summary>
+<br>
 
 | Action | Command |
 |---|---|
@@ -206,9 +212,15 @@ moidify download <url>  Download and import audio from YouTube/SoundCloud/etc
 | 🔄 Update | `sudo /opt/moidify/update.sh` |
 | 🗑️ Uninstall | `sudo /opt/moidify/uninstall.sh` |
 
+</details>
+
 ---
 
 ## 🔧 Configuration
+
+<details>
+<summary><b>Click to expand</b></summary>
+<br>
 
 Moidify checks three places for settings, in order of priority:
 
@@ -236,12 +248,16 @@ When installed, settings live in `/etc/moidify/config.json`:
   "covers_dir": "/var/lib/moidify/covers",
   "db_path": "/var/lib/moidify/music.db",
   "port": 8000,
-  "max_upload_size": 2684354560
+  "max_upload_size": 2684354560,
+  "lastfm_api_key": "your_lastfm_api_key",
+  "lastfm_api_secret": "your_lastfm_shared_secret"
 }
 ```
 
 > [!NOTE]
 > Change a path and restart with `sudo systemctl restart moidify` — your music collection is re-scanned automatically.
+
+</details>
 
 ---
 
@@ -259,6 +275,10 @@ The script polls Moidify's `/api/player/now-playing` endpoint and updates your D
 ---
 
 ## 🛠️ Development
+
+<details>
+<summary><b>Click to expand</b></summary>
+<br>
 
 ```bash
 git clone https://github.com/Moid-M/moidify.git
@@ -286,6 +306,7 @@ moidify/
 │   ├── streaming.py          # Transcode, stream, cover art, download album
 │   ├── playlists.py          # Playlists CRUD, share, folders, favorites, export
 │   ├── admin.py              # Dashboard, stats, users, rescan scheduler
+│   ├── lastfm.py             # Last.fm scrobbling (now playing, scrobble, connect)
 │   └── subsonic.py           # Subsonic API compatibility layer (23 endpoints)
 ├── Dockerfile                # Container image
 ├── docker-compose.yml        # Docker orchestration
@@ -351,6 +372,8 @@ moidify/
 │           └── navigate.js
 └── music/                    # Your music goes here (local dev)
 ```
+
+</details>
 
 ---
 

@@ -3,6 +3,7 @@ function showSettings() {
     { id:'theme', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>', label:'Theme' },
     { id:'animations', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', label:'Animations' },
     { id:'playback', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>', label:'Playback' },
+    { id:'lastfm', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V8a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/><path d="M17 16v-2a3 3 0 0 0-3-3h-2"/></svg>', label:'Last.fm' },
     { id:'about', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>', label:'About' },
   ];
 
@@ -21,6 +22,7 @@ function showSettings() {
   renderThemeTab();
   renderAnimationsTab();
   renderPlaybackTab();
+  renderLastfmTab();
   renderAboutTab();
 
   qsa('.settings-sidebar-item').forEach(function(el) {
@@ -420,6 +422,66 @@ function renderPlaybackTab() {
       localStorage.setItem('moidify_volume_norm', state.volumeNorm);
     });
   }
+}
+
+function renderLastfmTab() {
+  var container = document.getElementById('tab-lastfm');
+  var token = getAuthToken();
+  if (!token) {
+    container.innerHTML = '<div class="settings-section"><h3>Last.fm Scrobbling</h3><p style="color:var(--text-muted);">Log in to connect your Last.fm account.</p></div>';
+    return;
+  }
+
+  fetch('/api/lastfm/status', {headers:{'token':token}}).then(function(r){return r.json();}).then(function(status){
+    if (status.connected) {
+      container.innerHTML =
+        '<div class="settings-section"><h3>Last.fm Scrobbling</h3>'+
+        '<p style="color:var(--text-secondary);margin-bottom:12px;">Connected as <strong>'+esc(status.username)+'</strong></p>'+
+        '<button onclick="disconnectLastfm()" class="btn-secondary" style="padding:6px 16px;font-size:13px;border-radius:20px;border:1px solid var(--danger);color:var(--danger);background:transparent;cursor:pointer;">Disconnect</button>'+
+        '</div>';
+    } else {
+      container.innerHTML =
+        '<div class="settings-section"><h3>Last.fm Scrobbling</h3>'+
+        '<p style="color:var(--text-muted);margin-bottom:12px;">Connect your Last.fm account to scrobble your listens.</p>'+
+        '<div style="display:flex;flex-direction:column;gap:8px;max-width:300px;">'+
+        '<input type="text" id="lastfm-username" placeholder="Last.fm username" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text-primary);">'+
+        '<input type="password" id="lastfm-password" placeholder="Password" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text-primary);">'+
+        '<button onclick="connectLastfm()" class="btn-primary" style="padding:8px;border-radius:20px;background:var(--accent);color:white;border:none;cursor:pointer;">Connect</button>'+
+        '<p id="lastfm-error" style="color:var(--danger);font-size:13px;display:none;"></p>'+
+        '</div>'+
+        '</div>';
+    }
+  }).catch(function(){
+    container.innerHTML = '<div class="settings-section"><h3>Last.fm Scrobbling</h3><p style="color:var(--text-muted);">Could not load status.</p></div>';
+  });
+}
+
+function connectLastfm() {
+  var username = document.getElementById('lastfm-username').value.trim();
+  var password = document.getElementById('lastfm-password').value;
+  var errEl = document.getElementById('lastfm-error');
+  if (!username || !password) {
+    if (errEl) { errEl.textContent = 'Please fill in both fields.'; errEl.style.display = ''; }
+    return;
+  }
+  var token = getAuthToken();
+  fetch('/api/lastfm/connect', {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'token':token},
+    body:JSON.stringify({username:username, password:password}),
+  }).then(function(r){
+    if (!r.ok) { return r.json().then(function(d){throw new Error(d.detail||'Connection failed');}); }
+    renderLastfmTab();
+  }).catch(function(e){
+    if (errEl) { errEl.textContent = e.message; errEl.style.display = ''; }
+  });
+}
+
+function disconnectLastfm() {
+  var token = getAuthToken();
+  fetch('/api/lastfm/disconnect', {method:'POST', headers:{'token':token}}).then(function(r){
+    renderLastfmTab();
+  });
 }
 
 function renderAboutTab() {

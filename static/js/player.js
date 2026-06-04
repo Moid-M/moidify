@@ -21,6 +21,7 @@ function playFromQueue(queue, index) {
 
   updatePlayerUI(track);
   saveSession();
+  lastfmNowPlaying(track);
 }
 
 function loadAndPlay(track, queue, index, startTime) {
@@ -47,6 +48,7 @@ function loadAndPlay(track, queue, index, startTime) {
   });
   audio.src = '/api/stream/' + track.id + '?quality=' + (state.streamQuality || 'high');
   fetch('/api/play/' + track.id, {method:'POST'});
+  lastfmNowPlaying(track);
 }
 
 function applyVolumeNorm(track) {
@@ -479,3 +481,63 @@ function nextTrackFallback() {
     clearAnimations();
   }
 }
+
+// Last.fm scrobbling
+var scrobbledTrackIds = {};
+
+function lastfmNowPlaying(track) {
+  if (!track || !state.token) return;
+  fetch('/api/lastfm/status', {headers:{'token':state.token}}).then(function(r){return r.json();}).then(function(s){
+    if (!s.connected) return;
+    fetch('/api/lastfm/now-playing', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'token':state.token},
+      body:JSON.stringify({
+        artist: track.artist || 'Unknown',
+        track: track.title || 'Unknown',
+        album: track.album || '',
+        duration: Math.round(track.duration || 0),
+      }),
+    }).catch(function(){});
+  }).catch(function(){});
+}
+
+function lastfmScrobble(track) {
+  if (!track || !track.id || scrobbledTrackIds[track.id] || !state.token) return;
+  scrobbledTrackIds[track.id] = true;
+  fetch('/api/lastfm/scrobble', {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'token':state.token},
+    body:JSON.stringify({
+      artist: track.artist || 'Unknown',
+      track: track.title || 'Unknown',
+      album: track.album || '',
+      duration: Math.round(track.duration || 0),
+      timestamp: Math.floor(Date.now() / 1000),
+    }),
+  }).catch(function(){});
+}
+
+var scrobbleCheckInterval = null;
+
+function startScrobbleChecker() {
+  stopScrobbleChecker();
+  scrobbleCheckInterval = setInterval(function() {
+    if (!audio.duration || audio.paused || state.currentIndex < 0) return;
+    var track = state.queue[state.currentIndex];
+    if (!track || !track.duration) return;
+    var threshold = Math.min(track.duration * 0.5, 240);
+    if (audio.currentTime >= threshold) {
+      lastfmScrobble(track);
+    }
+  }, 5000);
+}
+
+function stopScrobbleChecker() {
+  if (scrobbleCheckInterval) {
+    clearInterval(scrobbleCheckInterval);
+    scrobbleCheckInterval = null;
+  }
+}
+
+startScrobbleChecker();

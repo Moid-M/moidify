@@ -128,6 +128,13 @@ def init_db():
             updated_at INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS lastfm_settings (
+            user_id INTEGER PRIMARY KEY,
+            lastfm_username TEXT NOT NULL,
+            session_key TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
     """)
 
     # Indexes for performance

@@ -49,7 +49,8 @@ def list_tracks(
     else:
         rows = conn.execute(
             f"""SELECT * FROM tracks
-                ORDER BY COALESCE(NULLIF(album_artist,''), artist), album, disc_number, track_number{limit_clause}"""
+                ORDER BY COALESCE(NULLIF(album_artist,''), artist), album, disc_number, track_number{limit_clause}""",
+            (limit, offset) if limit > 0 else ()
         ).fetchall()
     total = conn.execute("SELECT COUNT(*) as c FROM tracks").fetchone()["c"]
     conn.close()

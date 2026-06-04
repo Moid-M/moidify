@@ -1,3 +1,7 @@
+function getAuthToken() {
+  return state.token || localStorage.getItem('moidify_token');
+}
+
 async function api(path, options) {
   options = options || {};
   var headers = {};
