@@ -54,15 +54,15 @@ function setupKeyboard() {
       'play-pause': function() { e.preventDefault(); togglePlay(); },
       'next': function() { nextTrack(); },
       'prev': function() { prevTrack(); },
-      'volume-up': function() { e.preventDefault(); audio.volume=Math.min(1,audio.volume+0.1); document.getElementById('volume').value=audio.volume; },
-      'volume-down': function() { e.preventDefault(); audio.volume=Math.max(0,audio.volume-0.1); document.getElementById('volume').value=audio.volume; },
+      'volume-up': function() { e.preventDefault(); audio.volume=Math.min(1,audio.volume+0.1); document.getElementById('volume').value=audio.volume; updateVolumeLabel(); },
+      'volume-down': function() { e.preventDefault(); audio.volume=Math.max(0,audio.volume-0.1); document.getElementById('volume').value=audio.volume; updateVolumeLabel(); },
       'seek-forward': function() { e.preventDefault(); seekRelative(10); },
       'seek-back': function() { e.preventDefault(); seekRelative(-10); },
       'like': function() { if (state.queue[state.currentIndex]) toggleFavorite(state.queue[state.currentIndex].id); },
       'repeat': function() { cycleRepeat(); },
       'search': function() { e.preventDefault(); document.getElementById('search').focus(); },
       'queue': function() { toggleQueuePanel(); },
-      'escape': function() { closeModal(); hideContextMenu(); closeLyricsPanel(); closeEQPanel(); },
+      'escape': function() { closeModal(); hideContextMenu(); closeLyricsPanel(); closeEQPanel(); closeShortcutOverlay(); },
     };
     var keys = safeJSON('moidify_custom_keys', {});
     var defaults = {
@@ -79,6 +79,15 @@ function setupKeyboard() {
       'queue': 'q',
       'escape': 'Escape',
     };
+    // Handle ? key for shortcut overlay
+    if (key === '?' || (e.shiftKey && key === '/')) {
+      var overlay = document.getElementById('shortcut-overlay');
+      if (overlay) {
+        e.preventDefault();
+        overlay.style.display = overlay.style.display === 'none' ? 'flex' : 'none';
+      }
+      return;
+    }
     for (var action in defaults) {
       var boundKey = (keys[action] || defaults[action]);
       if (key === boundKey || (key.length === 1 && key.toLowerCase() === boundKey.toLowerCase())) {
@@ -87,4 +96,9 @@ function setupKeyboard() {
       }
     }
   });
+}
+
+function closeShortcutOverlay() {
+  var el = document.getElementById('shortcut-overlay');
+  if (el) el.style.display = 'none';
 }

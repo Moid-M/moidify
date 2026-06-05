@@ -56,12 +56,16 @@ function createTrackRow(track, index, queue) {
   row.innerHTML = '<span class="track-num">'+numLabel+'</span>'+
     (state.showTrackCovers ? '<img class="track-cover" src="/api/cover/'+track.id+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '')+
     '<span class="track-title">'+esc(track.title)+'</span>'+
-    '<span class="track-artist">'+esc(track.artist||'Unknown')+'</span>'+
-    '<span class="track-album">'+esc(track.album||'')+'</span>'+
+    '<span class="track-artist clickable" data-navigate-artist="'+esc(track.artist||'')+'">'+esc(track.artist||'Unknown')+'</span>'+
+    '<span class="track-album clickable" data-navigate-album="'+esc(track.album||'')+'" data-navigate-artist="'+esc(track.artist||'')+'">'+esc(track.album||'')+'</span>'+
     '<span class="track-rating">'+stars+'</span>'+
     '<span class="track-dur">'+dur+'</span>'+
     '';
   row.addEventListener('click',function(e){
+    var artistEl = e.target.closest('[data-navigate-artist]');
+    var albumEl = e.target.closest('[data-navigate-album]');
+    if (artistEl) { e.stopPropagation(); navigate('artist-tracks', artistEl.dataset.navigateArtist); return; }
+    if (albumEl) { e.stopPropagation(); navigate('album', {album: albumEl.dataset.navigateAlbum, artist: albumEl.dataset.navigateArtist || ''}); return; }
     if(e.ctrlKey||e.metaKey||e.shiftKey){
       handleTrackSelect(e, track.id, index);
     } else {
@@ -213,7 +217,7 @@ function getSelectedTracks() {
 
 async function renderTracks(searchQuery, navId) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">'+(searchQuery?'Search Results':'All Tracks')+'</div></div>'+(searchQuery?'':'<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>')+'<div class="track-skeleton-wrap">'+skeletonTrackRows()+'</div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">'+(searchQuery?'Search Results':'All Tracks')+'</div>'+(searchQuery?'':'<button id="duplicates-btn" class="icon-btn" title="Find duplicate tracks" style="flex-shrink:0">'+iconCollapse()+'</button>')+'</div>'+(searchQuery?'':'<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>')+'<div class="track-skeleton-wrap">'+skeletonTrackRows()+'</div>';
   try {
     var url = searchQuery ? '/api/tracks?search='+encodeURIComponent(searchQuery) : '/api/tracks?limit=200';
     var data = await apiJson(url);
@@ -296,4 +300,46 @@ async function renderFavorites(navId) {
     var filterInput = document.getElementById('track-filter-input');
     if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
   } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+}
+
+// Wire up duplicates button after render
+var _duplicatesWired = false;
+function wireDuplicatesBtn() {
+  if (_duplicatesWired) return;
+  var btn = document.getElementById('duplicates-btn');
+  if (!btn) { setTimeout(wireDuplicatesBtn, 100); return; }
+  _duplicatesWired = true;
+  btn.addEventListener('click', function() {
+    var content = document.getElementById('content');
+    content.innerHTML = '<div class="content-header"><div class="view-title">Duplicate Tracks</div><button onclick="navigate(\'tracks\')" class="icon-btn">&larr;</button></div><div class="track-skeleton-wrap">'+skeletonTrackRows()+'</div>';
+    apiJson('/api/duplicates').then(function(dupes) {
+      if (!dupes.length) {
+        content.innerHTML = '<div class="content-header"><div class="view-title">Duplicate Tracks</div><button onclick="navigate(\'tracks\')" class="icon-btn">&larr;</button></div><p style="color:#727272;padding:20px 0;">No duplicate tracks found.</p>';
+        return;
+      }
+      var html = '<div class="content-header"><div class="view-title">Duplicate Tracks ('+dupes.length+' pairs)</div><button onclick="navigate(\'tracks\')" class="icon-btn">&larr;</button></div>';
+      html += '<div class="track-list" style="font-size:13px">';
+      html += '<div class="track-header"><span>Title</span><span>Artist</span><span>Album</span><span>Duration</span><span></span></div>';
+      dupes.forEach(function(d) {
+        html += '<div class="track-row" style="cursor:default">'+
+          '<span class="track-title" title="'+esc(d.file1)+'\n'+esc(d.file2)+'">'+esc(d.title)+'</span>'+
+          '<span class="track-artist">'+esc(d.artist||'')+'</span>'+
+          '<span class="track-album">'+esc(d.album||'')+'</span>'+
+          '<span class="track-dur">'+formatTime(d.duration)+'</span>'+
+          '<span class="track-actions"><button class="del-btn" data-id="'+d.id2+'" title="Delete duplicate" style="font-size:11px;padding:2px 8px">Remove</button></span>'+
+          '</div>';
+      });
+      html += '</div>';
+      content.innerHTML = html;
+      qsa('.del-btn', content).forEach(function(b) {
+        b.addEventListener('click', function() {
+          if (!confirm('Delete this duplicate track?')) return;
+          api('/api/admin/tracks/'+this.dataset.id, {method:'DELETE'}).then(function() {
+            showToast('Duplicate removed', 'success');
+            document.getElementById('duplicates-btn').click();
+          }).catch(function() { showToast('Failed to remove', 'error'); });
+        });
+      });
+    }).catch(function() { content.innerHTML += '<p style="color:#e74c3c;">Failed to load duplicates</p>'; });
+  });
 }

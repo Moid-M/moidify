@@ -22,6 +22,11 @@ function setupEvents() {
   };
   document.getElementById('close-lyrics-btn').addEventListener('click', closeLyrics);
   lyricsOverlay.addEventListener('click', function(e) { if (e.target === lyricsOverlay) closeLyrics(); });
+  var shortcutOverlay = document.getElementById('shortcut-overlay');
+  if (shortcutOverlay) {
+    document.getElementById('close-shortcut-btn').addEventListener('click', function() { shortcutOverlay.style.display = 'none'; });
+    shortcutOverlay.addEventListener('click', function(e) { if (e.target === shortcutOverlay) shortcutOverlay.style.display = 'none'; });
+  }
   document.getElementById('queue-toggle-btn').addEventListener('click', toggleQueuePanel);
   document.getElementById('close-queue-btn').addEventListener('click', toggleQueuePanel);
   document.getElementById('clear-queue-btn').addEventListener('click', clearQueue);
@@ -49,7 +54,28 @@ function setupEvents() {
   document.getElementById('player-cover-expand').addEventListener('click', function(e) {
     e.stopPropagation();
     var track = state.queue[state.currentIndex];
-    if (track) openFullScreenArt(track.id);
+    if (!track) return;
+    var fs = document.getElementById('fs-art');
+    document.getElementById('fs-art-img').src = '/api/cover/'+track.id;
+    fs.style.display = 'flex';
+  });
+  // Now-playing overlay navigation
+  document.getElementById('np-cover').addEventListener('click', function(e) {
+    e.stopPropagation();
+    var album = this.dataset.navigateAlbum;
+    var artist = this.dataset.navigateArtist;
+    if (album) navigate('album', {album: album, artist: artist});
+  });
+  document.getElementById('np-title').addEventListener('click', function(e) {
+    e.stopPropagation();
+    var album = this.dataset.navigateAlbum;
+    var artist = this.dataset.navigateArtist;
+    if (album) navigate('album', {album: album, artist: artist});
+  });
+  document.getElementById('np-artist').addEventListener('click', function(e) {
+    e.stopPropagation();
+    var artist = this.dataset.navigateArtist;
+    if (artist) navigate('artist-tracks', artist);
   });
   qs('.player-left').addEventListener('dblclick', function() {
     toggleNowPlaying();
@@ -76,7 +102,7 @@ function setupEvents() {
   document.getElementById('volume').addEventListener('input', function() {
     audio.volume = parseFloat(this.value);
     updateVolumeFill();
-    audio.muted = false;
+    updateVolumeLabel();
   });
   // Mini player — popup window
   var miniBtn = document.getElementById('mini-player-btn');
@@ -212,12 +238,15 @@ function setupEvents() {
       if (!state.user) { showLoginModal(); return; }
       showNewPlaylistForm(null, trackIds);
     } else if (action === 'download') {
+      var trackIds = getSelectedTracks();
       var currentTracks = state.currentTracks || [];
-      trackIds.forEach(function(id) {
-        var track = currentTracks.find(function(t) { return t.id === id; });
-        var title = track ? track.title : 'track';
-        downloadTrack(id, title);
-      });
+      // Offer batch download via ZIP
+      var a = document.createElement('a');
+      a.href = '/api/download/tracks-zip?ids=' + trackIds.join(',');
+      a.download = 'tracks.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       clearSelection();
     }
   });

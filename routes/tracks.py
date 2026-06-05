@@ -397,3 +397,21 @@ def set_track_rating(track_id: int, body: RatingBody, token: Optional[str] = Hea
     conn.commit()
     conn.close()
     return {"ok": True, "rating": body.rating}
+
+
+@router.get("/api/duplicates")
+def list_duplicates():
+    conn = get_connection()
+    rows = conn.execute("""
+        SELECT t1.id as id1, t2.id as id2,
+               t1.title, t1.artist, t1.album,
+               t1.duration, t1.file_path as file1, t2.file_path as file2
+        FROM tracks t1
+        JOIN tracks t2 ON LOWER(t1.title) = LOWER(t2.title)
+                      AND LOWER(COALESCE(t1.artist,'')) = LOWER(COALESCE(t2.artist,''))
+                      AND ABS(COALESCE(t1.duration,0) - COALESCE(t2.duration,0)) < 2
+                      AND t1.id < t2.id
+        ORDER BY t1.title
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

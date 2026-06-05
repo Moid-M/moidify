@@ -461,6 +461,48 @@ body[data-colplays="1"] .track-row .track-plays { display: block; }
   background: var(--accent-dim);
 }
 
+/* ---- Clickable text links in track rows ---- */
+.clickable {
+  cursor: pointer;
+  transition: color .15s;
+}
+.clickable:hover {
+  color: var(--accent);
+}
+
+/* ---- ? Shortcut overlay ---- */
+#shortcut-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+}
+#shortcut-panel {
+  background: var(--bg-elevated); border-radius: 12px; padding: 24px;
+  min-width: 360px; max-width: 440px;
+}
+.shortcut-header {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 18px; font-weight: 700; margin-bottom: 16px;
+}
+.shortcut-header button { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; }
+.shortcut-header button:hover { color: var(--text); }
+.shortcut-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
+.shortcut-grid div { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); }
+.shortcut-grid kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; padding: 2px 6px; border-radius: 4px;
+  background: var(--bg-hover); color: var(--text); font-size: 11px;
+  font-family: monospace; border: 1px solid var(--text3);
+}
+
+/* ---- Volume percentage label ---- */
+.vol-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- Cover blur-load ---- */
 img.blur-load {
   filter: blur(20px);

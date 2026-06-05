@@ -335,6 +335,12 @@ function updateNowPlaying() {
   document.getElementById('np-title').textContent = track.title || '';
   document.getElementById('np-artist').textContent = (track.artist || 'Unknown') + (track.album ? ' \u2022 ' + track.album : '');
   document.getElementById('np-total-time').textContent = formatTime(audio.duration || track.duration || 0);
+  // Store nav data for click handlers
+  document.getElementById('np-cover').dataset.navigateAlbum = track.album || '';
+  document.getElementById('np-cover').dataset.navigateArtist = track.artist || '';
+  document.getElementById('np-title').dataset.navigateAlbum = track.album || '';
+  document.getElementById('np-title').dataset.navigateArtist = track.artist || '';
+  document.getElementById('np-artist').dataset.navigateArtist = track.artist || '';
   updateNowPlayingProgress();
   renderNowPlayingLyrics();
 }

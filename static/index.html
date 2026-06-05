@@ -171,6 +171,7 @@
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
             </button>
             <input type="range" id="volume" min="0" max="1" step="0.05" value="1">
+            <span id="vol-label" class="vol-label">100%</span>
           </div>
           <button id="eq-btn" class="ctrl-btn" title="Equalizer" data-i18n-title="player.eq">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
@@ -312,6 +313,27 @@
           </div>
         </div>
         <canvas id="lyrics-visualizer" width="200" height="400"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div id="shortcut-overlay" style="display:none">
+    <div id="shortcut-panel">
+      <div class="shortcut-header">Keyboard Shortcuts <button id="close-shortcut-btn" class="icon-btn">&times;</button></div>
+      <div class="shortcut-grid">
+        <div><kbd>Space</kbd> <span>Play / Pause</span></div>
+        <div><kbd>N</kbd> <span>Next track</span></div>
+        <div><kbd>P</kbd> <span>Previous track</span></div>
+        <div><kbd>&larr;</kbd> <span>Seek back 10s</span></div>
+        <div><kbd>&rarr;</kbd> <span>Seek forward 10s</span></div>
+        <div><kbd>&uarr;</kbd> <span>Volume up</span></div>
+        <div><kbd>&darr;</kbd> <span>Volume down</span></div>
+        <div><kbd>L</kbd> <span>Like / Unlike</span></div>
+        <div><kbd>R</kbd> <span>Cycle repeat</span></div>
+        <div><kbd>S</kbd> <span>Search</span></div>
+        <div><kbd>Q</kbd> <span>Toggle queue</span></div>
+        <div><kbd>?</kbd> <span>This help</span></div>
+        <div><kbd>Esc</kbd> <span>Close modal / overlay</span></div>
       </div>
     </div>
   </div>

@@ -93,6 +93,14 @@ function applyTrackCovers() {
 function updateVolumeFill() {
   var vol = parseFloat(document.getElementById('volume').value) || 1;
   document.documentElement.style.setProperty('--vol-pct', (vol * 100) + '%');
+  updateVolumeLabel();
+}
+
+function updateVolumeLabel() {
+  var el = document.getElementById('vol-label');
+  if (!el) return;
+  var vol = parseFloat(document.getElementById('volume').value) || 1;
+  el.textContent = Math.round(vol * 100) + '%';
 }
 
 function updateSeekFill() {

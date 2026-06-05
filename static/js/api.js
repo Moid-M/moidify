@@ -330,6 +330,66 @@ function downloadTrack(trackId, title) {
   document.body.removeChild(a);
 }
 
+function downloadTrackZip(trackId, title) {
+  var a = document.createElement('a');
+  a.href = '/api/download/track-zip/' + trackId;
+  a.download = (title || 'track') + '.zip';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function showDownloadMenu(x, y, type, data) {
+  var existing = document.getElementById('download-menu');
+  if (existing) existing.remove();
+  var menu = document.createElement('div');
+  menu.id = 'download-menu';
+  menu.className = 'context-menu';
+  menu.style.cssText = 'display:block;position:fixed;left:'+x+'px;top:'+y+'px;z-index:300;';
+  if (type === 'track') {
+    menu.innerHTML =
+      '<div class="context-menu-item" data-action="download-raw"><span class="cmi-icon">'+iconDownload()+'</span> Download Raw</div>'+
+      '<div class="context-menu-item" data-action="download-zip"><span class="cmi-icon">'+iconAlbum()+'</span> Download as ZIP</div>';
+    menu.querySelector('[data-action="download-raw"]').addEventListener('click', function() { downloadTrack(data.id, data.title); menu.remove(); });
+    menu.querySelector('[data-action="download-zip"]').addEventListener('click', function() { downloadTrackZip(data.id, data.title); menu.remove(); });
+  } else if (type === 'album') {
+    menu.innerHTML =
+      '<div class="context-menu-item" data-action="download-raw"><span class="cmi-icon">'+iconDownload()+'</span> Download Raw (all files)</div>'+
+      '<div class="context-menu-item" data-action="download-zip"><span class="cmi-icon">'+iconAlbum()+'</span> Download as ZIP</div>';
+    menu.querySelector('[data-action="download-raw"]').addEventListener('click', function() { downloadAlbumRaw(data.album, data.artist); menu.remove(); });
+    menu.querySelector('[data-action="download-zip"]').addEventListener('click', function() { downloadAlbum(data.album, data.artist); menu.remove(); });
+  } else if (type === 'playlist') {
+    menu.innerHTML =
+      '<div class="context-menu-item" data-action="download-raw"><span class="cmi-icon">'+iconDownload()+'</span> Download Raw (all files)</div>'+
+      '<div class="context-menu-item" data-action="download-zip"><span class="cmi-icon">'+iconAlbum()+'</span> Download as ZIP</div>';
+    menu.querySelector('[data-action="download-raw"]').addEventListener('click', function() { downloadPlaylistRaw(data.id); menu.remove(); });
+    menu.querySelector('[data-action="download-zip"]').addEventListener('click', function() { downloadPlaylistZip(data.id, data.name); menu.remove(); });
+  }
+  document.body.appendChild(menu);
+  setTimeout(function() { document.addEventListener('click', function cleanup() { menu.remove(); document.removeEventListener('click', cleanup); }); }, 0);
+}
+
+function downloadAlbumRaw(albumName, artistName) {
+  apiJson('/api/albums/tracks?album='+encodeURIComponent(albumName)+(artistName?'&artist='+encodeURIComponent(artistName):'')).then(function(tracks) {
+    tracks.forEach(function(t) { downloadTrack(t.id, t.title); });
+  }).catch(function() {});
+}
+
+function downloadPlaylistRaw(playlistId) {
+  apiJson('/api/playlists/'+playlistId+'/tracks').then(function(tracks) {
+    tracks.forEach(function(t) { downloadTrack(t.id, t.title); });
+  }).catch(function() {});
+}
+
+function downloadPlaylistZip(playlistId, name) {
+  var a = document.createElement('a');
+  a.href = '/api/download/playlist/' + playlistId;
+  a.download = (name || 'playlist') + '.zip';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 function togglePinPlaylist(id) {
   var idx = state.pinnedPlaylists.indexOf(id);
   if (idx === -1) { state.pinnedPlaylists.push(id); } else { state.pinnedPlaylists.splice(idx, 1); }

@@ -170,5 +170,94 @@ def download_album(album: str = Query(...), artist: Optional[str] = Query(None))
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.zip"'},
+    )
+
+
+@router.get("/api/download/tracks-zip")
+def download_tracks_zip(ids: str = Query(...)):
+    import io
+
+    track_ids = [int(x) for x in ids.split(",") if x.strip().isdigit()]
+    if not track_ids:
+        raise HTTPException(400, "No valid track IDs")
+    placeholders = ",".join("?" * len(track_ids))
+    conn = get_connection()
+    rows = conn.execute(f"SELECT * FROM tracks WHERE id IN ({placeholders})", track_ids).fetchall()
+    conn.close()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for row in rows:
+            path = Path(row["file_path"])
+            if path.exists():
+                prefix = f"{row['track_number'] or 0:02d}"
+                track_name = f"{prefix} - {row['title'] or path.stem}{path.suffix}"
+                safe_name = "".join(c if c.isalnum() or c in " ._-" else "_" for c in track_name)
+                zf.write(str(path), safe_name)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="tracks.zip"'},
+    )
+
+
+@router.get("/api/download/track-zip/{track_id}")
+def download_track_zip(track_id: int):
+    import io
+
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM tracks WHERE id = ?", (track_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "Track not found")
+    path = Path(row["file_path"])
+    if not path.exists():
+        raise HTTPException(404, "File not found on disk")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        arcname = f"{row['title'] or path.stem}{path.suffix}"
+        safe_arcname = "".join(c if c.isalnum() or c in " ._-" else "_" for c in arcname)
+        zf.write(str(path), safe_arcname)
+    buf.seek(0)
+    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in (row["title"] or "track")).strip()
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.zip"'},
+    )
+
+
+@router.get("/api/download/playlist/{playlist_id}")
+def download_playlist(playlist_id: int):
+    import io
+
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT t.* FROM tracks t JOIN playlist_tracks pt ON t.id = pt.track_id WHERE pt.playlist_id = ? ORDER BY pt.position",
+        (playlist_id,),
+    ).fetchall()
+    pl_name = conn.execute("SELECT name FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+    conn.close()
+    if not rows:
+        raise HTTPException(404, "No tracks in playlist")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for row in rows:
+            path = Path(row["file_path"])
+            if path.exists():
+                prefix = f"{row['disc_number'] or 1}-{row['track_number'] or 0:02d}" if row['disc_number'] and row['disc_number'] > 1 else f"{row['track_number'] or 0:02d}"
+                track_name = f"{prefix} - {row['title'] or path.stem}{path.suffix}"
+                safe_name = "".join(c if c.isalnum() or c in " ._-" else "_" for c in track_name)
+                zf.write(str(path), safe_name)
+    buf.seek(0)
+    name = (pl_name["name"] if pl_name else "playlist") if isinstance(pl_name, dict) else (pl_name[0] if pl_name else "playlist")
+    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in name).strip()
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.zip"'},
     )

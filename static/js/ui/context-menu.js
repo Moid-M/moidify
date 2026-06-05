@@ -52,7 +52,8 @@ function showAlbumContextMenu(event, album) {
       } else if (action === 'album-go-artist') {
         navigate('artist-tracks', album.artist);
       } else if (action === 'album-download') {
-        downloadAlbum(album.album, album.artist);
+        hideContextMenu();
+        showDownloadMenu(e.clientX, e.clientY, 'album', {album: album.album, artist: album.artist});
       } else if (action === 'album-rate') {
         var rateVal = parseInt(this.dataset.rating);
         apiJson('/api/albums/tracks?album='+encodeURIComponent(album.album)+(album.artist?'&artist='+encodeURIComponent(album.artist):'')).then(function(tracks) {
@@ -145,7 +146,7 @@ function showContextMenu(event, track, queue, index) {
   html += '<div class="context-menu-item" data-action="go-artist"><span class="cmi-icon">'+iconArtist()+'</span> Go to Artist</div>';
 
   html += '<div class="context-menu-divider"></div>';
-  html += '<div class="context-menu-item" data-action="download"><span class="cmi-icon">'+iconDownload()+'</span> Download Song</div>';
+  html += '<div class="context-menu-item" data-action="download"><span class="cmi-icon">'+iconDownload()+'</span> Download</div>';
   if (track.album) {
     html += '<div class="context-menu-item" data-action="download-album"><span class="cmi-icon">'+iconDownload()+'</span> Download Album</div>';
   }
@@ -196,8 +197,8 @@ function showContextMenu(event, track, queue, index) {
       else if (action==='remove-queue') { removeFromQueue(parseInt(this.dataset.qi)); showToast('Removed from queue', 'info'); }
       else if (action==='go-album') navigate('album',{album:track.album,artist:track.artist});
       else if (action==='go-artist') navigate('artist-tracks',track.artist);
-      else if (action==='download') downloadTrack(track.id, track.title);
-      else if (action==='download-album') downloadAlbum(track.album, track.artist);
+      else if (action==='download') { hideContextMenu(); showDownloadMenu(x, y, 'track', {id: track.id, title: track.title}); return; }
+      else if (action==='download-album') { hideContextMenu(); showDownloadMenu(x, y, 'album', {album: track.album, artist: track.artist}); return; }
       else if (action==='share-track') { copyTrackLink(track); }
       hideContextMenu();
     });
