@@ -5,8 +5,23 @@ async function renderPlaylistDetail(playlistId, navId) {
     var tracks = await apiJson('/api/playlists/'+playlistId+'/tracks');
     if (state._navId !== navId) return;
     var playlistName = state.playlists.find(function(p){return p.id===playlistId;});
-    content.innerHTML = '<div class="content-header"><div class="view-title">'+esc(playlistName?playlistName.name:'Playlist')+'</div>'+
+
+    // Build collage cover from first up to 4 tracks
+    var collageHtml = '';
+    if (tracks.length > 0) {
+      var covers = tracks.slice(0, 4).map(function(t) { return '/api/cover/' + t.id; });
+      if (covers.length === 1) {
+        collageHtml = '<div class="pl-collage pl-collage-1"><img src="'+covers[0]+'" alt=""></div>';
+      } else if (covers.length === 2) {
+        collageHtml = '<div class="pl-collage pl-collage-2">'+covers.map(function(u){return '<img src="'+u+'" alt="">';}).join('')+'</div>';
+      } else {
+        collageHtml = '<div class="pl-collage pl-collage-4">'+covers.map(function(u){return '<img src="'+u+'" alt="">';}).join('')+'</div>';
+      }
+    }
+
+    content.innerHTML = '<div class="pl-header">'+collageHtml+'<div class="pl-meta"><div class="content-header" style="margin:0;padding:0"><div class="view-title">'+esc(playlistName?playlistName.name:'Playlist')+'</div>'+
       '<div style="display:flex;gap:8px"><button id="share-pl-btn" class="icon-btn" title="Share playlist">'+iconShare()+'</button><button id="export-pl-btn" class="icon-btn" title="Export playlist">'+iconDownload()+'</button></div></div>'+
+      '<p style="color:var(--text-muted);font-size:13px;margin:4px 0 0;">'+tracks.length+' tracks</p></div></div>'+
       '<div id="share-pl-status" style="display:none;padding:10px 14px;background:var(--bg-el);border-radius:var(--radius);margin-bottom:12px;font-size:13px;align-items:center;gap:10px"></div>'+
       '<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>';
     if (tracks.length===0) { content.innerHTML += '<div class="fav-empty">This playlist is empty.</div>'; return; }

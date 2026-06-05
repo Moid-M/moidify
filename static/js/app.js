@@ -278,6 +278,25 @@ function setupEvents() {
     }
   });
 
+  // Seek bar hover preview
+  var seekWrap = document.getElementById('seek-wrap');
+  var seekPreview = document.getElementById('seek-preview');
+  if (seekWrap && seekPreview) {
+    seekWrap.addEventListener('mousemove', function(e) {
+      var rect = seekWrap.getBoundingClientRect();
+      var pct = (e.clientX - rect.left) / rect.width;
+      if (audio.duration) {
+        var t = pct * audio.duration;
+        seekPreview.textContent = formatTime(t);
+        seekPreview.style.display = '';
+        seekPreview.style.left = Math.max(0, Math.min(rect.width - 50, pct * rect.width - 25)) + 'px';
+      }
+    });
+    seekWrap.addEventListener('mouseleave', function() {
+      seekPreview.style.display = 'none';
+    });
+  }
+
   audio.addEventListener('loadedmetadata', function() {
     var d = formatTime(audio.duration);
     document.getElementById('total-time').textContent = d;
@@ -564,6 +583,13 @@ function init() {
   initSeekWave();
   initSeekSmooth();
   applyTrackCovers();
+  setupQueueDropZone();
+  startScannerPoller();
+  applyCustomCSS(localStorage.getItem('moidify_custom_css') || '');
+  applyDensity(localStorage.getItem('moidify_density') || 'normal');
+  applyColumnVis();
+  initCoverBlur();
+  applyNavVisibility();
   checkAuth().then(function() {
     restoreSession();
     navigate('home');
@@ -578,6 +604,74 @@ function init() {
   window.addEventListener('pagehide', saveSession);
   // Also save on timeupdate (every 10 seconds via the interval)
   scheduleSessionSave();
+}
+
+function applyCustomCSS(css) {
+  var existing = document.getElementById('custom-css-style');
+  if (existing) existing.remove();
+  if (!css || !css.trim()) return;
+  var style = document.createElement('style');
+  style.id = 'custom-css-style';
+  style.textContent = css;
+  document.head.appendChild(style);
+}
+
+function applyDensity(density) {
+  document.body.dataset.density = density || 'normal';
+}
+
+function applyColumnVis() {
+  var cols = ['covers','title','artist','album','duration','genre','plays'];
+  cols.forEach(function(c) {
+    var val = localStorage.getItem('moidify_col_' + c);
+    if (val !== null) {
+      document.body.dataset['col' + c.charAt(0).toUpperCase() + c.slice(1)] = val;
+    }
+  });
+}
+
+function initCoverBlur() {
+  var observer = new MutationObserver(function() {
+    qsa('img[src*="/api/cover/"]:not(.blur-load)').forEach(function(img) {
+      img.classList.add('blur-load');
+      if (img.complete) { img.classList.add('loaded'); }
+      else { img.addEventListener('load', function() { this.classList.add('loaded'); }); }
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  // Also apply to existing images
+  qsa('img[src*="/api/cover/"]').forEach(function(img) {
+    img.classList.add('blur-load');
+    if (img.complete) { img.classList.add('loaded'); }
+    else { img.addEventListener('load', function() { this.classList.add('loaded'); }); }
+  });
+}
+
+function applyNavVisibility() {
+  ['tracks','albums','artists','genres','favorites'].forEach(function(view) {
+    var val = localStorage.getItem('moidify_nav_' + view);
+    if (val === '0') {
+      var el = qs('.nav-item[data-view="'+view+'"]');
+      if (el) el.style.display = 'none';
+    }
+  });
+}
+
+var _scanPoll = null;
+function startScannerPoller() {
+  if (_scanPoll) return;
+  _scanPoll = setInterval(function() {
+    fetch('/api/admin/scanner').then(function(r) { return r.json(); }).then(function(d) {
+      var el = document.getElementById('scan-indicator');
+      var txt = document.getElementById('scan-indicator-text');
+      if (d.running) {
+        el.style.display = '';
+        txt.textContent = 'Scanning... ' + d.files_imported + ' / ' + d.files_found;
+      } else {
+        el.style.display = 'none';
+      }
+    }).catch(function() {});
+  }, 3000);
 }
 
 document.addEventListener('DOMContentLoaded', init);

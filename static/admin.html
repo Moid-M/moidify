@@ -138,7 +138,11 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
       <div id="scanner-card" class="chart-card" style="margin-bottom:32px;display:none">
         <h3 style="margin-bottom:6px">Scanner Status</h3>
         <div id="scanner-status" style="font-size:13px;color:var(--text2)"></div>
-        <button onclick="rescanMusic()" class="admin-btn" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;">
+        <div id="scanner-progress" style="margin-top:8px;display:none">
+          <progress id="scan-progress-bar" style="width:100%;height:6px;border-radius:3px;accent-color:var(--accent)" max="100" value="0"></progress>
+          <div id="scan-progress-text" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
+        </div>
+        <button onclick="rescanMusic()" class="admin-btn" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;" id="rescan-btn">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
           Rescan Music Folder
         </button>
@@ -496,20 +500,61 @@ async function loadDashboard() {
   } catch(e) { document.getElementById('chart-grid').innerHTML = '<p style="color:var(--danger)">Error loading dashboard</p>'; }
 }
 
+var scanPollTimer = null;
+
 async function rescanMusic() {
   var msg = document.getElementById('rescan-msg');
+  var btn = document.getElementById('rescan-btn');
+  var progressBar = document.getElementById('scanner-progress');
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+  progressBar.style.display = 'block';
   msg.style.display = 'block';
-  msg.textContent = 'Scanning...';
+  msg.textContent = 'Starting scan...';
   try {
     var r = await api('/api/admin/rescan', {method:'POST'});
     if (!r.ok) { msg.textContent = 'Scan failed'; return; }
-    var d = await r.json();
-    msg.textContent = 'Done. Found '+d.files_found+' files, imported '+d.files_imported+'.';
-    loadStats();
-    loadScannerStatus();
-    loadTracks();
-  } catch(e) { msg.textContent = 'Error: '+e.message; }
-  setTimeout(function(){ msg.style.display = 'none'; }, 5000);
+    msg.textContent = 'Scan in progress...';
+    if (scanPollTimer) clearInterval(scanPollTimer);
+    scanPollTimer = setInterval(async function() {
+      try {
+        var pr = await api('/api/admin/scanner');
+        if (!pr.ok) return;
+        var ps = await pr.json();
+        var el = document.getElementById('scanner-status');
+        el.innerHTML = '<div style="display:flex;gap:20px;flex-wrap:wrap">'+
+          '<span>Last scan: <strong>'+esc(ps.last_scan||'Never')+'</strong></span>'+
+          '<span>Files found: <strong>'+ps.files_found+'</strong></span>'+
+          '<span>Imported: <strong>'+ps.files_imported+'</strong></span>'+
+          (ps.errors && ps.errors.length ? '<span style="color:var(--danger)">; '+ps.errors.length+' error(s)</span>' : '')+
+          '</div>';
+        var bar = document.getElementById('scan-progress-bar');
+        var txt = document.getElementById('scan-progress-text');
+        if (ps.files_found > 0) {
+          bar.max = ps.files_found;
+          bar.value = ps.files_imported;
+        } else {
+          bar.max = 1;
+          bar.value = 0;
+        }
+        txt.textContent = ps.files_imported + ' / ' + ps.files_found + ' files imported';
+        if (!ps.running) {
+          clearInterval(scanPollTimer);
+          scanPollTimer = null;
+          btn.disabled = false;
+          btn.style.opacity = '';
+          msg.textContent = 'Done. Found ' + ps.files_found + ' files, imported ' + ps.files_imported + '.';
+          setTimeout(function(){ msg.style.display = 'none'; progressBar.style.display = 'none'; }, 5000);
+          loadStats();
+          loadTracks();
+        }
+      } catch(e) {}
+    }, 1000);
+  } catch(e) {
+    msg.textContent = 'Error: '+e.message;
+    btn.disabled = false;
+    btn.style.opacity = '';
+  }
 }
 
 async function loadSchedule() {
@@ -603,16 +648,26 @@ async function loadScannerStatus() {
     var d = await r.json();
     var el = document.getElementById('scanner-card');
     var content = document.getElementById('scanner-status');
-    if (!d.last_scan) { el.style.display = 'none'; return; }
+    var progressBar = document.getElementById('scanner-progress');
+    if (!d.last_scan && !d.running) { el.style.display = 'none'; return; }
     el.style.display = '';
     var errHtml = d.errors && d.errors.length ? '<span style="color:var(--danger)">; '+d.errors.length+' error(s)</span>' : '';
     content.innerHTML =
       '<div style="display:flex;gap:20px;flex-wrap:wrap">'+
-        '<span>Last scan: <strong>'+esc(d.last_scan)+'</strong></span>'+
+        '<span>Last scan: <strong>'+esc(d.last_scan||'Never')+'</strong></span>'+
         '<span>Files found: <strong>'+d.files_found+'</strong></span>'+
         '<span>Imported: <strong>'+d.files_imported+'</strong></span>'+
+        (d.running ? '<span style="color:var(--accent)">⚡ Scanning...</span>' : '')+
         errHtml+
       '</div>';
+    if (d.running) {
+      progressBar.style.display = 'block';
+      var bar = document.getElementById('scan-progress-bar');
+      var txt = document.getElementById('scan-progress-text');
+      if (d.files_found > 0) { bar.max = d.files_found; bar.value = d.files_imported; }
+      else { bar.max = 1; bar.value = 0; }
+      txt.textContent = d.files_imported + ' / ' + d.files_found + ' files imported';
+    }
   } catch(e) {}
 }
 

@@ -39,6 +39,7 @@ window.VirtualList = {
 function createTrackRow(track, index, queue) {
   var row = document.createElement('div');
   row.className = 'track-row';
+  row.draggable = true;
   row.dataset.trackId = track.id;
   row.dataset.index = index;
   row.dataset.trackDuration = track.duration || 0;
@@ -68,6 +69,8 @@ function createTrackRow(track, index, queue) {
     }
   });
   row.addEventListener('contextmenu',function(e){e.preventDefault();showContextMenu(e,track,queue,index);});
+  row.addEventListener('dragstart', function(e) { e.dataTransfer.setData('text/plain', String(track.id)); e.dataTransfer.effectAllowed = 'copy'; row.classList.add('dragging'); });
+  row.addEventListener('dragend', function() { row.classList.remove('dragging'); });
   setupLongPress(row, function(e) { showContextMenu({ clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY }, track, queue, index); });
   qsa('.star-rating-star', row).forEach(function(el) {
     el.addEventListener('click', function(e) {
@@ -127,6 +130,8 @@ function setupTrackSorting(trackList, tracks) {
       if (state.sortBy === field) dir = state.sortDir === 'asc' ? 'desc' : 'asc';
       state.sortBy = field;
       state.sortDir = dir;
+      // Persist per-view
+      localStorage.setItem('moidify_sort_' + state.currentView, JSON.stringify({by:field, dir:dir}));
       var allTracks = tracks;
       if (trackList._mergeAll) {
         showToast('Please wait, tracks are still loading...', 'info');

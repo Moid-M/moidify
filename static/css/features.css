@@ -217,5 +217,255 @@
   text-align: center;
   font-size: 13px;
   color: var(--text-muted);
-  border-top: 1px solid var(--player-border);
+}
+
+/* ---- Queue drag-and-drop ---- */
+#queue-panel.drag-over {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.track-row.dragging {
+  opacity: 0.4;
+}
+
+/* ---- Playlist cover collage ---- */
+.pl-header {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 16px 20px;
+}
+.pl-collage {
+  width: 160px;
+  height: 160px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-hover);
+}
+.pl-collage-1 img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pl-collage-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.pl-collage-2 img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pl-collage-4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.pl-collage-4 img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pl-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- Scan progress indicator ---- */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Album version grouping ---- */
+.album-group {
+  margin-bottom: 8px;
+}
+.album-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-radius: var(--radius);
+  background: var(--bg-el);
+  transition: background .15s;
+}
+.album-group-header:hover {
+  background: var(--bg-hover);
+}
+.album-group-arrow {
+  font-size: 12px;
+  color: var(--text-muted);
+  width: 12px;
+  flex-shrink: 0;
+}
+.album-group-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.album-group-artist {
+  font-size: 13px;
+  color: var(--text2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.album-group-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+}
+.album-group-versions {
+  padding-left: 16px;
+  border-left: 2px solid var(--bg-hover);
+  margin-top: 4px;
+  margin-left: 6px;
+}
+
+/* ---- Seek bar hover preview ---- */
+.seek-preview {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  background: var(--accent);
+  color: #000;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+.seek-preview::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -4px;
+  border: 4px solid transparent;
+  border-top-color: var(--accent);
+}
+
+/* ---- Grid density ---- */
+body[data-density="compact"] .album-card { padding: 8px; }
+body[data-density="compact"] .album-card .album-name { font-size: 12px; }
+body[data-density="compact"] .album-card .album-artist { font-size: 11px; }
+body[data-density="compact"] .track-row { padding: 4px 10px; font-size: 12px; }
+body[data-density="compact"] .genre-card { padding: 10px 14px; }
+body[data-density="compact"] .artist-card { padding: 10px; }
+body[data-density="compact"] .artist-card .artist-name { font-size: 12px; }
+body[data-density="compact"] #player-bar { --player-h: 72px; }
+body[data-density="compact"] .player-seek-bar { padding: 4px 12px; }
+body[data-density="compact"] .album-grid { gap: 8px; }
+body[data-density="compact"] .content-header { padding: 12px 16px; }
+body[data-density="compact"] .artist-grid { gap: 8px; }
+body[data-density="compact"] .genre-grid { gap: 8px; }
+
+body[data-density="comfortable"] .album-card { padding: 20px; }
+body[data-density="comfortable"] .album-card .album-name { font-size: 16px; }
+body[data-density="comfortable"] .album-card .album-artist { font-size: 14px; }
+body[data-density="comfortable"] .track-row { padding: 12px 16px; font-size: 15px; }
+body[data-density="comfortable"] .genre-card { padding: 18px 24px; font-size: 15px; }
+body[data-density="comfortable"] .artist-card { padding: 18px; }
+body[data-density="comfortable"] .artist-card .artist-name { font-size: 15px; }
+body[data-density="comfortable"] #player-bar { --player-h: 100px; }
+body[data-density="comfortable"] .player-seek-bar { padding: 8px 16px; }
+body[data-density="comfortable"] .album-grid { gap: 20px; }
+body[data-density="comfortable"] .content-header { padding: 20px 24px; }
+body[data-density="comfortable"] .artist-grid { gap: 20px; }
+body[data-density="comfortable"] .genre-grid { gap: 20px; }
+
+/* ---- Track list column visibility ---- */
+body[data-colcovers="0"] .track-num img.album-list-cover { display: none; }
+body[data-coltitle="0"] .track-row .track-title { display: none; }
+body[data-colartist="0"] .track-row .track-artist { display: none; }
+body[data-colalbum="0"] .track-row .track-album { display: none; }
+body[data-colduration="0"] .track-row .track-duration { display: none; }
+body[data-colgenre="1"] .track-header span:nth-child(5),
+body[data-colgenre="1"] .track-row .track-genre { display: block; }
+body[data-colplays="1"] .track-header span:nth-child(6),
+body[data-colplays="1"] .track-row .track-plays { display: block; }
+
+/* ---- Shortcut editor ---- */
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--bg-hover);
+}
+.shortcut-label {
+  font-size: 13px;
+  color: var(--text2);
+}
+.shortcut-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text);
+  font-size: 12px;
+  font-family: monospace;
+  cursor: pointer;
+  border: 1px solid transparent;
+  outline: none;
+  user-select: none;
+}
+.shortcut-key:focus {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* ---- Custom CSS editor ---- */
+.css-editor {
+  width: 100%;
+  min-height: 200px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--bg-hover);
+  background: var(--bg-el);
+  color: var(--text);
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+.css-editor:focus {
+  border-color: var(--accent);
+}
+
+/* ---- Now playing jump button ---- */
+.queue-jump-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background .15s;
+}
+.queue-jump-btn:hover {
+  background: var(--accent-dim);
+}
+
+/* ---- Cover blur-load ---- */
+img.blur-load {
+  filter: blur(20px);
+  transition: filter 0.4s ease-out;
+}
+img.blur-load.loaded {
+  filter: blur(0);
 }

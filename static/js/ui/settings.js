@@ -1,9 +1,12 @@
 function showSettings() {
   var tabs = [
     { id:'theme', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>', label:'Theme' },
+    { id:'layout', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>', label:'Layout' },
     { id:'animations', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>', label:'Animations' },
     { id:'playback', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>', label:'Playback' },
+    { id:'shortcuts', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>', label:'Shortcuts' },
     { id:'lastfm', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16V8a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/><path d="M17 16v-2a3 3 0 0 0-3-3h-2"/></svg>', label:'Last.fm' },
+    { id:'advanced', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>', label:'Advanced' },
     { id:'about', icon:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>', label:'About' },
   ];
 
@@ -20,9 +23,12 @@ function showSettings() {
   if (settingsModal) settingsModal.classList.add('settings-open');
   translateDOM(settingsModal);
   renderThemeTab();
+  renderLayoutTab();
   renderAnimationsTab();
   renderPlaybackTab();
+  renderShortcutsTab();
   renderLastfmTab();
+  renderAdvancedTab();
   renderAboutTab();
 
   qsa('.settings-sidebar-item').forEach(function(el) {
@@ -509,4 +515,127 @@ function renderAboutTab() {
     '<div class="about-row"><span>Search</span><span class="about-val"><kbd>S</kbd></span></div>'+
     '<div class="about-row"><span>Close modals</span><span class="about-val"><kbd>Esc</kbd></span></div>'+
     '</div>';
+}
+
+function renderLayoutTab() {
+  var container = document.getElementById('tab-layout');
+  var density = localStorage.getItem('moidify_density') || 'normal';
+  var colCovers = localStorage.getItem('moidify_col_covers') !== '0';
+  var colTitle = localStorage.getItem('moidify_col_title') !== '0';
+  var colArtist = localStorage.getItem('moidify_col_artist') !== '0';
+  var colAlbum = localStorage.getItem('moidify_col_album') !== '0';
+  var colDuration = localStorage.getItem('moidify_col_duration') !== '0';
+  var colGenre = localStorage.getItem('moidify_col_genre') === '1';
+  var colPlays = localStorage.getItem('moidify_col_plays') === '1';
+  container.innerHTML =
+    '<div class="settings-section"><h3>Grid Density</h3><div class="anim-speed-wrap">'+
+    ['compact','normal','comfortable'].map(function(d) {
+      return '<button class="anim-speed-btn'+(density===d?' active':'')+'" data-density="'+d+'">'+
+        d.charAt(0).toUpperCase()+d.slice(1)+'</button>';
+    }).join('')+'</div></div>'+
+    '<div class="settings-section"><h3>Track List Columns</h3>'+
+    '<label class="toggle-row"><span>Cover art</span><input type="checkbox" class="col-toggle" data-col="covers"'+(colCovers?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Title</span><input type="checkbox" class="col-toggle" data-col="title"'+(colTitle?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Artist</span><input type="checkbox" class="col-toggle" data-col="artist"'+(colArtist?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Album</span><input type="checkbox" class="col-toggle" data-col="album"'+(colAlbum?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Duration</span><input type="checkbox" class="col-toggle" data-col="duration"'+(colDuration?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Genre</span><input type="checkbox" class="col-toggle" data-col="genre"'+(colGenre?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Play count</span><input type="checkbox" class="col-toggle" data-col="plays"'+(colPlays?' checked':'')+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3>Sidebar</h3>'+
+    '<label class="toggle-row"><span>Show All Tracks</span><input type="checkbox" id="nav-tracks-toggle"'+(localStorage.getItem('moidify_nav_tracks')!=='0'?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Show Albums</span><input type="checkbox" id="nav-albums-toggle"'+(localStorage.getItem('moidify_nav_albums')!=='0'?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Show Artists</span><input type="checkbox" id="nav-artists-toggle"'+(localStorage.getItem('moidify_nav_artists')!=='0'?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Show Genres</span><input type="checkbox" id="nav-genres-toggle"'+(localStorage.getItem('moidify_nav_genres')!=='0'?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<label class="toggle-row"><span>Show Liked Songs</span><input type="checkbox" id="nav-favorites-toggle"'+(localStorage.getItem('moidify_nav_favorites')!=='0'?' checked':'')+'><span class="toggle-slider"></span></label></div>';
+  qsa('.anim-speed-btn[data-density]', container).forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      qsa('.anim-speed-btn', container).forEach(function(b){b.classList.remove('active');});
+      this.classList.add('active');
+      localStorage.setItem('moidify_density', this.dataset.density);
+      document.body.dataset.density = this.dataset.density;
+    });
+  });
+  qsa('.col-toggle', container).forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      var col = this.dataset.col;
+      var key = 'moidify_col_' + col;
+      localStorage.setItem(key, this.checked ? '1' : '0');
+      document.body.dataset['col' + col.charAt(0).toUpperCase() + col.slice(1)] = this.checked ? '1' : '0';
+    });
+  });
+  ['tracks','albums','artists','genres','favorites'].forEach(function(view) {
+    var el = document.getElementById('nav-'+view+'-toggle');
+    if (!el) return;
+    el.addEventListener('change', function() {
+      localStorage.setItem('moidify_nav_'+view, this.checked ? '1' : '0');
+      var navItem = qs('.nav-item[data-view="'+view+'"]');
+      if (navItem) navItem.style.display = this.checked ? '' : 'none';
+    });
+  });
+}
+
+function renderShortcutsTab() {
+  var container = document.getElementById('tab-shortcuts');
+  var customKeys = safeJSON('moidify_custom_keys', {});
+  var defaults = {
+    'play-pause': 'Space',
+    'next': 'N',
+    'prev': 'P',
+    'volume-up': 'ArrowUp',
+    'volume-down': 'ArrowDown',
+    'seek-forward': 'ArrowRight',
+    'seek-back': 'ArrowLeft',
+    'like': 'L',
+    'repeat': 'R',
+    'search': 'S',
+    'queue': 'Q',
+    'escape': 'Escape',
+  };
+  var html = '<div class="settings-section"><h3>Custom Keyboard Shortcuts</h3><p style="color:var(--text-muted);font-size:13px;margin-bottom:12px;">Click a shortcut to rebind. Press <kbd>Esc</kbd> to clear.</p>';
+  for (var action in defaults) {
+    var val = customKeys[action] || defaults[action];
+    html += '<div class="shortcut-row" data-action="'+action+'"><span class="shortcut-label">'+action.replace('-',' ').replace(/\b\w/g,function(l){return l.toUpperCase();})+'</span>'+
+      '<span class="shortcut-key" tabindex="0">'+esc(val)+'</span></div>';
+  }
+  html += '</div>';
+  container.innerHTML = html;
+  qsa('.shortcut-key', container).forEach(function(el) {
+    el.addEventListener('keydown', function(e) {
+      e.preventDefault();
+      var key = e.key === ' ' ? 'Space' : e.key;
+      if (key === 'Escape') { this.textContent = ''; return; }
+      this.textContent = key;
+      var action = this.closest('.shortcut-row').dataset.action;
+      var keys = safeJSON('moidify_custom_keys', {});
+      keys[action] = key;
+      localStorage.setItem('moidify_custom_keys', JSON.stringify(keys));
+      this.blur();
+    });
+    el.addEventListener('click', function() { this.focus(); this.textContent = '...'; });
+  });
+}
+
+function renderAdvancedTab() {
+  var container = document.getElementById('tab-advanced');
+  var customCss = localStorage.getItem('moidify_custom_css') || '';
+  container.innerHTML =
+    '<div class="settings-section"><h3>Custom CSS</h3><p style="color:var(--text-muted);font-size:13px;margin-bottom:8px;">Paste custom CSS to override any styles. Changes apply immediately.</p>'+
+    '<textarea id="custom-css-editor" class="css-editor" spellcheck="false">'+esc(customCss)+'</textarea></div>';
+  var editor = document.getElementById('custom-css-editor');
+  if (editor) {
+    editor.addEventListener('input', function() {
+      localStorage.setItem('moidify_custom_css', this.value);
+      applyCustomCSS(this.value);
+    });
+  }
+}
+
+function applyCustomCSS(css) {
+  var existing = document.getElementById('custom-css-style');
+  if (existing) existing.remove();
+  if (!css || !css.trim()) return;
+  var style = document.createElement('style');
+  style.id = 'custom-css-style';
+  style.textContent = css;
+  document.head.appendChild(style);
 }

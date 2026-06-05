@@ -23,6 +23,10 @@ function showModal(html) {
   var overlay = document.getElementById('modal-overlay');
   document.getElementById('modal-content').innerHTML = html;
   overlay.style.display = 'flex';
+  overlay.classList.remove('overlay-out');
+  overlay.classList.add('overlay-in');
+  var modal = document.getElementById('modal');
+  if (modal) { modal.classList.remove('modal-out'); modal.classList.add('modal-in'); }
   overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
 }
 
@@ -31,9 +35,12 @@ function closeModal() {
   var overlay = document.getElementById('modal-overlay');
   var modal = document.getElementById('modal');
   if (!overlay) return;
-  overlay.style.display = 'none';
-  if (modal) { modal.style.animation = ''; }
-  if (overlay) { overlay.style.animation = ''; }
+  overlay.classList.remove('overlay-in');
+  overlay.classList.add('overlay-out');
+  if (modal) { modal.classList.remove('modal-in'); modal.classList.add('modal-out'); }
+  setTimeout(function() {
+    overlay.style.display = 'none';
+  }, 200);
 }
 
 function showLoginModal() {

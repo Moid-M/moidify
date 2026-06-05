@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Optional
+import re
 
 import mutagen
 from fastapi import APIRouter, HTTPException, Query, Header, Response
@@ -10,6 +11,30 @@ from config import COVERS_DIR
 from routes.deps import _normalize, _get_user_from_token, _fetch_lyrics_from_lrclib, RatingBody
 
 router = APIRouter(tags=["tracks"])
+
+_EDITION_PATTERN = re.compile(
+    r'\s*[\(\[]\s*\d*\s*('
+    r'Deluxe\s*(Edition|Version)?'
+    r'|Remaster(ed)?'
+    r'|Expanded\s*(Edition|Version)?'
+    r'|Bonus\s*Track\s*(Edition|Version)?'
+    r'|Special\s*(Edition|Version)?'
+    r'|Collector\'?s?\s*(Edition|Version)?'
+    r'|Limited\s*(Edition|Version)?'
+    r'|Super\s*Deluxe'
+    r'|Disk\s*\d+|Disc\s*\d+'
+    r'|Version\s*\d+'
+    r'|Anniversary\s*(Edition)?'
+    r'|Reissue'
+    r'|Original|Single|Explicit|Clean'
+    r')\s*[\)\]]',
+    re.IGNORECASE
+)
+
+def _base_album_name(name):
+    if not name:
+        return name
+    return _EDITION_PATTERN.sub('', name).strip()
 
 
 def _escape_like(s: str) -> str:
@@ -141,7 +166,7 @@ def update_track_lyrics(track_id: int, body: dict):
 
 
 @router.get("/api/albums")
-def list_albums():
+def list_albums(grouped: Optional[bool] = Query(False)):
     conn = get_connection()
     rows = conn.execute(
         """SELECT album, artist, album_artist, COUNT(*) as track_count,
@@ -152,7 +177,17 @@ def list_albums():
            ORDER BY COALESCE(NULLIF(album_artist,''), artist), album""",
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    albums = [dict(r) for r in rows]
+    if not grouped:
+        return albums
+    groups = {}
+    for a in albums:
+        base = _base_album_name(a["album"])
+        key = (base, a.get("album_artist") or a["artist"])
+        if key not in groups:
+            groups[key] = {"base_album": base, "artist": key[1], "versions": []}
+        groups[key]["versions"].append(a)
+    return sorted(groups.values(), key=lambda g: (g["artist"].lower() or "", g["base_album"].lower()))
 
 
 @router.get("/api/albums/tracks")

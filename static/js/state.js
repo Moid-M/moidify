@@ -3,8 +3,7 @@ function safeJSON(key, fallback) {
   catch(e) { return fallback; }
 }
 
-var _mq = localStorage.getItem('moidify_stream_quality');
-if (_mq === 'high') _mq = 'original';
+var _mq = localStorage.getItem('moidify_stream_quality') || 'high';
 var state = {
   token: localStorage.getItem('moidify_token'),
   user: null,
@@ -46,20 +45,19 @@ var state = {
   volumeNorm: localStorage.getItem('moidify_volume_norm') === 'true',
   pinnedAlbums: safeJSON('moidify_pinned_albums', []),
   pinnedArtists: safeJSON('moidify_pinned_artists', []),
+  albumGrouping: localStorage.getItem('moidify_album_grouping') === '1',
+  expandedAlbumGroups: safeJSON('moidify_expanded_groups', []),
   vizBars: parseInt(localStorage.getItem('moidify_viz_bars') || '32'),
   vizMirror: localStorage.getItem('moidify_viz_mirror') === 'true',
   vizStyle: localStorage.getItem('moidify_viz_style') || 'bars',
 };
 
 var audio = document.getElementById('audio');
-var searchTimeout = null;
 var audioCtx = null;
 var gainNode = null;
 var eqNodes = [];
 var isCrossfading = false;
-var sleepTimerInterval = null;
 var analyserNode = null;
-var visualizerRAF = null;
 
 var SLEEP_OPTIONS = [
   {label:'Off', value:0},

@@ -39,6 +39,12 @@
         </div>
         <div id="playlist-list"></div>
       </div>
+      <div id="scan-indicator" style="display:none;padding:6px 16px;font-size:11px;color:var(--accent);border-top:1px solid var(--bg-hover);margin-top:auto;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="scan-spinner" style="width:8px;height:8px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:spin .8s linear infinite;"></div>
+          <span id="scan-indicator-text">Scanning library...</span>
+        </div>
+      </div>
     </aside>
 
     <div id="main-area">
@@ -91,6 +97,7 @@
       <div class="queue-divider">
         <span data-i18n="tracks.addQueue">Next up</span>
         <span id="queue-count"></span>
+        <button id="queue-jump-btn" class="queue-jump-btn" title="Jump to current track" style="display:none">↓</button>
       </div>
       <div id="queue-list"></div>
       <div id="sleep-timer-section" class="queue-section" style="display:none">
@@ -112,10 +119,11 @@
     <footer id="player-bar">
       <div class="player-seek-bar">
         <span id="current-time">0:00</span>
-        <div class="seek-wrap">
+        <div class="seek-wrap" id="seek-wrap">
           <div class="seek-wave" id="seek-wave"></div>
           <div class="seek-dot" id="seek-dot"></div>
           <input type="range" id="seek" min="0" max="100" value="0">
+          <div id="seek-preview" class="seek-preview" style="display:none"></div>
         </div>
         <span id="total-time">0:00</span>
       </div>

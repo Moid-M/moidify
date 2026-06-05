@@ -190,6 +190,7 @@ function crossfadeTo(queue, index) {
   var fadeInterval = 50;
   var steps = Math.floor((duration * 1000) / fadeInterval);
   var step = 0;
+  var wasMuted = audio.muted;
 
   var timer = setInterval(function() {
     step++;
@@ -198,14 +199,15 @@ function crossfadeTo(queue, index) {
     try { audio.volume = vol; } catch(e) {}
     if (progress >= 1) {
       clearInterval(timer);
-      audio.volume = parseFloat(document.getElementById('volume').value) || 1;
+      if (!wasMuted) audio.volume = parseFloat(document.getElementById('volume').value) || 1;
       playFromQueue(queue, index);
-      var newVol = 0;
       var fadeIn = setInterval(function() {
-        newVol += 0.05;
+        if (wasMuted) { clearInterval(fadeIn); isCrossfading = false; return; }
         var target = parseFloat(document.getElementById('volume').value) || 1;
-        try { audio.volume = Math.min(target, newVol); } catch(e) {}
-        if (newVol >= target) { clearInterval(fadeIn); isCrossfading = false; }
+        if (!audio.muted) {
+          audio.volume = Math.min(target, audio.volume + 0.05);
+        }
+        if (audio.volume >= target) { clearInterval(fadeIn); isCrossfading = false; }
       }, fadeInterval);
     }
   }, fadeInterval);
@@ -235,7 +237,10 @@ function getAudioCtx() {
       gainNode.gain.value = 1;
       source.connect(gainNode);
       buildEQChain();
-    } catch(e) { return null; }
+    } catch(e) {
+      showToast('Audio processing (EQ, visualizer) unavailable in this browser', 'error');
+      return null;
+    }
   }
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;

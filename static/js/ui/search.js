@@ -27,21 +27,64 @@ function setupSearch() {
   });
 }
 
+function _customKey(action) {
+  var keys = safeJSON('moidify_custom_keys', {});
+  var defaults = {
+    'play-pause': ' ',
+    'next': 'n',
+    'prev': 'p',
+    'volume-up': 'ArrowUp',
+    'volume-down': 'ArrowDown',
+    'seek-forward': 'ArrowRight',
+    'seek-back': 'ArrowLeft',
+    'like': 'l',
+    'repeat': 'r',
+    'search': 's',
+    'queue': 'q',
+    'escape': 'Escape',
+  };
+  return (keys[action] || defaults[action]).toLowerCase();
+}
+
 function setupKeyboard() {
   document.addEventListener('keydown', function(e) {
-    if (e.target.tagName === 'INPUT') return;
-    switch (e.key) {
-      case ' ': e.preventDefault(); togglePlay(); break;
-      case 'ArrowLeft': e.preventDefault(); seekRelative(-10); break;
-      case 'ArrowRight': e.preventDefault(); seekRelative(10); break;
-      case 'ArrowUp': e.preventDefault(); audio.volume=Math.min(1,audio.volume+0.1); document.getElementById('volume').value=audio.volume; break;
-      case 'ArrowDown': e.preventDefault(); audio.volume=Math.max(0,audio.volume-0.1); document.getElementById('volume').value=audio.volume; break;
-      case 'n': case 'N': nextTrack(); break;
-      case 'p': case 'P': prevTrack(); break;
-      case 'l': case 'L': { if (state.queue[state.currentIndex]) toggleFavorite(state.queue[state.currentIndex].id); break; }
-      case 'r': case 'R': cycleRepeat(); break;
-      case 's': case 'S': e.preventDefault(); document.getElementById('search').focus(); break;
-      case 'Escape': closeModal(); hideContextMenu(); closeLyricsPanel(); closeEQPanel(); break;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    var key = e.key;
+    var actions = {
+      'play-pause': function() { e.preventDefault(); togglePlay(); },
+      'next': function() { nextTrack(); },
+      'prev': function() { prevTrack(); },
+      'volume-up': function() { e.preventDefault(); audio.volume=Math.min(1,audio.volume+0.1); document.getElementById('volume').value=audio.volume; },
+      'volume-down': function() { e.preventDefault(); audio.volume=Math.max(0,audio.volume-0.1); document.getElementById('volume').value=audio.volume; },
+      'seek-forward': function() { e.preventDefault(); seekRelative(10); },
+      'seek-back': function() { e.preventDefault(); seekRelative(-10); },
+      'like': function() { if (state.queue[state.currentIndex]) toggleFavorite(state.queue[state.currentIndex].id); },
+      'repeat': function() { cycleRepeat(); },
+      'search': function() { e.preventDefault(); document.getElementById('search').focus(); },
+      'queue': function() { toggleQueuePanel(); },
+      'escape': function() { closeModal(); hideContextMenu(); closeLyricsPanel(); closeEQPanel(); },
+    };
+    var keys = safeJSON('moidify_custom_keys', {});
+    var defaults = {
+      'play-pause': ' ',
+      'next': 'n',
+      'prev': 'p',
+      'volume-up': 'ArrowUp',
+      'volume-down': 'ArrowDown',
+      'seek-forward': 'ArrowRight',
+      'seek-back': 'ArrowLeft',
+      'like': 'l',
+      'repeat': 'r',
+      'search': 's',
+      'queue': 'q',
+      'escape': 'Escape',
+    };
+    for (var action in defaults) {
+      var boundKey = (keys[action] || defaults[action]);
+      if (key === boundKey || (key.length === 1 && key.toLowerCase() === boundKey.toLowerCase())) {
+        if (actions[action]) actions[action]();
+        return;
+      }
     }
   });
 }

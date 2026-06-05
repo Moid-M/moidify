@@ -382,8 +382,16 @@ class MusicFileHandler(FileSystemEventHandler):
 
 
 def get_scan_status():
+    with _SCAN_RUNNING_LOCK:
+        running = _SCAN_RUNNING
     with SCAN_LOCK:
-        return {"last_scan": SCAN_STATUS["last_scan"], "files_found": SCAN_STATUS["files_found"], "files_imported": SCAN_STATUS["files_imported"], "errors": list(SCAN_STATUS["errors"])}
+        return {
+            "running": running,
+            "last_scan": SCAN_STATUS["last_scan"],
+            "files_found": SCAN_STATUS["files_found"],
+            "files_imported": SCAN_STATUS["files_imported"],
+            "errors": list(SCAN_STATUS["errors"]),
+        }
 
 
 def start_watcher():

@@ -104,6 +104,18 @@ function renderQueuePanel() {
   var upcoming = state.queue.slice(state.currentIndex+1);
   count.textContent = upcoming.length+' tracks';
   updateQueueBadge();
+  var jumpBtn = document.getElementById('queue-jump-btn');
+  if (jumpBtn) {
+    if (upcoming.length > 0) {
+      jumpBtn.style.display = '';
+      jumpBtn.onclick = function() {
+        var el = qs('.qitem[data-qi="'+(state.currentIndex+1)+'"]');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      };
+    } else {
+      jumpBtn.style.display = 'none';
+    }
+  }
 
   if (upcoming.length===0) { list.innerHTML = '<div style="color:#6a6a6a;font-size:13px;padding:20px 0;text-align:center;">Queue is empty</div>'; return; }
 
@@ -211,4 +223,35 @@ function renderRepeatShuffleButtons() {
     var titles = { off:'Repeat: Off', all:'Repeat: All', one:'Repeat: One' };
     repeatBtn.title = titles[state.repeatMode] || 'Repeat: Off';
   }
+}
+
+function setupQueueDropZone() {
+  var panel = document.getElementById('queue-panel');
+  if (!panel) return;
+  panel.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; panel.classList.add('drag-over'); });
+  panel.addEventListener('dragleave', function() { panel.classList.remove('drag-over'); });
+  panel.addEventListener('drop', function(e) {
+    e.preventDefault();
+    panel.classList.remove('drag-over');
+    var trackId = e.dataTransfer.getData('text/plain');
+    if (!trackId) return;
+    // Look for a track row with this ID in the DOM
+    var row = document.querySelector('[data-track-id="'+trackId+'"]');
+    if (row) {
+      addTrackToQueueEnd({
+        id: parseInt(trackId),
+        title: (row.querySelector('.track-title') || {}).textContent || 'Unknown',
+        artist: (row.querySelector('.track-artist') || {}).textContent || 'Unknown',
+        album: (row.querySelector('.track-album') || {}).textContent || '',
+        duration: parseFloat(row.dataset.trackDuration) || 0,
+      });
+      showToast('Added to queue', 'success');
+    } else {
+      // If no DOM row found, try fetching from API
+      fetch('/api/tracks/' + trackId).then(function(r) { return r.json(); }).then(function(t) {
+        addTrackToQueueEnd(t);
+        showToast('Added to queue', 'success');
+      }).catch(function() {});
+    }
+  });
 }
