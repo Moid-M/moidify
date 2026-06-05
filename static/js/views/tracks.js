@@ -24,6 +24,18 @@ function filterTrackList(query) {
   state.currentTracks = filtered;
 }
 
+// Simple virtual list shim (no actual virtualization — renders all items)
+window.VirtualList = {
+  create: function(container, items, renderFn) {
+    function render(data) {
+      qsa('.track-row', container).forEach(function(el) { el.remove(); });
+      data.forEach(function(item, i) { container.appendChild(renderFn(item, i, data)); });
+    }
+    render(items);
+    return { update: render };
+  }
+};
+
 function createTrackRow(track, index, queue) {
   var row = document.createElement('div');
   row.className = 'track-row';
@@ -196,7 +208,7 @@ function getSelectedTracks() {
 
 async function renderTracks(searchQuery, navId) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">'+(searchQuery?'Search Results':'All Tracks')+'</div></div>'+(searchQuery?'':'<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>')+'<div class="loading-spinner"></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">'+(searchQuery?'Search Results':'All Tracks')+'</div></div>'+(searchQuery?'':'<div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div>')+'<div class="track-skeleton-wrap">'+skeletonTrackRows()+'</div>';
   try {
     var url = searchQuery ? '/api/tracks?search='+encodeURIComponent(searchQuery) : '/api/tracks?limit=200';
     var data = await apiJson(url);
@@ -204,8 +216,8 @@ async function renderTracks(searchQuery, navId) {
     var tracks = Array.isArray(data) ? data : data.tracks;
     var total = Array.isArray(data) ? tracks.length : data.total;
     if (tracks.length===0) { content.innerHTML += '<p style="color:#727272;">'+(searchQuery?'No results for "'+esc(searchQuery)+'".':'No tracks yet.')+'</p>'; return; }
-    var spinner = qs('.loading-spinner', content);
-    if (spinner) spinner.remove();
+    var skelWrap = qs('.track-skeleton-wrap', content);
+    if (skelWrap) skelWrap.remove();
     var list = document.createElement('div'); list.className='track-list virtual';
     list.id = searchQuery ? '' : 'current-track-list';
     list.innerHTML = trackHeaderHTML();
@@ -258,14 +270,14 @@ async function renderTracks(searchQuery, navId) {
 
 async function renderFavorites(navId) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">Liked Songs</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div><div class="loading-spinner"></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">Liked Songs</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div><div class="track-skeleton-wrap">'+skeletonTrackRows()+'</div>';
   if (!state.user) { content.innerHTML += '<p style="color:#727272;padding:20px 0;">Log in to see your liked songs.</p>'; return; }
   try {
     var tracks = await apiJson('/api/favorites');
     if (state._navId !== navId) return;
     if (tracks.length===0) { content.innerHTML += '<div class="fav-empty">No liked songs yet. Click the heart on any track.</div>'; return; }
-    var spinner = qs('.loading-spinner', content);
-    if (spinner) spinner.remove();
+    var skelWrap = qs('.track-skeleton-wrap', content);
+    if (skelWrap) skelWrap.remove();
     var list = document.createElement('div'); list.className='track-list virtual';
     list.id = 'current-track-list';
     list.innerHTML = trackHeaderHTML();

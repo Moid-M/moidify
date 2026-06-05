@@ -7,12 +7,12 @@ function togglePinArtist(artistName) {
 
 async function renderArtists(navId) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div><div class="loading-spinner"></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div>'+skeletonGrid();
   try {
     var artists = await apiJson('/api/artists');
     if (state._navId !== navId) return;
     if (artists.length===0) { content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div><p style="color:#727272;">No artists found.</p>'; return; }
-    qs('.loading-spinner', content).remove();
+    qs('.skeleton-grid', content).remove();
     artists.sort(function(a, b) {
       var aPinned = state.pinnedArtists.indexOf(a.artist) !== -1 ? 0 : 1;
       var bPinned = state.pinnedArtists.indexOf(b.artist) !== -1 ? 0 : 1;

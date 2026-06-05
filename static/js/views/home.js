@@ -25,7 +25,7 @@ function homePlayTrack(i) {
 
 async function renderHome(navId) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">\uD83C\uDFE0 Home</div></div><div id="home-feed"><div class="loading-spinner"></div></div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">\uD83C\uDFE0 Home</div></div><div id="home-feed">'+skeletonGrid()+'</div>';
 
   apiJson('/api/home').then(function(data) {
     if (state._navId !== navId) return;

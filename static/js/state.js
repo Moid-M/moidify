@@ -111,6 +111,22 @@ function formatTimeLong(sec) {
 function qs(sel, parent) { return (parent || document).querySelector(sel); }
 function qsa(sel, parent) { return Array.from((parent || document).querySelectorAll(sel)); }
 
+function skeletonGrid(count) {
+  var html = '<div class="skeleton-grid">';
+  for (var i = 0; i < (count || 12); i++) {
+    html += '<div class="skeleton-card"><div class="skeleton-img"></div><div class="skeleton-line"></div><div class="skeleton-line"></div></div>';
+  }
+  return html + '</div>';
+}
+
+function skeletonTrackRows(count) {
+  var html = '';
+  for (var i = 0; i < (count || 10); i++) {
+    html += '<div class="skeleton-track"><div class="skeleton-num"></div><div class="skeleton-img-small"></div><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line"></div></div>';
+  }
+  return html;
+}
+
 function esc(s) {
   if (s == null) return '';
   var d = document.createElement('div');
