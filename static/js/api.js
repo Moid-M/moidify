@@ -53,6 +53,7 @@ async function register(username, password, email) {
 }
 
 function logout() {
+  api('/api/auth/logout', { method: 'POST' }).catch(function() {});
   api('/api/player/state', { method: 'DELETE' }).catch(function() {});
   state.token = null; localStorage.removeItem('moidify_token'); state.user = null;
   renderAuth(); navigate('albums'); qs('#playlist-list').innerHTML = '';

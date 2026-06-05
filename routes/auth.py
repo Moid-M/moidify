@@ -4,7 +4,9 @@ from typing import Optional
 from database import get_connection
 from routes.deps import (
     _hash_password, _create_session, _get_user_from_token, _validate_password,
-    RegisterBody, LoginBody, SetupInitBody,
+    _check_account_locked, _increment_failed_attempts, _reset_failed_attempts,
+    _is_registration_open, check_rate_limit, _token_hash,
+    RegisterBody, LoginBody, SetupInitBody, ChangeOwnPasswordBody,
 )
 
 router = APIRouter(tags=["auth"])
@@ -18,9 +20,17 @@ def get_version():
 
 @router.post("/api/auth/register")
 def register(body: RegisterBody):
+    if not _is_registration_open():
+        raise HTTPException(403, "Registration is disabled")
+    if not check_rate_limit(f"register:{body.username}", max_attempts=3, window_seconds=3600):
+        raise HTTPException(429, "Too many registration attempts. Try again later.")
     _validate_password(body.password)
     if len(body.username) < 1:
         raise HTTPException(400, "Username is required")
+    if body.email and body.email.strip():
+        import re
+        if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', body.email.strip()):
+            raise HTTPException(400, "Invalid email format")
     conn = get_connection()
     existing = conn.execute(
         "SELECT id FROM users WHERE username = ?", (body.username,)
@@ -40,6 +50,9 @@ def register(body: RegisterBody):
 
 @router.post("/api/auth/login")
 def login(body: LoginBody):
+    if not check_rate_limit(f"login:{body.username}", max_attempts=10, window_seconds=900):
+        raise HTTPException(429, "Too many login attempts. Try again later.")
+    _check_account_locked(body.username)
     conn = get_connection()
     row = conn.execute(
         "SELECT * FROM users WHERE username = ?", (body.username,)
@@ -49,7 +62,9 @@ def login(body: LoginBody):
         raise HTTPException(401, "Invalid credentials")
     pwd_hash, _ = _hash_password(body.password, row["salt"])
     if pwd_hash != row["password_hash"]:
+        _increment_failed_attempts(body.username)
         raise HTTPException(401, "Invalid credentials")
+    _reset_failed_attempts(body.username)
     token = _create_session(row["id"])
     return {
         "token": token,
@@ -63,6 +78,62 @@ def me(token: Optional[str] = Header(None)):
     if user is None:
         raise HTTPException(401, "Not logged in")
     return user
+
+
+@router.post("/api/auth/password")
+def change_own_password(body: ChangeOwnPasswordBody, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if not user:
+        raise HTTPException(401, "Not logged in")
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM users WHERE id = ?", (user["id"],)
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "User not found")
+    current_hash, _ = _hash_password(body.current_password, row["salt"])
+    if current_hash != row["password_hash"]:
+        conn.close()
+        raise HTTPException(400, "Current password is incorrect")
+    _validate_password(body.new_password)
+    new_hash, new_salt = _hash_password(body.new_password)
+    conn.execute(
+        "UPDATE users SET password_hash = ?, salt = ? WHERE id = ?",
+        (new_hash, new_salt, user["id"]),
+    )
+    # Revoke all other sessions
+    conn.execute(
+        "DELETE FROM sessions WHERE user_id = ? AND token_hash != ?",
+        (user["id"], _token_hash(token)),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@router.post("/api/auth/logout")
+def logout(token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if not user:
+        raise HTTPException(401, "Not logged in")
+    conn = get_connection()
+    conn.execute("DELETE FROM sessions WHERE token_hash = ?", (_token_hash(token),))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@router.post("/api/auth/logout-all")
+def logout_all(token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if not user:
+        raise HTTPException(401, "Not logged in")
+    conn = get_connection()
+    conn.execute("DELETE FROM sessions WHERE user_id = ?", (user["id"],))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "message": "All sessions revoked"}
 
 
 @router.get("/api/setup/status")

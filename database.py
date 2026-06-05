@@ -166,6 +166,8 @@ def init_db():
 
     for stmt in [
         "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN failed_attempts INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN locked_until INTEGER DEFAULT NULL",
         "ALTER TABLE tracks ADD COLUMN play_count INTEGER DEFAULT 0",
         "ALTER TABLE tracks ADD COLUMN rating INTEGER DEFAULT 0",
         "ALTER TABLE tracks ADD COLUMN disc_number INTEGER DEFAULT 1",
@@ -173,9 +175,10 @@ def init_db():
         "ALTER TABLE tracks ADD COLUMN lyrics TEXT DEFAULT NULL",
         "ALTER TABLE playlists ADD COLUMN folder_id INTEGER REFERENCES playlist_folders(id) ON DELETE SET NULL",
         "ALTER TABLE sessions ADD COLUMN expires_at INTEGER DEFAULT NULL",
+        "ALTER TABLE sessions ADD COLUMN token_hash TEXT DEFAULT NULL",
         "ALTER TABLE tracks ADD COLUMN cover_hash TEXT DEFAULT NULL",
         "ALTER TABLE tracks ADD COLUMN artist_img_hash TEXT DEFAULT NULL",
-    ]:
+    ]:  
         table = stmt.split()[2]
         col = stmt.split()[3].split(" ")[0].split("(")[0]
         if not _has_col(table, col):
@@ -190,6 +193,10 @@ def init_db():
     # index on migrated column
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash)")
     except sqlite3.OperationalError:
         pass
 

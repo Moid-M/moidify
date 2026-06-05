@@ -505,3 +505,83 @@ def get_import_status(job_id: str, token: Optional[str] = Header(None)):
     if not job:
         raise HTTPException(404, "Job not found")
     return job
+
+
+@router.get("/api/admin/registration-status")
+def admin_registration_status(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    from routes.deps import _is_registration_open
+    return {"registration_open": _is_registration_open()}
+
+
+@router.post("/api/admin/registration-toggle")
+def admin_toggle_registration(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    current = conn.execute(
+        "SELECT value FROM settings WHERE key = 'registration_open'"
+    ).fetchone()
+    new_val = "0" if (current and current["value"] == "0") else "1"
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES ('registration_open', ?)",
+        (new_val,),
+    )
+    conn.commit()
+    conn.close()
+    return {"registration_open": new_val == "1"}
+
+
+@router.get("/api/admin/failed-logins")
+def admin_failed_logins(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT id, username, failed_attempts, locked_until
+           FROM users WHERE failed_attempts > 0 OR locked_until IS NOT NULL
+           ORDER BY failed_attempts DESC"""
+    ).fetchall()
+    conn.close()
+    return [{
+        "id": r["id"],
+        "username": r["username"],
+        "failed_attempts": r["failed_attempts"],
+        "locked_until": r["locked_until"],
+        "locked": r["locked_until"] is not None and r["locked_until"] > int(__import__("time").time()),
+    } for r in rows]
+
+
+@router.post("/api/admin/users/{user_id}/unlock")
+def admin_unlock_user(user_id: int, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    conn.execute(
+        "UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?",
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@router.get("/api/admin/users/{user_id}/sessions")
+def admin_user_sessions(user_id: int, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT token, user_id, created_at, expires_at
+           FROM sessions WHERE user_id = ?
+           ORDER BY created_at DESC""",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@router.delete("/api/admin/users/{user_id}/sessions")
+def admin_revoke_user_sessions(user_id: int, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "message": "All sessions revoked"}
