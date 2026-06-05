@@ -98,12 +98,13 @@ function createTrackRow(track, index, queue) {
 function trackHeaderHTML() {
   return '<div class="track-list-header"><div class="track-header">'+
     '<span class="sortable" data-sort="tracknum"><input type="checkbox" id="select-all-checkbox" title="Select all" style="cursor:pointer;accent-color:var(--accent);"><span class="sort-indicator"></span></span>'+
+    '<span></span>'+
     '<span class="sortable" data-sort="title">Title<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="artist">Artist<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="album">Album<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="rating">Rating<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="duration">Duration<span class="sort-indicator"></span></span>'+
-    '<span></span></div></div>';
+    '</div></div>';
 }
 
 function sortTracks(tracks, field, dir) {

@@ -26,7 +26,8 @@ function applyAnimations() {
 
   var playBtn = document.getElementById('play-btn');
   var isPlaying = !audio.paused && audio.src;
-  playBtn.classList.toggle('playing', state.animations.glowPulse !== false && isPlaying);
+  var glowEnabled = state.animations.glowPulse !== false && state.animSpeed !== 'off';
+  playBtn.classList.toggle('playing', glowEnabled && isPlaying);
 
   var eqAnim = document.querySelector('.player-eq');
   if (eqAnim) {

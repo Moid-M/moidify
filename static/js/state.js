@@ -150,6 +150,17 @@ function applyTheme() {
   document.body.classList.toggle('light-mode', light);
   localStorage.setItem('moidify_light', state.lightMode);
   localStorage.setItem('moidify_auto_theme', state.autoTheme);
+  applyCustomThemeColors();
+}
+
+function applyCustomThemeColors() {
+  var vars = ['bg','bg-card','text-primary','text-muted','border'];
+  vars.forEach(function(name) {
+    var stored = localStorage.getItem('moidify_theme_' + name);
+    if (stored) {
+      document.documentElement.style.setProperty('--' + name, stored);
+    }
+  });
 }
 
 function lightenColor(hex, percent) {

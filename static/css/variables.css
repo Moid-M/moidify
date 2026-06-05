@@ -18,6 +18,8 @@
   --accent-glow: rgba(168, 85, 247, 0.3);
   --danger: #e74c3c;
   --radius: 8px;
+  --radius-lg: 12px;
+  --radius-sm: 4px;
   --sidebar-w: 260px;
   --queue-w: 320px;
   --player-h: 90px;

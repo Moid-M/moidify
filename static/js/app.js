@@ -6,9 +6,8 @@ function setupEvents() {
   document.getElementById('shuffle-btn').addEventListener('click', toggleShuffle);
   document.getElementById('repeat-btn').addEventListener('click', cycleRepeat);
   document.getElementById('eq-btn').addEventListener('click', openEQPanel);
-  var eqOverlay = document.getElementById('eq-overlay');
   document.getElementById('close-eq-btn').addEventListener('click', closeEQPanel);
-  eqOverlay.addEventListener('click', function(e) { if (e.target === eqOverlay) closeEQPanel(); });
+  document.getElementById('nowplaying-btn').addEventListener('click', toggleNowPlaying);
   document.getElementById('lyrics-btn').addEventListener('click', toggleLyrics);
   document.getElementById('viz-toggle-btn').addEventListener('click', toggleLyricsVisualizer);
   var lyricsOverlay = document.getElementById('lyrics-overlay');
@@ -86,10 +85,6 @@ function setupEvents() {
   document.getElementById('np-play').addEventListener('click', togglePlay);
   document.getElementById('np-next').addEventListener('click', nextTrack);
   document.getElementById('np-prev').addEventListener('click', prevTrack);
-  document.getElementById('np-cover').addEventListener('click', function() {
-    var track = state.queue[state.currentIndex];
-    if (track) openFullScreenArt(track.id);
-  });
   document.getElementById('fs-art-close').addEventListener('click', closeFullScreenArt);
   document.getElementById('fs-art').addEventListener('click', function(e) {
     if (e.target === this) closeFullScreenArt();

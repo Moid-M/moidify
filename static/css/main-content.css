@@ -34,6 +34,7 @@
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
+  border-radius: 6px;
 }
 .album-list-cover { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; display: block; }
 
@@ -79,7 +80,7 @@
 
 .track-header {
   display: grid;
-  grid-template-columns: 40px 3fr 2fr 1fr 80px 60px;
+  grid-template-columns: 28px 28px 3fr 2fr 1fr 64px 50px;
   padding: 8px 16px;
   font-size: 12px;
   text-transform: uppercase;
@@ -87,6 +88,8 @@
   color: var(--text-muted);
   border-bottom: 1px solid var(--player-border);
 }
+.track-header span:first-child { display: flex; align-items: center; }
+.track-header #select-all-checkbox { margin: 0; }
 
 .track-row {
   display: grid;

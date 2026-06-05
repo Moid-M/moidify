@@ -130,14 +130,23 @@ async function renderAlbumDetail(data, navId) {
     if (state._navId !== navId) return;
     var first = albumTracks[0]||{};
     var yearStr = first.year ? '<div class="album-detail-year">'+first.year+'</div>' : '';
-    content.innerHTML = '<div class="album-detail-header"><img src="/api/cover/'+(first.id||0)+'" alt=""><div class="album-detail-meta"><div class="album-detail-title">'+esc(data.album)+'</div><div class="album-detail-artist">'+esc(data.artist||'Unknown Artist')+'</div>'+yearStr+'</div><div style="display:flex;gap:8px;align-items:center"><button class="shuffle-play-btn" id="album-shuffle-btn" title="Shuffle Album">'+iconShuffle()+' <span>Shuffle</span></button><button class="icon-btn" id="album-share-btn" title="Share album">'+iconShare()+'</button></div></div><div class="track-list">'+trackHeaderHTML()+'</div>';
+    content.innerHTML = '<div class="album-detail-header"><img src="/api/cover/'+(first.id||0)+'" alt=""><div class="album-detail-meta"><div class="album-detail-title">'+esc(data.album)+'</div><div class="album-detail-artist">'+esc(data.artist||'Unknown Artist')+'</div>'+yearStr+'</div><div style="display:flex;gap:8px;align-items:center"><button class="shuffle-view-btn" id="album-play-btn" title="Play All">'+iconPlay()+' <span>Play All</span></button><button class="shuffle-play-btn" id="album-shuffle-btn" title="Shuffle Album">'+iconShuffle()+' <span>Shuffle</span></button><button class="icon-btn" id="album-share-btn" title="Share album">'+iconShare()+'</button></div></div><div class="track-list">'+trackHeaderHTML()+'</div>';
     var list = qs('.track-list');
     albumTracks.forEach(function(t,i) { list.appendChild(createTrackRow(t,i,albumTracks)); });
     state.currentTracks = albumTracks; state.currentQueue = albumTracks; state._favedFlag = false;
     setupTrackSorting(list, albumTracks);
+    setupAlbumPlay(albumTracks);
     setupAlbumShuffle(albumTracks);
     setupAlbumShare(data.album, data.artist);
   } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+}
+
+function setupAlbumPlay(tracks) {
+  var btn = document.getElementById('album-play-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function() {
+    playFromQueue(tracks, 0);
+  });
 }
 
 function setupAlbumShuffle(tracks) {

@@ -84,7 +84,15 @@ function renderThemeTab() {
     '<div class="anim-speed-wrap" id="font-size-wrap">'+
     fontSizeOpts.map(function(f){return '<button class="anim-speed-btn'+(fontSize===f.value?' active':'')+'" data-size="'+f.value+'">'+f.label+'</button>';}).join('')+
     '</div></div>'+
-    '<div class="settings-section"><h3 data-i18n="settings.language">Language</h3><select class="lang-select" id="lang-select">'+langOpts+'</select></div>';
+    '<div class="settings-section"><h3 data-i18n="settings.language">Language</h3><select class="lang-select" id="lang-select">'+langOpts+'</select></div>'+
+    '<div class="settings-section"><h3>Custom Colors</h3>'+
+    '<p style="color:var(--text-muted);font-size:12px;margin-bottom:8px;">Override specific CSS variables. Leave default to keep current theme.</p>'+
+    '<div class="theme-slider-row"><label>Background</label><input type="color" id="custom-bg-color" value="'+hexFromVar('--bg')+'"><span class="slider-val" id="custom-bg-label">bg</span></div>'+
+    '<div class="theme-slider-row"><label>Cards</label><input type="color" id="custom-card-color" value="'+hexFromVar('--bg-card')+'"><span class="slider-val" id="custom-card-label">card</span></div>'+
+    '<div class="theme-slider-row"><label>Text</label><input type="color" id="custom-text-color" value="'+hexFromVar('--text-primary')+'"><span class="slider-val" id="custom-text-label">text</span></div>'+
+    '<div class="theme-slider-row"><label>Muted text</label><input type="color" id="custom-muted-color" value="'+hexFromVar('--text-muted')+'"><span class="slider-val" id="custom-muted-label">muted</span></div>'+
+    '<div class="theme-slider-row"><label>Borders</label><input type="color" id="custom-border-color" value="'+hexFromVar('--border')+'"><span class="slider-val" id="custom-border-label">border</span></div>'+
+    '</div>';
 
   qsa('.color-swatch', container).forEach(function(el) {
     el.addEventListener('click', function() {
@@ -153,6 +161,32 @@ function renderThemeTab() {
       applyFontSize(size);
     });
   });
+
+  // Custom color overrides
+  var customVars = [
+    { id:'custom-bg-color', var:'--bg' },
+    { id:'custom-card-color', var:'--bg-card' },
+    { id:'custom-text-color', var:'--text-primary' },
+    { id:'custom-muted-color', var:'--text-muted' },
+    { id:'custom-border-color', var:'--border' },
+  ];
+  customVars.forEach(function(cfg) {
+    var input = document.getElementById(cfg.id);
+    if (!input) return;
+    input.addEventListener('input', function() {
+      document.documentElement.style.setProperty(cfg.var, this.value);
+      localStorage.setItem('moidify_theme_' + cfg.var.replace('--', ''), this.value);
+    });
+  });
+}
+
+function hexFromVar(name) {
+  var val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  if (val.startsWith('#')) return val;
+  // Try stored override
+  var stored = localStorage.getItem('moidify_theme_' + name.replace('--', ''));
+  if (stored) return stored;
+  return '#000000';
 }
 
 function applyBgBrightness(val) {
@@ -165,12 +199,16 @@ function applyBgBrightness(val) {
   var g = Math.min(255, Math.round(baseG * ratio));
   var b = Math.min(255, Math.round(baseB * ratio));
   var bgColor = 'rgb(' + r + ', ' + g + ', ' + b + ')';
-  if (!isLight) document.documentElement.style.setProperty('--bg', bgColor);
+  document.documentElement.style.setProperty('--bg', bgColor);
+  if (isLight) {
+    document.documentElement.style.setProperty('--bg-elevated', bgColor);
+  }
 }
 
 function applyFontSize(size) {
   var sizes = {small: '13px', normal: '14px', large: '16px'};
   document.documentElement.style.setProperty('--font-size-base', sizes[size] || '14px');
+  document.body.dataset.font = size;
 }
 
 function renderAnimationsTab() {
@@ -620,12 +658,22 @@ function renderAdvancedTab() {
   var customCss = localStorage.getItem('moidify_custom_css') || '';
   container.innerHTML =
     '<div class="settings-section"><h3>Custom CSS</h3><p style="color:var(--text-muted);font-size:13px;margin-bottom:8px;">Paste custom CSS to override any styles. Changes apply immediately.</p>'+
-    '<textarea id="custom-css-editor" class="css-editor" spellcheck="false">'+esc(customCss)+'</textarea></div>';
+    '<textarea id="custom-css-editor" class="css-editor" spellcheck="false">'+esc(customCss)+'</textarea></div>'+
+    '<div class="settings-section"><h3>Reset to Defaults</h3><p style="color:var(--text-muted);font-size:13px;margin-bottom:8px;">Reset all settings to their default values. This cannot be undone.</p>'+
+    '<button class="reset-defaults-btn" id="reset-defaults-btn">Reset All Settings</button></div>';
   var editor = document.getElementById('custom-css-editor');
   if (editor) {
     editor.addEventListener('input', function() {
       localStorage.setItem('moidify_custom_css', this.value);
       applyCustomCSS(this.value);
+    });
+  }
+  var resetBtn = document.getElementById('reset-defaults-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function() {
+      if (!confirm('Reset all settings to defaults?')) return;
+      localStorage.clear();
+      location.reload();
     });
   }
 }
