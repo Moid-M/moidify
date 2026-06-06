@@ -1,6 +1,4 @@
-import os
 import subprocess
-import tempfile
 import zipfile
 from pathlib import Path
 from typing import Optional
@@ -82,10 +80,6 @@ def stream_track(track_id: int, quality: Optional[str] = Query("high")):
     conn.close()
     if row is None:
         raise HTTPException(404, "Track not found")
-
-    path = Path(row["file_path"]).resolve()
-    if not path.exists():
-        raise HTTPException(404, "File not found on disk")
 
     path = Path(row["file_path"]).resolve()
     if not path.exists():
@@ -254,7 +248,7 @@ def download_playlist(playlist_id: int):
                 safe_name = "".join(c if c.isalnum() or c in " ._-" else "_" for c in track_name)
                 zf.write(str(path), safe_name)
     buf.seek(0)
-    name = (pl_name["name"] if pl_name else "playlist") if isinstance(pl_name, dict) else (pl_name[0] if pl_name else "playlist")
+    name = pl_name["name"] if pl_name else "playlist"
     safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in name).strip()
     return StreamingResponse(
         buf,

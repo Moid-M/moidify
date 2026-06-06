@@ -99,7 +99,7 @@ function renderAlbumItem(container, album, isGrid) {
   if (isGrid) {
     var card = document.createElement('div');
     card.className = 'album-card';
-    card.innerHTML = '<img src="/api/cover/'+album.cover_track_id+'" alt="" loading="lazy"><button class="album-pin-btn'+(isPinned?' pinned':'')+'" data-album="'+esc(album.album)+'">'+iconPin()+'</button><div class="album-name">'+esc(album.album)+'</div><div class="album-artist">'+esc(album.artist||'Unknown Artist')+'</div>';
+    card.innerHTML = '<img src="/api/cover/'+album.cover_track_id+'" alt="" loading="lazy"><button class="album-pin-btn'+(isPinned?' pinned':'')+'" data-album="'+escAttr(album.album)+'">'+iconPin()+'</button><div class="album-name">'+esc(album.album)+'</div><div class="album-artist">'+esc(album.artist||'Unknown Artist')+'</div>';
     qs('.album-pin-btn', card).addEventListener('click', function(e) { e.stopPropagation(); togglePinAlbum(this.dataset.album); });
     card.addEventListener('click', function() { navigate('album', {album:album.album, artist:album.artist}); });
     card.addEventListener('contextmenu', function(e) { e.preventDefault(); showAlbumContextMenu(e, album); });
@@ -109,7 +109,7 @@ function renderAlbumItem(container, album, isGrid) {
     row.className = 'track-row';
     var coverUrl = '/api/cover/' + album.cover_track_id;
     row.innerHTML =
-      '<span class="track-num"><img src="'+coverUrl+'" alt="" class="album-list-cover" loading="lazy"><button class="album-pin-btn'+(isPinned?' pinned':'')+'" data-album="'+esc(album.album)+'" style="background:none;border:none;cursor:pointer;padding:0;color:var(--text-muted);margin-left:4px;display:inline-flex;">'+iconPin()+'</button></span>'+
+      '<span class="track-num"><img src="'+coverUrl+'" alt="" class="album-list-cover" loading="lazy"><button class="album-pin-btn'+(isPinned?' pinned':'')+'" data-album="'+escAttr(album.album)+'" style="background:none;border:none;cursor:pointer;padding:0;color:var(--text-muted);margin-left:4px;display:inline-flex;">'+iconPin()+'</button></span>'+
       '<span class="track-title">'+esc(album.album)+'</span>'+
       '<span class="track-artist">'+esc(album.artist||'Unknown Artist')+'</span>'+
       '<span class="track-album">'+(album.track_count||'')+' tracks</span>'+
@@ -129,7 +129,7 @@ async function renderAlbumDetail(data, navId) {
     var albumTracks = await apiJson(url);
     if (state._navId !== navId) return;
     var first = albumTracks[0]||{};
-    var yearStr = first.year ? '<div class="album-detail-year">'+first.year+'</div>' : '';
+    var yearStr = first.year ? '<div class="album-detail-year">'+esc(first.year)+'</div>' : '';
     content.innerHTML = '<div class="album-detail-header"><img src="/api/cover/'+(first.id||0)+'" alt=""><div class="album-detail-meta"><div class="album-detail-title">'+esc(data.album)+'</div><div class="album-detail-artist">'+esc(data.artist||'Unknown Artist')+'</div>'+yearStr+'</div><div style="display:flex;gap:8px;align-items:center"><button class="shuffle-view-btn" id="album-play-btn" title="Play All">'+iconPlay()+' <span>Play All</span></button><button class="shuffle-play-btn" id="album-shuffle-btn" title="Shuffle Album">'+iconShuffle()+' <span>Shuffle</span></button><button class="icon-btn" id="album-share-btn" title="Share album">'+iconShare()+'</button></div></div><div class="track-list">'+trackHeaderHTML()+'</div>';
     var list = qs('.track-list');
     albumTracks.forEach(function(t,i) { list.appendChild(createTrackRow(t,i,albumTracks)); });

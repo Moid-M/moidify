@@ -37,7 +37,7 @@ async function renderSearchResults(query, navId) {
     if (matchedAlbums.length) {
       html += '<div class="sr-full-section"><h3 class="sr-full-title">Albums</h3><div class="album-grid">';
       matchedAlbums.forEach(function(a) {
-        html += '<div class="album-card sr-album" data-album="'+esc(a.album)+'" data-artist="'+esc(a.artist||'')+'">'+
+        html += '<div class="album-card sr-album" data-album="'+escAttr(a.album)+'" data-artist="'+escAttr(a.artist||'')+'">'+
           '<img src="/api/cover/'+a.cover_track_id+'" alt="" loading="lazy">'+
           '<div class="album-name">'+esc(a.album)+'</div>'+
           '<div class="album-artist">'+esc(a.artist||'Unknown Artist')+'</div></div>';
@@ -48,7 +48,7 @@ async function renderSearchResults(query, navId) {
     if (matchedArtists.length) {
       html += '<div class="sr-full-section"><h3 class="sr-full-title">Artists</h3><div class="sr-full-artists">';
       matchedArtists.forEach(function(a) {
-        html += '<div class="sr-full-artist" data-artist="'+esc(a.artist)+'">'+
+        html += '<div class="sr-full-artist" data-artist="'+escAttr(a.artist)+'">'+
           '<div class="sr-full-artist-icon">\uD83C\uDFA4</div>'+
           '<div class="sr-full-artist-info">'+
             '<div class="sr-full-artist-name">'+esc(a.artist)+'</div>'+

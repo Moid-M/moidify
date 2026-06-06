@@ -56,8 +56,8 @@ function createTrackRow(track, index, queue) {
   row.innerHTML = '<span class="track-num">'+numLabel+'</span>'+
     (state.showTrackCovers ? '<img class="track-cover" src="/api/cover/'+track.id+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '')+
     '<span class="track-title">'+esc(track.title)+'</span>'+
-    '<span class="track-artist clickable" data-navigate-artist="'+esc(track.artist||'')+'">'+esc(track.artist||'Unknown')+'</span>'+
-    '<span class="track-album clickable" data-navigate-album="'+esc(track.album||'')+'" data-navigate-artist="'+esc(track.artist||'')+'">'+esc(track.album||'')+'</span>'+
+    '<span class="track-artist clickable" data-navigate-artist="'+escAttr(track.artist||'')+'">'+esc(track.artist||'Unknown')+'</span>'+
+    '<span class="track-album clickable" data-navigate-album="'+escAttr(track.album||'')+'" data-navigate-artist="'+escAttr(track.artist||'')+'">'+esc(track.album||'')+'</span>'+
     '<span class="track-rating">'+stars+'</span>'+
     '<span class="track-dur">'+dur+'</span>'+
     '';
@@ -304,12 +304,9 @@ async function renderFavorites(navId) {
 }
 
 // Wire up duplicates button after render
-var _duplicatesWired = false;
 function wireDuplicatesBtn() {
-  if (_duplicatesWired) return;
   var btn = document.getElementById('duplicates-btn');
-  if (!btn) { setTimeout(wireDuplicatesBtn, 100); return; }
-  _duplicatesWired = true;
+  if (!btn) return;
   btn.addEventListener('click', function() {
     var content = document.getElementById('content');
     content.innerHTML = '<div class="content-header"><div class="view-title">Duplicate Tracks</div><button onclick="navigate(\'tracks\')" class="icon-btn">&larr;</button></div><div class="track-skeleton-wrap">'+skeletonTrackRows()+'</div>';

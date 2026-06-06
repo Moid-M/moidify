@@ -437,6 +437,7 @@ function initSeekSmooth() {
   var queueCur = document.getElementById('queue-current-time');
   var npCur = document.getElementById('np-current-time');
   var npSeek = document.getElementById('np-seek');
+  var _smoothRaf = null;
   function tick() {
     if (a.duration && !a.paused) {
       var pct = (a.currentTime / a.duration) * 100;
@@ -446,11 +447,14 @@ function initSeekSmooth() {
       queueCur.textContent = t;
       if (npCur) npCur.textContent = t;
       if (npSeek) { npSeek.value = pct; npSeek.style.setProperty('--seek-pct', pct + '%'); }
-      requestAnimationFrame(tick);
+      _smoothRaf = requestAnimationFrame(tick);
     }
   }
-  if (!a.paused) { requestAnimationFrame(tick); }
-  a.addEventListener('play', function() { requestAnimationFrame(tick); });
+  if (!a.paused) { _smoothRaf = requestAnimationFrame(tick); }
+  a.addEventListener('play', function() {
+    if (_smoothRaf) cancelAnimationFrame(_smoothRaf);
+    _smoothRaf = requestAnimationFrame(tick);
+  });
 }
 
 var _sessionSaveTimer = null;
@@ -624,8 +628,16 @@ function init() {
       if (state.autoTheme) applyTheme();
     });
   }
-  window.addEventListener('beforeunload', saveSession);
-  window.addEventListener('pagehide', saveSession);
+  window.addEventListener('beforeunload', function() {
+    saveSession();
+    if (_sessionSaveTimer) clearInterval(_sessionSaveTimer);
+    if (_scanPoll) clearInterval(_scanPoll);
+  });
+  window.addEventListener('pagehide', function() {
+    saveSession();
+    if (_sessionSaveTimer) clearInterval(_sessionSaveTimer);
+    if (_scanPoll) clearInterval(_scanPoll);
+  });
   // Also save on timeupdate (every 10 seconds via the interval)
   scheduleSessionSave();
 }

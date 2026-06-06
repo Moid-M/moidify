@@ -132,6 +132,11 @@ function esc(s) {
   return d.innerHTML;
 }
 
+function escAttr(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function applyAccent(color) {
   state.accentColor = color;
   document.documentElement.style.setProperty('--accent', color);

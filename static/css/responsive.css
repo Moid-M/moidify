@@ -417,6 +417,4 @@ body.sidebar-open #sidebar {
   .player-right .ctrl-btn svg { width: 16px; height: 16px; }
 }
 
-@media (max-width: 700px) {
-  #queue-panel { display: none; }
-}
+/* Queue stays as overlay on all mobile sizes, no hidden breakpoint */

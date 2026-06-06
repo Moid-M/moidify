@@ -1,6 +1,5 @@
 import hashlib
 import json
-import re
 from pathlib import Path
 from typing import Optional
 from xml.etree.ElementTree import Element, SubElement, tostring
@@ -13,12 +12,6 @@ from config import BASE_DIR, MUSIC_DIR, COVERS_DIR
 
 router = APIRouter(prefix="/rest")
 
-
-_view_re = re.compile(r"\.view$")
-
-
-def _strip_view(path: str) -> str:
-    return _view_re.sub("", path)
 
 API_VERSION = "1.16.1"
 

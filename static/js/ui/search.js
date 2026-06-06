@@ -27,25 +27,6 @@ function setupSearch() {
   });
 }
 
-function _customKey(action) {
-  var keys = safeJSON('moidify_custom_keys', {});
-  var defaults = {
-    'play-pause': ' ',
-    'next': 'n',
-    'prev': 'p',
-    'volume-up': 'ArrowUp',
-    'volume-down': 'ArrowDown',
-    'seek-forward': 'ArrowRight',
-    'seek-back': 'ArrowLeft',
-    'like': 'l',
-    'repeat': 'r',
-    'search': 's',
-    'queue': 'q',
-    'escape': 'Escape',
-  };
-  return (keys[action] || defaults[action]).toLowerCase();
-}
-
 function setupKeyboard() {
   document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;

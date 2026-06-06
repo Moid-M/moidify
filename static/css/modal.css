@@ -9,6 +9,12 @@
   justify-content: center;
 }
 body.light-mode #modal-overlay { background: rgba(0,0,0,0.3); }
+#modal-overlay.overlay-in {
+  animation: overlay-in 0.2s ease-out;
+}
+#modal-overlay.overlay-out {
+  animation: overlay-out 0.2s ease-in forwards;
+}
 #modal {
   background: var(--bg-elevated);
   border-radius: var(--radius-lg);
@@ -37,59 +43,13 @@ body.light-mode #modal-overlay { background: rgba(0,0,0,0.3); }
   from { opacity: 0; transform: scale(0.95) translateY(-8px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
-#modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.7);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-body.light-mode #modal-overlay { background: rgba(0,0,0,0.3); }
-#modal-overlay.overlay-in {
-  animation: overlay-in 0.2s ease-out;
-}
-#modal-overlay.overlay-out {
-  animation: overlay-out 0.2s ease-in forwards;
-}
-@keyframes overlay-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 @keyframes modal-out {
   from { opacity: 1; transform: scale(1) translateY(0); }
   to { opacity: 0; transform: scale(0.95) translateY(-8px); }
 }
-@keyframes overlay-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-#modal.settings-open {
-  overflow: hidden;
-  padding: 24px;
-  height: 480px;
-  display: flex;
-  flex-direction: column;
-}
-#modal.settings-open #modal-content {
-  flex: 1;
-  min-height: 0;
-}
-@keyframes modal-in {
-  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-#modal-overlay {
-  animation: overlay-in 0.2s ease-out;
-}
 @keyframes overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-@keyframes modal-out {
-  from { opacity: 1; transform: scale(1) translateY(0); }
-  to { opacity: 0; transform: scale(0.95) translateY(-8px); }
 }
 @keyframes overlay-out {
   from { opacity: 1; }
@@ -116,4 +76,3 @@ body.light-mode #modal-overlay { background: rgba(0,0,0,0.3); }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--text-muted); }
 .btn-secondary:hover { color: var(--text-primary); border-color: var(--text-primary); }
-

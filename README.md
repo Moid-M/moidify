@@ -25,7 +25,7 @@
   <p align="center">
     <img src="https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python">
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
-    <img src="https://img.shields.io/badge/version-1.6-purple?style=flat-square">
+    <img src="https://img.shields.io/badge/version-1.8-purple?style=flat-square">
     <img src="https://img.shields.io/badge/status-stable-brightgreen?style=flat-square">
   </p>
   <br>
@@ -118,8 +118,8 @@ curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sud
 | 8 | **Asks for your music folder location** |
 | 9 | **Asks to create an admin account** (optional — skip to use the browser setup wizard later) |
 | 10 | Writes config to `/etc/moidify/config.json` |
-| 10 | Installs a systemd service |
-| 11 | Starts the server immediately |
+| 11 | Installs a systemd service |
+| 12 | Starts the server immediately |
 
 </details>
 

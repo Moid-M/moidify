@@ -333,24 +333,30 @@ def home_feed(token: Optional[str] = Header(None)):
         ).fetchall()
 
     recommended_albums = conn.execute(
-        """SELECT album, COALESCE(NULLIF(album_artist,''), artist) as artist, album_artist,
-                  COUNT(*) as track_count, MAX(has_cover) as has_cover, MIN(id) as cover_track_id
-           FROM tracks WHERE album IS NOT NULL
-           GROUP BY album, COALESCE(NULLIF(album_artist,''), artist)
-           ORDER BY RANDOM() LIMIT 12"""
+        """SELECT t.album, t.artist, t.album_artist,
+                  COUNT(*) as track_count, MAX(t.has_cover) as has_cover, MIN(t.id) as cover_track_id
+           FROM tracks t JOIN (
+               SELECT DISTINCT album, COALESCE(NULLIF(album_artist,''), artist) as artist_key
+               FROM tracks WHERE album IS NOT NULL
+               ORDER BY RANDOM() LIMIT 12
+           ) r ON t.album = r.album AND COALESCE(NULLIF(t.album_artist,''), t.artist) = r.artist_key
+           GROUP BY t.album, t.artist"""
     ).fetchall()
 
     recommended_tracks = conn.execute(
-        "SELECT * FROM tracks ORDER BY RANDOM() LIMIT 20"
+        "SELECT * FROM tracks WHERE id IN (SELECT id FROM tracks ORDER BY RANDOM() LIMIT 20)"
     ).fetchall()
 
     recommended_artists = conn.execute(
-        """SELECT COALESCE(NULLIF(album_artist,''), artist) as artist,
-                  COUNT(*) as track_count, COUNT(DISTINCT album) as album_count,
-                  MIN(id) as cover_track_id
-           FROM tracks WHERE artist IS NOT NULL
-           GROUP BY COALESCE(NULLIF(album_artist,''), artist)
-           ORDER BY RANDOM() LIMIT 12"""
+        """SELECT COALESCE(NULLIF(t.album_artist,''), t.artist) as artist,
+                  COUNT(*) as track_count, COUNT(DISTINCT t.album) as album_count,
+                  MIN(t.id) as cover_track_id
+           FROM tracks t JOIN (
+               SELECT DISTINCT COALESCE(NULLIF(album_artist,''), artist) as artist_key
+               FROM tracks WHERE artist IS NOT NULL
+               ORDER BY RANDOM() LIMIT 12
+           ) r ON COALESCE(NULLIF(t.album_artist,''), t.artist) = r.artist_key
+           GROUP BY COALESCE(NULLIF(t.album_artist,''), t.artist)"""
     ).fetchall()
 
     playlists = []

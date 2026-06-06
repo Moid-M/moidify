@@ -241,10 +241,6 @@
 #queue-panel.drag-over {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
-.track-row.dragging {
-  opacity: 0.4;
-}
-
 /* ---- Playlist cover collage ---- */
 .pl-header {
   display: flex;

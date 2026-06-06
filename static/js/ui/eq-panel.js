@@ -53,7 +53,9 @@ function renderEQPanel() {
     });
   });
 
-  cf.addEventListener('input', function() {
+  var newCf = cf.cloneNode(true);
+  cf.parentNode.replaceChild(newCf, cf);
+  newCf.addEventListener('input', function() {
     state.crossfade = parseFloat(this.value);
     localStorage.setItem('moidify_crossfade', this.value);
     document.getElementById('eq-crossfade-label').textContent = this.value + 's';

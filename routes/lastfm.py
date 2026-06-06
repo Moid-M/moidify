@@ -44,7 +44,8 @@ def _load_keys():
     if LASTFM_API_KEY:
         return
     try:
-        cfg = json.loads((BASE_DIR / "config.json").read_text())
+        from config import INSTALLED_CONFIG
+        cfg = json.loads(INSTALLED_CONFIG.read_text())
         LASTFM_API_KEY = cfg.get("lastfm_api_key", "")
         LASTFM_API_SECRET = cfg.get("lastfm_api_secret", "")
     except Exception:

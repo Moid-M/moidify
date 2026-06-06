@@ -1,3 +1,4 @@
+import html
 import threading
 import sys
 from pathlib import Path
@@ -107,7 +108,7 @@ def shared_album_page(token: str):
 
 @app.get("/track/{track_id}")
 def shared_track_page(track_id: int, request: Request):
-    import html
+    
     from database import get_connection
     conn = get_connection()
     row = conn.execute(

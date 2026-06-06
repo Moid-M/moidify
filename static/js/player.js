@@ -107,6 +107,7 @@ function fetchSimilarAndAppend(lastTrackId) {
 
 function nextTrack() {
   if (state.queue.length===0) return;
+  clearCrossfadeTimer();
   if (state.repeatMode === 'one' && state.currentIndex >= 0) {
     audio.currentTime = 0; audio.play().catch(function() {}); return;
   }
@@ -132,7 +133,7 @@ function nextTrack() {
         }
       }
     }
-    if (next == null) next = state.shuffleOrder[state.shuffleIndex];
+    if (next == null) next = state.shuffleOrder.length > 0 ? state.shuffleOrder[state.shuffleIndex] : null;
   } else {
     next = state.currentIndex + 1;
     if (next >= state.queue.length) {
@@ -147,6 +148,10 @@ function nextTrack() {
     }
   }
 
+  if (next == null) {
+    state.currentIndex = -1; audio.src = ''; qs('#play-btn').innerHTML = iconPlay();
+    renderQueuePanel(); checkSleepTimer('ended'); clearAnimations(); return;
+  }
   if (state.gapless) {
     gaplessCrossfadeToNext();
   } else if (state.crossfade > 0 && audio.src) {
@@ -158,6 +163,7 @@ function nextTrack() {
 
 function prevTrack() {
   if (state.queue.length===0) return;
+  clearCrossfadeTimer();
   if (state.shuffle && state.playHistory.length) {
     var prev = state.playHistory.pop();
     playFromQueue(state.queue, prev);
@@ -455,6 +461,15 @@ function getNextTrackIndex() {
   return next;
 }
 
+var _crossfadeTimer = null;
+
+function clearCrossfadeTimer() {
+  if (_crossfadeTimer) {
+    clearInterval(_crossfadeTimer);
+    _crossfadeTimer = null;
+  }
+}
+
 function gaplessCrossfadeToNext() {
   if (isCrossfading) return;
   var nextAudio = document.getElementById('next-audio');
@@ -467,6 +482,7 @@ function gaplessCrossfadeToNext() {
   if (nextIdx == null) { nextTrackFallback(); return; }
 
   isCrossfading = true;
+  clearCrossfadeTimer();
   var fadeDuration = 2000;
   var fadeInterval = 50;
   var steps = fadeDuration / fadeInterval;
@@ -478,7 +494,7 @@ function gaplessCrossfadeToNext() {
   nextAudio.volume = 0;
   nextAudio.play();
 
-  var timer = setInterval(function() {
+  _crossfadeTimer = setInterval(function() {
     step++;
     var progress = step / steps;
     var currentVol = Math.max(0, mainVol * (1 - progress));
@@ -487,7 +503,7 @@ function gaplessCrossfadeToNext() {
     try { nextAudio.volume = nextVol; } catch(e) {}
 
     if (progress >= 1) {
-      clearInterval(timer);
+      clearCrossfadeTimer();
       audio.pause();
       audio.src = '';
       // Swap: set main audio to next track's properties
@@ -575,4 +591,11 @@ function stopScrobbleChecker() {
   }
 }
 
-startScrobbleChecker();
+// Start scrobble checker on first play instead of at module load
+var _firstPlayHandled = false;
+document.getElementById('audio').addEventListener('play', function() {
+  if (!_firstPlayHandled) {
+    _firstPlayHandled = true;
+    startScrobbleChecker();
+  }
+});

@@ -19,6 +19,14 @@ from pydantic import BaseModel
 
 DOWNLOAD_JOBS = {}
 DOWNLOAD_LOCK = threading.Lock()
+_MAX_DOWNLOAD_JOBS = 100
+
+
+def _cleanup_old_jobs():
+    with DOWNLOAD_LOCK:
+        done_jobs = [jid for jid, j in DOWNLOAD_JOBS.items() if j.get("status") in ("done", "error")]
+        for jid in done_jobs[:-50]:
+            del DOWNLOAD_JOBS[jid]
 
 class ImportUrlBody(BaseModel):
     url: str
@@ -123,6 +131,34 @@ router = APIRouter(tags=["admin"])
 
 AUDIO_EXTS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.aac', '.wma'}
 
+_DISK_CACHE = {"bytes": 0, "by_format": {}, "timestamp": 0}
+_DISK_CACHE_TTL = 300
+
+
+def _walk_music_dir():
+    now = __import__("time").time()
+    if now - _DISK_CACHE["timestamp"] < _DISK_CACHE_TTL:
+        return _DISK_CACHE["bytes"], _DISK_CACHE["by_format"]
+    total = 0
+    fmt = {}
+    try:
+        for root, dirs, files in os.walk(str(MUSIC_DIR)):
+            for fname in files:
+                ext = Path(fname).suffix.lower()
+                if ext in AUDIO_EXTS:
+                    try:
+                        sz = os.path.getsize(os.path.join(root, fname))
+                        total += sz
+                        fmt[ext[1:].upper()] = fmt.get(ext[1:].upper(), 0) + sz
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    _DISK_CACHE["bytes"] = total
+    _DISK_CACHE["by_format"] = fmt
+    _DISK_CACHE["timestamp"] = now
+    return total, fmt
+
 
 @router.get("/api/admin/stats")
 def admin_stats(token: Optional[str] = Header(None)):
@@ -134,18 +170,7 @@ def admin_stats(token: Optional[str] = Header(None)):
     total_dur = conn.execute("SELECT COALESCE(SUM(duration),0) FROM tracks").fetchone()[0]
     conn.close()
 
-    total_bytes = 0
-    try:
-        for root, dirs, files in os.walk(str(MUSIC_DIR)):
-            for f in files:
-                if Path(f).suffix.lower() in AUDIO_EXTS:
-                    try:
-                        total_bytes += os.path.getsize(os.path.join(root, f))
-                    except Exception:
-                        pass
-    except Exception:
-        pass
-
+    total_bytes, _ = _walk_music_dir()
     return {"tracks": tracks, "artists": artists, "albums": albums,
             "total_duration": round(total_dur, 1), "disk_usage_bytes": total_bytes}
 
@@ -234,19 +259,7 @@ def admin_dashboard(token: Optional[str] = Header(None)):
 
     conn.close()
 
-    disk_fmt = {}
-    try:
-        for root, dirs, files in os.walk(str(MUSIC_DIR)):
-            for fname in files:
-                ext = Path(fname).suffix.lower()
-                if ext in AUDIO_EXTS:
-                    try:
-                        sz = os.path.getsize(os.path.join(root, fname))
-                        disk_fmt[ext[1:].upper()] = disk_fmt.get(ext[1:].upper(), 0) + sz
-                    except Exception:
-                        pass
-    except Exception:
-        pass
+    _, disk_fmt = _walk_music_dir()
     disk = [{"format": k, "bytes": v} for k, v in sorted(disk_fmt.items(), key=lambda x: -x[1])]
 
     disk_free = 0
@@ -490,8 +503,11 @@ def admin_delete_user(user_id: int, token: Optional[str] = Header(None)):
 @router.post("/api/admin/import-url")
 def import_from_url(body: ImportUrlBody, token: Optional[str] = Header(None)):
     _require_admin(token)
+    _cleanup_old_jobs()
     job_id = uuid.uuid4().hex[:12]
     with DOWNLOAD_LOCK:
+        if len(DOWNLOAD_JOBS) >= _MAX_DOWNLOAD_JOBS:
+            raise HTTPException(503, "Too many download jobs. Wait for some to complete.")
         DOWNLOAD_JOBS[job_id] = {"status": "queued", "progress": 0, "title": None, "error": None}
     threading.Thread(target=_download_worker, args=(job_id, body.url), daemon=True).start()
     return {"job_id": job_id, "status": "queued"}
