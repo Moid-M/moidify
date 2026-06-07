@@ -198,6 +198,25 @@ def get_file_hash(file_path):
     return h.hexdigest()
 
 
+def _save_cover(cover_data):
+    if not isinstance(cover_data, bytes):
+        cover_data = bytes(cover_data)
+    if cover_data[:4] == b'\x89PNG':
+        ext = '.png'
+    elif cover_data[:2] == b'\xff\xd8':
+        ext = '.jpg'
+    elif cover_data[:4] == b'RIFF' and cover_data[8:12] == b'WEBP':
+        ext = '.webp'
+    else:
+        ext = '.jpg'
+    cover_hash = hashlib.sha256(cover_data).hexdigest()[:16]
+    cover_path = COVERS_DIR / f"{cover_hash}{ext}"
+    if not cover_path.exists():
+        with open(cover_path, 'wb') as f:
+            f.write(cover_data)
+    return cover_hash
+
+
 def process_file(file_path, conn=None, force=False):
     path = Path(file_path)
     if path.suffix.lower() not in AUDIO_EXTENSIONS:
@@ -242,23 +261,7 @@ def process_file(file_path, conn=None, force=False):
 
         cover_hash = None
         if metadata['cover_data']:
-            cover_data = metadata['cover_data']
-            if not isinstance(cover_data, bytes):
-                cover_data = bytes(cover_data)
-            if isinstance(cover_data, bytes):
-                if cover_data[:4] == b'\x89PNG':
-                    ext = '.png'
-                elif cover_data[:2] == b'\xff\xd8':
-                    ext = '.jpg'
-                elif cover_data[:4] == b'RIFF' and cover_data[8:12] == b'WEBP':
-                    ext = '.webp'
-                else:
-                    ext = '.jpg'
-                cover_hash = hashlib.sha256(cover_data).hexdigest()[:16]
-                cover_path = COVERS_DIR / f"{cover_hash}{ext}"
-                if not cover_path.exists():
-                    with open(cover_path, 'wb') as f:
-                        f.write(cover_data)
+            cover_hash = _save_cover(metadata['cover_data'])
 
         if existing and force:
             conn.execute(

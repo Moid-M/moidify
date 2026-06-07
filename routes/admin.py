@@ -404,6 +404,199 @@ async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str]
     return {"imported": imported}
 
 
+class MetadataBody(BaseModel):
+    title: Optional[str] = None
+    artist: Optional[str] = None
+    album_artist: Optional[str] = None
+    album: Optional[str] = None
+    genre: Optional[str] = None
+    year: Optional[int] = None
+    track_number: Optional[int] = None
+    disc_number: Optional[int] = None
+
+@router.patch("/api/admin/tracks/{track_id}/metadata")
+def admin_update_track_metadata(track_id: int, body: MetadataBody, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    row = conn.execute("SELECT id, file_path FROM tracks WHERE id = ?", (track_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "Track not found")
+    fields = []
+    vals = []
+    for field in ("title", "artist", "album_artist", "album", "genre", "year", "track_number", "disc_number"):
+        val = getattr(body, field, None)
+        if val is not None:
+            fields.append(f"{field} = ?")
+            vals.append(val)
+    if not fields:
+        raise HTTPException(400, "No fields to update")
+    vals.append(track_id)
+    sql = f"UPDATE tracks SET {', '.join(fields)} WHERE id = ?"
+    conn.execute(sql, vals)
+    conn.commit()
+    conn.close()
+    return {"ok": True, "updated": fields}
+
+
+@router.get("/api/admin/albums")
+def admin_albums(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT
+           COALESCE(NULLIF(album,''), 'Unknown') as album,
+           COALESCE(NULLIF(album_artist,''), artist, 'Unknown') as artist,
+           COUNT(*) as track_count,
+           SUM(duration) as total_duration,
+           MAX(has_cover) as has_cover
+           FROM tracks
+           GROUP BY album, artist
+           ORDER BY artist, album"""
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@router.get("/api/admin/artists")
+def admin_artists(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT
+           COALESCE(NULLIF(album_artist,''), artist, 'Unknown') as artist,
+           COUNT(*) as track_count,
+           COUNT(DISTINCT album) as album_count,
+           SUM(duration) as total_duration
+           FROM tracks
+           GROUP BY artist
+           ORDER BY artist"""
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@router.get("/api/admin/albums/{album_name}")
+def admin_album_tracks(album_name: str, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    from urllib.parse import unquote
+    album_name = unquote(album_name)
+    rows = conn.execute(
+        """SELECT id, title, artist, album, duration, track_number, has_cover
+           FROM tracks WHERE album = ?
+           ORDER BY track_number, title""",
+        (album_name,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@router.post("/api/admin/re-extract-covers")
+def admin_re_extract_covers(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    from scanner import extract_metadata, process_file
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT id, file_path FROM tracks WHERE has_cover = 0"
+    ).fetchall()
+    processed = 0
+    errors = 0
+    for row in rows:
+        fp = row["file_path"]
+        tid = row["id"]
+        if not Path(fp).exists():
+            errors += 1
+            continue
+        metadata = extract_metadata(fp)
+        if metadata and metadata.get("cover_data"):
+            from scanner import _save_cover
+            cover_hash = _save_cover(metadata["cover_data"])
+            conn.execute(
+                "UPDATE tracks SET has_cover = 1, cover_hash = ? WHERE id = ?",
+                (cover_hash, tid),
+            )
+            processed += 1
+    conn.commit()
+    conn.close()
+    return {"processed": processed, "errors": errors, "total_checked": len(rows)}
+
+
+@router.post("/api/admin/db/vacuum")
+def admin_db_vacuum(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    conn.execute("VACUUM")
+    conn.close()
+    return {"ok": True, "message": "Database vacuumed"}
+
+
+@router.get("/api/admin/db/integrity")
+def admin_db_integrity(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    result = conn.execute("PRAGMA integrity_check").fetchone()[0]
+    conn.close()
+    return {"ok": result == "ok", "result": result}
+
+
+@router.get("/api/admin/db/stats")
+def admin_db_stats(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    page_count = conn.execute("PRAGMA page_count").fetchone()[0]
+    page_size = conn.execute("PRAGMA page_size").fetchone()[0]
+    db_size = page_count * page_size
+    track_count = conn.execute("SELECT COUNT(*) FROM tracks").fetchone()[0]
+    user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    playlist_count = conn.execute("SELECT COUNT(*) FROM playlists").fetchone()[0]
+    play_history = conn.execute("SELECT COUNT(*) FROM play_history").fetchone()[0]
+    conn.close()
+    return {
+        "db_size_bytes": db_size,
+        "db_size_display": f"{db_size/1024/1024:.1f} MB" if db_size > 1024*1024 else f"{db_size/1024:.1f} KB",
+        "track_count": track_count,
+        "user_count": user_count,
+        "playlist_count": playlist_count,
+        "play_history_count": play_history,
+    }
+
+
+@router.get("/api/admin/server-info")
+def admin_server_info(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    import sys, platform, time
+    info = {
+        "python_version": sys.version.split()[0],
+        "platform": platform.platform(),
+        "server_time": time.strftime('%Y-%m-%d %H:%M:%S'),
+        "process_uptime": None,
+    }
+    try:
+        import psutil
+        p = psutil.Process()
+        uptime_secs = time.time() - p.create_time()
+        days = int(uptime_secs // 86400)
+        hours = int((uptime_secs % 86400) // 3600)
+        mins = int((uptime_secs % 3600) // 60)
+        info["process_uptime"] = f"{days}d {hours}h {mins}m"
+    except ImportError:
+        pass
+    try:
+        import mutagen
+        info["mutagen_version"] = mutagen.version_string
+    except Exception:
+        info["mutagen_version"] = "unknown"
+    try:
+        import subprocess
+        result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=5)
+        info["yt_dlp_version"] = result.stdout.strip()
+    except Exception:
+        info["yt_dlp_version"] = "not found"
+    info["music_dir"] = str(MUSIC_DIR)
+    info["base_dir"] = str(BASE_DIR)
+    return info
+
+
 @router.delete("/api/admin/tracks/{track_id}")
 def admin_delete_track(track_id: int, token: Optional[str] = Header(None)):
     _require_admin(token)

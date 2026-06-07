@@ -128,8 +128,10 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
       <li class="active" data-tab="dashboard">Dashboard</li>
       <li data-tab="statistics">Statistics</li>
       <li data-tab="songs">Songs</li>
+      <li data-tab="library">Library</li>
       <li data-tab="users">Users</li>
       <li data-tab="security">Security</li>
+      <li data-tab="maintenance">Maintenance</li>
     </ul>
   </div>
   <div class="content">
@@ -141,6 +143,12 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
       <div id="scanner-card" class="chart-card" style="margin-bottom:32px;display:none">
         <h3 style="margin-bottom:6px">Scanner Status</h3>
         <div id="scanner-status" style="font-size:13px;color:var(--text2)"></div>
+        <div id="scanner-errors" style="display:none;margin-top:8px;">
+          <details style="font-size:12px;color:var(--danger);background:var(--accent-dim);border-radius:var(--radius);padding:8px 12px;">
+            <summary style="cursor:pointer;font-weight:600;" id="scanner-error-summary">Errors</summary>
+            <div id="scanner-error-list" style="margin-top:6px;max-height:200px;overflow-y:auto;font-family:monospace;white-space:pre-wrap;"></div>
+          </details>
+        </div>
         <div id="scanner-progress" style="margin-top:8px;display:none">
           <progress id="scan-progress-bar" style="width:100%;height:6px;border-radius:3px;accent-color:var(--accent)" max="100" value="0"></progress>
           <div id="scan-progress-text" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
@@ -263,6 +271,44 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
         <span style="flex:1"></span>
         <button class="del-btn" id="delete-selected-btn" style="padding:6px 16px;font-size:13px">Delete Selected</button>
         <button style="background:var(--bg-hover);color:var(--text2);border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-size:12px" id="clear-track-sel">Clear</button>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-library">
+      <h2>Album &amp; Artist Browser</h2>
+      <div style="display:flex;gap:12px;margin-bottom:16px;">
+        <button id="lib-albums-btn" class="admin-btn" onclick="switchLibView('albums')" style="padding:8px 20px">Albums</button>
+        <button id="lib-artists-btn" class="admin-btn" onclick="switchLibView('artists')" style="padding:8px 20px">Artists</button>
+      </div>
+      <div id="lib-search" style="margin-bottom:12px;">
+        <input type="text" id="lib-filter" placeholder="Filter..." style="padding:8px 12px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg-el);color:var(--text);font-size:14px;max-width:300px;outline:none;width:100%">
+      </div>
+      <div id="lib-content" style="font-size:13px;color:var(--text2);"></div>
+    </div>
+
+    <div class="tab" id="tab-maintenance">
+      <h2>Maintenance</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="chart-card" style="margin-bottom:0;">
+          <h3 style="margin-bottom:12px">Database</h3>
+          <div id="db-stats" style="font-size:13px;color:var(--text2);margin-bottom:12px;"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="dbVacuum()" class="admin-btn admin-btn-danger" style="display:inline-flex;align-items:center;gap:6px;">Vacuum</button>
+            <button onclick="dbIntegrity()" class="admin-btn" style="display:inline-flex;align-items:center;gap:6px;">Check Integrity</button>
+            <button onclick="loadDbStats()" class="admin-btn" style="display:inline-flex;align-items:center;gap:6px;">Refresh Stats</button>
+          </div>
+          <div id="db-msg" style="font-size:12px;color:var(--accent);margin-top:8px;display:none;"></div>
+        </div>
+        <div class="chart-card" style="margin-bottom:0;">
+          <h3 style="margin-bottom:12px">Cover Art</h3>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:8px;">Re-extract cover art from file tags for tracks currently missing covers.</p>
+          <button onclick="reExtractCovers()" class="admin-btn" style="display:inline-flex;align-items:center;gap:6px;">Re-extract Missing Covers</button>
+          <div id="cover-extract-msg" style="font-size:12px;color:var(--accent);margin-top:8px;display:none;"></div>
+        </div>
+      </div>
+      <div class="chart-card" style="margin-top:20px;">
+        <h3 style="margin-bottom:12px">Server Info</h3>
+        <div id="server-info" style="font-size:13px;color:var(--text2);"></div>
       </div>
     </div>
 
@@ -1218,10 +1264,308 @@ async function handleFiles(files) {
   loadStats();
 }
 
+// --- Inline metadata editor ---
+function makeEditable(cell, trackId, field) {
+  var original = cell.textContent;
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.value = original;
+  input.style.cssText = 'width:100%;padding:2px 4px;border-radius:4px;border:1px solid var(--accent);background:var(--bg);color:var(--text);font-size:13px;outline:none;';
+  cell.textContent = '';
+  cell.appendChild(input);
+  input.focus();
+  input.select();
+
+  function save() {
+    var val = input.value.trim();
+    if (val && val !== original) {
+      api('/api/admin/tracks/' + trackId + '/metadata', {
+        method: 'PATCH',
+        body: (function(){ var o = {}; o[field] = val; return o; })()
+      });
+    }
+    cell.textContent = val || original;
+  }
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { input.blur(); }
+    if (e.key === 'Escape') { cell.textContent = original; }
+  });
+}
+
+// --- Library browser ---
+var libView = 'albums';
+
+function switchLibView(view) {
+  libView = view;
+  document.getElementById('lib-albums-btn').style.opacity = view === 'albums' ? '1' : '0.5';
+  document.getElementById('lib-artists-btn').style.opacity = view === 'artists' ? '1' : '0.5';
+  loadLib();
+}
+
+document.getElementById('lib-filter').addEventListener('input', function() {
+  loadLib();
+});
+
+async function loadLib() {
+  var filter = (document.getElementById('lib-filter').value || '').toLowerCase();
+  var container = document.getElementById('lib-content');
+  if (libView === 'albums') {
+    try {
+      var r = await api('/api/admin/albums');
+      if (!r.ok) { container.innerHTML = 'Failed to load'; return; }
+      var albums = await r.json();
+      if (filter) {
+        albums = albums.filter(function(a) {
+          return (a.album && a.album.toLowerCase().indexOf(filter) !== -1) ||
+                 (a.artist && a.artist.toLowerCase().indexOf(filter) !== -1);
+        });
+      }
+      var html = '<table class="track-table"><thead><tr><th>Album</th><th>Artist</th><th>Tracks</th><th>Duration</th><th>Cover</th></tr></thead><tbody>';
+      for (var i = 0; i < albums.length; i++) {
+        var a = albums[i];
+        var dur = Math.round(a.total_duration / 60) + 'm';
+        html += '<tr style="cursor:pointer" onclick="showAlbumTracks(\'' + encodeURIComponent(a.album || '') + '\')">' +
+          '<td>' + esc(a.album) + '</td>' +
+          '<td>' + esc(a.artist) + '</td>' +
+          '<td>' + a.track_count + '</td>' +
+          '<td>' + dur + '</td>' +
+          '<td>' + (a.has_cover ? '✓' : '—') + '</td></tr>';
+      }
+      html += '</tbody></table>' +
+        '<div style="margin-top:8px;font-size:12px;color:var(--text3);">' + albums.length + ' album(s)</div>';
+      container.innerHTML = html;
+    } catch(e) { container.innerHTML = 'Error loading albums'; }
+  } else {
+    try {
+      var r = await api('/api/admin/artists');
+      if (!r.ok) { container.innerHTML = 'Failed to load'; return; }
+      var artists = await r.json();
+      if (filter) {
+        artists = artists.filter(function(a) {
+          return a.artist && a.artist.toLowerCase().indexOf(filter) !== -1;
+        });
+      }
+      var html = '<table class="track-table"><thead><tr><th>Artist</th><th>Tracks</th><th>Albums</th><th>Duration</th></tr></thead><tbody>';
+      for (var i = 0; i < artists.length; i++) {
+        var a = artists[i];
+        var dur = Math.round(a.total_duration / 60) + 'm';
+        html += '<tr>' +
+          '<td><strong>' + esc(a.artist) + '</strong></td>' +
+          '<td>' + a.track_count + '</td>' +
+          '<td>' + a.album_count + '</td>' +
+          '<td>' + dur + '</td></tr>';
+      }
+      html += '</tbody></table>' +
+        '<div style="margin-top:8px;font-size:12px;color:var(--text3);">' + artists.length + ' artist(s)</div>';
+      container.innerHTML = html;
+    } catch(e) { container.innerHTML = 'Error loading artists'; }
+  }
+}
+
+async function showAlbumTracks(encodedName) {
+  var albumName = decodeURIComponent(encodedName);
+  try {
+    var r = await api('/api/admin/albums/' + encodeURIComponent(albumName));
+    if (!r.ok) return;
+    var tracks = await r.json();
+    var container = document.getElementById('lib-content');
+    var html = '<button class="admin-btn" onclick="loadLib()" style="margin-bottom:12px">&larr; Back to albums</button>';
+    html += '<h3 style="font-size:16px;color:var(--text);margin-bottom:8px">' + esc(albumName) + '</h3>';
+    html += '<table class="track-table"><thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Duration</th></tr></thead><tbody>';
+    for (var i = 0; i < tracks.length; i++) {
+      var t = tracks[i];
+      var dur = t.duration ? Math.floor(t.duration/60)+':'+String(Math.floor(t.duration%60)).padStart(2,'0') : '?';
+      html += '<tr>' +
+        '<td>' + (t.track_number || '—') + '</td>' +
+        '<td>' + esc(t.title || '') + '</td>' +
+        '<td>' + esc(t.artist || '') + '</td>' +
+        '<td>' + dur + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch(e) {}
+}
+
+// --- Scanner error log ---
+function updateScannerErrorLog(d) {
+  var el = document.getElementById('scanner-errors');
+  var list = document.getElementById('scanner-error-list');
+  var summary = document.getElementById('scanner-error-summary');
+  if (d.errors && d.errors.length) {
+    el.style.display = '';
+    var errors = d.errors.slice(-50);
+    summary.textContent = errors.length + ' error(s) — click to expand';
+    list.textContent = errors.join('\n');
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// Patch scanner status display to include errors
+var origLoadScannerStatus = loadScannerStatus;
+loadScannerStatus = async function() {
+  try {
+    var r = await api('/api/admin/scanner');
+    if (!r.ok) return;
+    var d = await r.json();
+    var el = document.getElementById('scanner-card');
+    var content = document.getElementById('scanner-status');
+    var progressBar = document.getElementById('scanner-progress');
+    if (!d.last_scan && !d.running) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    var errHtml = d.errors && d.errors.length ? '<span style="color:var(--danger)">; ' + d.errors.length + ' error(s)</span>' : '';
+    content.innerHTML =
+      '<div style="display:flex;gap:20px;flex-wrap:wrap">' +
+        '<span>Last scan: <strong>' + esc(d.last_scan||'Never') + '</strong></span>' +
+        '<span>Files found: <strong>' + d.files_found + '</strong></span>' +
+        '<span>Imported: <strong>' + d.files_imported + '</strong></span>' +
+        (d.running ? '<span style="color:var(--accent)"> Scanning...</span>' : '') +
+        errHtml +
+      '</div>';
+    updateScannerErrorLog(d);
+    if (d.running) {
+      progressBar.style.display = 'block';
+      var bar = document.getElementById('scan-progress-bar');
+      var txt = document.getElementById('scan-progress-text');
+      if (d.files_found > 0) { bar.max = d.files_found; bar.value = d.files_imported; }
+      else { bar.max = 1; bar.value = 0; }
+      txt.textContent = d.files_imported + ' / ' + d.files_found + ' files imported';
+    }
+  } catch(e) {}
+};
+
+// Patch renderTracks to add editable cells
+var origRenderTracks = renderTracks;
+renderTracks = function() {
+  origRenderTracks();
+  // Make title, artist, album cells editable
+  document.querySelectorAll('#track-body tr').forEach(function(tr) {
+    var tid = parseInt(tr.dataset.trackId);
+    var cells = tr.querySelectorAll('td');
+    if (cells.length >= 5) {
+      // Title (index 2)
+      cells[2].style.cursor = 'pointer';
+      cells[2].title = 'Click to edit';
+      cells[2].addEventListener('dblclick', function(e) {
+        makeEditable(this, tid, 'title');
+      });
+      // Artist (index 3)
+      cells[3].style.cursor = 'pointer';
+      cells[3].title = 'Click to edit';
+      cells[3].addEventListener('dblclick', function(e) {
+        makeEditable(this, tid, 'artist');
+      });
+      // Album (index 4)
+      cells[4].style.cursor = 'pointer';
+      cells[4].title = 'Click to edit';
+      cells[4].addEventListener('dblclick', function(e) {
+        makeEditable(this, tid, 'album');
+      });
+    }
+  });
+};
+
+// --- Maintenance ---
+async function loadDbStats() {
+  try {
+    var r = await api('/api/admin/db/stats');
+    if (!r.ok) return;
+    var d = await r.json();
+    document.getElementById('db-stats').innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+      '<span>DB Size: <strong>' + d.db_size_display + '</strong></span>' +
+      '<span>Tracks: <strong>' + d.track_count + '</strong></span>' +
+      '<span>Users: <strong>' + d.user_count + '</strong></span>' +
+      '<span>Playlists: <strong>' + d.playlist_count + '</strong></span>' +
+      '<span>Play History: <strong>' + d.play_history_count + '</strong></span>' +
+      '</div>';
+  } catch(e) {}
+}
+
+async function dbVacuum() {
+  var msg = document.getElementById('db-msg');
+  msg.style.display = 'block';
+  msg.textContent = 'Vacuuming database...';
+  try {
+    var r = await api('/api/admin/db/vacuum', {method:'POST'});
+    var d = await r.json();
+    msg.textContent = d.message || 'Done';
+    loadDbStats();
+  } catch(e) {
+    msg.textContent = 'Error: ' + e.message;
+  }
+  setTimeout(function() { msg.style.display = 'none'; }, 3000);
+}
+
+async function dbIntegrity() {
+  var msg = document.getElementById('db-msg');
+  msg.style.display = 'block';
+  msg.textContent = 'Checking integrity...';
+  try {
+    var r = await api('/api/admin/db/integrity');
+    var d = await r.json();
+    if (d.ok) {
+      msg.style.color = '#22c55e';
+      msg.textContent = '✓ Integrity check passed';
+    } else {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = '✗ Integrity check failed: ' + d.result;
+    }
+  } catch(e) {
+    msg.textContent = 'Error: ' + e.message;
+  }
+  setTimeout(function() { msg.style.display = 'none'; }, 5000);
+}
+
+async function reExtractCovers() {
+  var msg = document.getElementById('cover-extract-msg');
+  msg.style.display = 'block';
+  msg.textContent = 'Processing...';
+  try {
+    var r = await api('/api/admin/re-extract-covers', {method:'POST'});
+    var d = await r.json();
+    msg.textContent = 'Done. Processed: ' + d.processed + ', Errors: ' + d.errors + ', Total checked: ' + d.total_checked;
+    loadStats();
+  } catch(e) {
+    msg.textContent = 'Error: ' + e.message;
+  }
+  setTimeout(function() { msg.style.display = 'none'; }, 5000);
+}
+
+async function loadServerInfo() {
+  try {
+    var r = await api('/api/admin/server-info');
+    if (!r.ok) return;
+    var d = await r.json();
+    document.getElementById('server-info').innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+      '<span>Python: <strong>' + esc(d.python_version) + '</strong></span>' +
+      '<span>Platform: <strong>' + esc(d.platform) + '</strong></span>' +
+      (d.mutagen_version ? '<span>Mutagen: <strong>' + esc(d.mutagen_version) + '</strong></span>' : '') +
+      (d.yt_dlp_version ? '<span>yt-dlp: <strong>' + esc(d.yt_dlp_version) + '</strong></span>' : '') +
+      (d.process_uptime ? '<span>Uptime: <strong>' + esc(d.process_uptime) + '</strong></span>' : '') +
+      '<span>Server time: <strong>' + esc(d.server_time) + '</strong></span>' +
+      '</div>';
+  } catch(e) {
+    document.getElementById('server-info').innerHTML = 'Error loading server info';
+  }
+}
+
 document.getElementById('track-filter').addEventListener('input', filterTracks);
 
 checkAdmin().then(function(ok) {
-  if (ok) { document.getElementById('admin-content').style.display = ''; loadStats(); loadDashboard(); loadRegistrationStatus(); loadFailedLogins(); loadSecurityTab(); loadScannerStatus(); loadPlayStats(); loadTrends(); loadUsers(); loadTracks(); loadSchedule(); }
+  if (ok) {
+    document.getElementById('admin-content').style.display = '';
+    loadStats(); loadDashboard(); loadRegistrationStatus(); loadFailedLogins();
+    loadSecurityTab(); loadScannerStatus(); loadPlayStats(); loadTrends();
+    loadUsers(); loadTracks(); loadSchedule();
+    loadLib(); loadDbStats(); loadServerInfo();
+    // Init library view
+    document.getElementById('lib-albums-btn').style.opacity = '1';
+    document.getElementById('lib-artists-btn').style.opacity = '0.5';
+  }
 });
 </script>
 </body>

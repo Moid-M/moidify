@@ -3,7 +3,8 @@ set -euo pipefail
 
 APP_DIR="/opt/moidify"
 SERVICE_USER="moidify"
-REPO_URL="https://github.com/Moid-M/moidify.git"
+REPO_URL="https://github.com/Moid-M/moidify"
+GIT_REPO_URL="${REPO_URL}.git"
 
 if [[ $EUID -ne 0 ]]; then
   echo "This must be run as root (sudo)."
@@ -21,7 +22,7 @@ if [[ -f "$SCRIPT_DIR/server.py" && "$SCRIPT_DIR" != "$APP_DIR" ]]; then
 elif [[ -d "$APP_DIR/.git" ]]; then
   cd "$APP_DIR"
   git stash --include-untracked 2>/dev/null || true
-  git pull
+  git pull origin main 2>/dev/null || git pull "$GIT_REPO_URL" main
 else
   # Download latest archive
   TMPDIR=$(mktemp -d)

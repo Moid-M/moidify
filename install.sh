@@ -8,7 +8,8 @@ CONFIG_DIR="/etc/moidify"
 SERVICE_USER="moidify"
 SERVICE_FILE="/etc/systemd/system/moidify.service"
 PYTHON="python3"
-REPO_URL="https://github.com/Moid-M/moidify.git"
+REPO_URL="https://github.com/Moid-M/moidify"
+GIT_REPO_URL="${REPO_URL}.git"
 
 # ─── Parse flags ─────────────────────────────────────────────────────────────
 VERBOSE=false
@@ -220,7 +221,7 @@ else
   TMPDIR=$(mktemp -d)
 
   if command -v git &>/dev/null; then
-    git clone --depth 1 "$REPO_URL" "$TMPDIR/repo" 2>&1 | tail -1 || true
+    git clone --depth 1 "$GIT_REPO_URL" "$TMPDIR/repo" 2>&1 | tail -1 || true
     if [[ -d "$TMPDIR/repo" ]]; then
       rm -rf "$TMPDIR/repo/.git" 2>/dev/null || true
       cp -r "$TMPDIR/repo"/* "$TMPDIR/" 2>/dev/null || true
