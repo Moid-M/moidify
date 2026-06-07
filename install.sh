@@ -207,7 +207,7 @@ if [[ -f "$SCRIPT_DIR/server.py" ]]; then
   info "Using local source files from $SCRIPT_DIR"
   VERSION=$(cat "$SCRIPT_DIR/version.txt" 2>/dev/null || echo "?")
   if command -v rsync &>/dev/null; then
-    rsync -a --delete --exclude='install.sh' --exclude='uninstall.sh' \
+    rsync -a --delete --exclude='install.sh' \
       --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' \
       --exclude='venv' --exclude='music' --exclude='data' --exclude='covers' \
       "$SCRIPT_DIR/" "$APP_DIR/"
@@ -244,7 +244,7 @@ else
 
   VERSION=$(cat "$TMPDIR/version.txt" 2>/dev/null || echo "?")
 
-  rm -rf "$TMPDIR/install.sh" "$TMPDIR/uninstall.sh" \
+  rm -rf "$TMPDIR/install.sh" \
          "$TMPDIR/__pycache__" "$TMPDIR/music" "$TMPDIR/data" "$TMPDIR/covers" \
          "$TMPDIR/.git" 2>/dev/null || true
   find "$TMPDIR" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
