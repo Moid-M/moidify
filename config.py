@@ -1,7 +1,10 @@
 import json
+import logging
 import os
 import sqlite3
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).parent
 
@@ -51,10 +54,10 @@ os.makedirs(MUSIC_DIR, exist_ok=True)
 os.makedirs(COVERS_DIR, exist_ok=True)
 os.makedirs(DB_PATH.parent, exist_ok=True)
 
-print(f"[config] MUSIC_DIR={MUSIC_DIR}", flush=True)
-print(f"[config] COVERS_DIR={COVERS_DIR}", flush=True)
-print(f"[config] DB_PATH={DB_PATH}", flush=True)
-print(f"[config] MAX_UPLOAD_SIZE={MAX_UPLOAD_SIZE} ({(MAX_UPLOAD_SIZE/1024/1024/1024):.1f} GB)", flush=True)
+logger.info("MUSIC_DIR=%s", MUSIC_DIR)
+logger.info("COVERS_DIR=%s", COVERS_DIR)
+logger.info("DB_PATH=%s", DB_PATH)
+logger.info("MAX_UPLOAD_SIZE=%s (%s GB)", MAX_UPLOAD_SIZE, round(MAX_UPLOAD_SIZE / 1024 / 1024 / 1024, 1))
 
 STATIC_DIR = BASE_DIR / "static"
 

@@ -10,6 +10,7 @@ from mutagen import File
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
 from mutagen.oggvorbis import OggVorbis
+from mutagen.oggopus import OggOpus
 from mutagen.mp4 import MP4
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -19,7 +20,7 @@ from config import MUSIC_DIR, COVERS_DIR
 
 logger = logging.getLogger(__name__)
 
-AUDIO_EXTENSIONS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.wma', '.aac'}
+AUDIO_EXTENSIONS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.wma', '.aac', '.opus'}
 
 SCAN_STATUS = {"last_scan": None, "files_found": 0, "files_imported": 0, "errors": []}
 SCAN_LOCK = threading.Lock()
@@ -94,6 +95,21 @@ def extract_metadata(file_path):
                 info['cover_data'] = audio.pictures[0].data
 
         elif isinstance(audio, OggVorbis):
+            info['title'] = audio.get('title', [''])[0]
+            info['artist'] = audio.get('artist', [''])[0]
+            info['album_artist'] = audio.get('albumartist', [''])[0]
+            if not info['album_artist']:
+                info['album_artist'] = audio.get('album_artist', [''])[0]
+            info['album'] = audio.get('album', [''])[0]
+            info['track_number'] = audio.get('tracknumber', [''])[0]
+            info['disc_number'] = audio.get('discnumber', [''])[0]
+            info['genre'] = audio.get('genre', [''])[0]
+            info['year'] = audio.get('date', [''])[0]
+            info['lyrics'] = audio.get('lyrics', [''])[0]
+            if hasattr(audio, 'pictures') and audio.pictures:
+                info['cover_data'] = audio.pictures[0].data
+
+        elif isinstance(audio, OggOpus):
             info['title'] = audio.get('title', [''])[0]
             info['artist'] = audio.get('artist', [''])[0]
             info['album_artist'] = audio.get('albumartist', [''])[0]

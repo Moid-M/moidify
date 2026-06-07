@@ -148,6 +148,7 @@ def setup_status():
 def setup_init(body: SetupInitBody):
     _validate_password(body.password)
     conn = get_connection()
+    conn.execute("BEGIN IMMEDIATE")
     admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
     if admin_count > 0:
         conn.close()

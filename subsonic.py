@@ -9,6 +9,7 @@ from fastapi.responses import Response, FileResponse
 
 from database import get_connection
 from config import BASE_DIR, MUSIC_DIR, COVERS_DIR
+from routes.deps import PBKDF2_ITERATIONS
 
 router = APIRouter(prefix="/rest")
 
@@ -135,7 +136,7 @@ def _authenticate(request: Request):
             # plaintext password - verify against stored hash
             import secrets
             pwd_hash_check = hashlib.pbkdf2_hmac(
-                "sha256", p.encode(), salt_db.encode(), 100000
+                "sha256", p.encode(), salt_db.encode(), PBKDF2_ITERATIONS
             ).hex()
             if pwd_hash_check == row["password_hash"]:
                 return dict(row)

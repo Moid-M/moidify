@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 
 from database import get_connection
 from config import COVERS_DIR
-from routes.deps import _normalize, _get_user_from_token, _fetch_lyrics_from_lrclib, RatingBody
+from routes.deps import _normalize, _get_user_from_token, _fetch_lyrics_from_lrclib, RatingBody, UpdateLyricsBody
 
 router = APIRouter(tags=["tracks"])
 
@@ -156,8 +156,8 @@ def get_track_lyrics(track_id: int):
     return {"lyrics": lyrics}
 
 @router.put("/api/tracks/{track_id}/lyrics")
-def update_track_lyrics(track_id: int, body: dict):
-    lyrics = body.get("lyrics", "")
+def update_track_lyrics(track_id: int, body: UpdateLyricsBody):
+    lyrics = body.lyrics
     conn = get_connection()
     conn.execute("UPDATE tracks SET lyrics = ? WHERE id = ?", (lyrics, track_id))
     conn.commit()

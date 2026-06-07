@@ -85,6 +85,12 @@ app.include_router(player_router)
 app.include_router(lastfm_router)
 
 
+# Health check for Docker/reverse proxy
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 # Static pages
 @app.get("/setup")
 def setup_page():

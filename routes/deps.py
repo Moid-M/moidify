@@ -68,7 +68,7 @@ def _create_session(user_id: int) -> str:
     conn = get_connection()
     conn.execute(
         "INSERT INTO sessions (token, user_id, expires_at, token_hash) VALUES (?, ?, ?, ?)",
-        (token, user_id, expires, _token_hash(token)),
+        (_token_hash(token), user_id, expires, _token_hash(token)),
     )
     conn.commit()
     conn.close()
@@ -272,3 +272,17 @@ class PlayerStateBody(BaseModel):
     volume: float = 0.7
     shuffle_order: list = []
     shuffle_index: int = 0
+
+
+class ShareAlbumBody(BaseModel):
+    album: str
+    artist: Optional[str] = None
+
+
+class UnshareAlbumBody(BaseModel):
+    album: str
+    artist: Optional[str] = None
+
+
+class UpdateLyricsBody(BaseModel):
+    lyrics: str = ""

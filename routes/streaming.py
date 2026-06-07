@@ -1,4 +1,5 @@
 import subprocess
+import threading
 import zipfile
 from pathlib import Path
 from typing import Optional
@@ -13,6 +14,11 @@ from routes.deps import TRANSCODE_MAP, FFMPEG_PATH
 router = APIRouter(tags=["streaming"])
 
 MUSIC_DIR_RESOLVED = Path(MUSIC_DIR).resolve(strict=False)
+
+# Limit concurrent transcodes to prevent resource exhaustion
+_active_transcodes = 0
+_MAX_TRANSCODES = 10
+_transcode_lock = threading.Lock()
 
 
 def _within_music_dir(path: Path) -> bool:
@@ -89,8 +95,21 @@ def stream_track(track_id: int, quality: Optional[str] = Query("high")):
         raise HTTPException(403, "Forbidden")
 
     if quality != "original" and quality in TRANSCODE_MAP and FFMPEG_PATH:
+        with _transcode_lock:
+            if _active_transcodes >= _MAX_TRANSCODES:
+                raise HTTPException(503, "Too many concurrent transcodes. Try again later.")
+            _active_transcodes += 1
+
+        def stream_with_cleanup():
+            try:
+                yield from _stream_file(path, quality)
+            finally:
+                with _transcode_lock:
+                    global _active_transcodes
+                    _active_transcodes -= 1
+
         return StreamingResponse(
-            _stream_file(path, quality),
+            stream_with_cleanup(),
             media_type=_media_type_for(path, quality),
             headers={
                 "Content-Disposition": "inline",

@@ -213,6 +213,13 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
         <p style="font-size:13px;color:var(--text2);margin-bottom:8px;">Download from YouTube, SoundCloud, Bandcamp, etc.</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input type="text" id="import-url-input" placeholder="https://youtube.com/watch?v=..." style="flex:1;min-width:200px;padding:8px 12px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg-el);color:var(--text);font-size:14px;outline:none;">
+          <select id="import-format" style="padding:8px 12px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg-el);color:var(--text);font-size:13px;outline:none;">
+            <option value="mp3">MP3 192k</option>
+            <option value="flac">FLAC</option>
+            <option value="opus">Opus 128k</option>
+            <option value="aac">AAC 192k (M4A)</option>
+            <option value="wav">WAV</option>
+          </select>
           <button onclick="submitImportUrl()" class="admin-btn" style="padding:8px 16px">Download</button>
         </div>
         <div id="import-status" style="display:none;margin-top:8px;font-size:13px;color:var(--text2);"></div>
@@ -705,12 +712,13 @@ async function submitImportUrl() {
   var input = document.getElementById('import-url-input');
   var url = input.value.trim();
   if (!url) { showToast('Enter a URL', 'error'); return; }
+  var fmt = document.getElementById('import-format').value;
   var statusEl = document.getElementById('import-status');
   statusEl.style.display = 'block';
   statusEl.innerHTML = 'Submitting...';
   input.disabled = true;
   try {
-    var r = await api('/api/admin/import-url', {method:'POST', body:{url: url}});
+    var r = await api('/api/admin/import-url', {method:'POST', body:{url: url, format: fmt}});
     if (!r.ok) { var e = await r.json(); statusEl.innerHTML = '<span style="color:var(--danger)">'+(e.detail||'Error')+'</span>'; input.disabled = false; return; }
     var d = await r.json();
     statusEl.innerHTML = 'Queued. Job ID: '+d.job_id;

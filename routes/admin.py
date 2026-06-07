@@ -30,24 +30,134 @@ def _cleanup_old_jobs():
 
 class ImportUrlBody(BaseModel):
     url: str
+    format: str = "mp3"
 
-def _download_worker(job_id: str, url: str):
+_ALLOWED_URL_SCHEMES = ("http", "https")
+
+_FORMAT_OPTIONS = {
+    'mp3':  {'codec': 'mp3',  'quality': '192', 'ext': 'mp3',  'label': 'MP3 192k'},
+    'flac': {'codec': 'flac', 'quality': '0',  'ext': 'flac', 'label': 'FLAC'},
+    'opus': {'codec': 'opus', 'quality': '128', 'ext': 'opus', 'label': 'Opus 128k'},
+    'aac':  {'codec': 'aac',  'quality': '192', 'ext': 'm4a',  'label': 'AAC 192k (M4A)'},
+    'wav':  {'codec': 'wav',  'quality': '0',  'ext': 'wav',  'label': 'WAV'},
+}
+
+
+def _validate_import_url(url: str):
+    import urllib.parse
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in _ALLOWED_URL_SCHEMES:
+        raise HTTPException(400, f"URL scheme '{parsed.scheme}' not allowed. Only http/https URLs are supported.")
+    if not parsed.netloc:
+        raise HTTPException(400, "Invalid URL: no hostname")
+
+def _fetch_cover(thumbnail_url):
+    if not thumbnail_url:
+        return None
+    import urllib.request
+    try:
+        req = urllib.request.Request(thumbnail_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = resp.read()
+        ct = resp.headers.get("Content-Type", "")
+        if "png" in ct:
+            return ("image/png", data)
+        if "webp" in ct:
+            return ("image/webp", data)
+        return ("image/jpeg", data)
+    except Exception:
+        return None
+
+def _write_tags(outfile, fmt, title, artist, album, year, genre, track_num, thumbnail_url):
+    if fmt == 'mp3':
+        from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, TDRC, TCON, TRCK
+        try:
+            tags = ID3(outfile)
+        except Exception:
+            tags = ID3()
+        tags["TIT2"] = TIT2(encoding=3, text=title)
+        tags["TPE1"] = TPE1(encoding=3, text=artist)
+        if album: tags["TALB"] = TALB(encoding=3, text=album)
+        if year: tags["TDRC"] = TDRC(encoding=3, text=year)
+        if genre: tags["TCON"] = TCON(encoding=3, text=genre)
+        if track_num: tags["TRCK"] = TRCK(encoding=3, text=track_num)
+        cover = _fetch_cover(thumbnail_url)
+        if cover:
+            mime, data = cover
+            tags["APIC"] = APIC(encoding=3, mime=mime, type=3, desc="Cover", data=data)
+        tags.save(outfile)
+
+    elif fmt in ('flac', 'opus'):
+        from mutagen import File
+        audio = File(outfile)
+        if audio is None:
+            return
+        audio['title'] = [title]
+        audio['artist'] = [artist]
+        if album: audio['album'] = [album]
+        if year: audio['date'] = [year]
+        if genre: audio['genre'] = [genre]
+        if track_num: audio['tracknumber'] = [track_num]
+        cover = _fetch_cover(thumbnail_url)
+        if cover:
+            mime, data = cover
+            try:
+                from mutagen.flac import Picture
+                pic = Picture()
+                pic.data = data
+                pic.type = 3
+                pic.mime = mime
+                pic.desc = 'Cover'
+                audio.add_picture(pic)
+            except Exception:
+                pass
+        audio.save()
+
+    elif fmt == 'aac':
+        from mutagen.mp4 import MP4, MP4Cover
+        audio = MP4(outfile)
+        audio['\xa9nam'] = title
+        audio['\xa9ART'] = artist
+        if album: audio['\xa9alb'] = album
+        if year: audio['\xa9day'] = year
+        if genre: audio['\xa9gen'] = genre
+        if track_num:
+            try:
+                audio['trkn'] = [(int(track_num), 0)]
+            except ValueError:
+                pass
+        cover = _fetch_cover(thumbnail_url)
+        if cover:
+            mime, data = cover
+            try:
+                flag = MP4Cover.FORMAT_PNG if mime == 'image/png' else MP4Cover.FORMAT_JPEG
+                audio['covr'] = [MP4Cover(data, flag)]
+            except Exception:
+                pass
+        audio.save()
+
+    # WAV: no standard tag support
+
+def _download_worker(job_id: str, url: str, fmt: str = "mp3"):
+    outfile = None
     try:
         import yt_dlp
-        import urllib.request
-        from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, TDRC, TCON, TRCK
-        from mutagen.mp3 import MP3
 
-        output_template = str(MUSIC_DIR / "%(title)s.%(ext)s")
+        fmt_cfg = _FORMAT_OPTIONS.get(fmt)
+        if not fmt_cfg:
+            raise ValueError(f"Unsupported format: {fmt}")
+
+        output_template = str(MUSIC_DIR / "%(id)s.%(ext)s")
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': output_template,
             'quiet': True,
             'no_warnings': True,
+            'max_filesize': 500000000,
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
+                'preferredcodec': fmt_cfg['codec'],
+                'preferredquality': fmt_cfg['quality'],
             }],
             'progress_hooks': [_make_progress_hook(job_id)],
         }
@@ -55,6 +165,10 @@ def _download_worker(job_id: str, url: str):
             DOWNLOAD_JOBS[job_id]["status"] = "downloading"
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            video_id = info.get("id", "")
+            if not video_id:
+                raise ValueError("Could not determine video ID from response")
+            outfile = MUSIC_DIR / f"{video_id}.{fmt_cfg['ext']}"
             title = info.get("title", "Unknown")
             artist = info.get("uploader") or info.get("channel") or info.get("artist") or "Unknown"
             album = info.get("album") or ""
@@ -63,56 +177,28 @@ def _download_worker(job_id: str, url: str):
             track_num = str(info.get("track_number") or info.get("playlist_index") or "")
             thumbnail_url = info.get("thumbnail") or ""
 
-        # Find the output file
-        outfile = None
-        for f in MUSIC_DIR.iterdir():
-            if f.suffix.lower() == ".mp3" and f.name.startswith(info.get("title", "")[:40]):
-                outfile = f
-                break
-        if not outfile:
+        if not outfile.exists():
             for f in MUSIC_DIR.iterdir():
-                if f.suffix.lower() == ".mp3":
+                if f.stem == video_id and f.suffix.lower() == f".{fmt_cfg['ext']}":
                     outfile = f
                     break
+            if not outfile or not outfile.exists():
+                raise FileNotFoundError(f"Downloaded file not found for video ID {video_id}")
 
-        if outfile:
-            try:
-                tags = ID3(outfile)
-            except Exception:
-                tags = ID3()
-            tags["TIT2"] = TIT2(encoding=3, text=title)
-            tags["TPE1"] = TPE1(encoding=3, text=artist)
-            if album:
-                tags["TALB"] = TALB(encoding=3, text=album)
-            if year:
-                tags["TDRC"] = TDRC(encoding=3, text=year)
-            if genre:
-                tags["TCON"] = TCON(encoding=3, text=genre)
-            if track_num:
-                tags["TRCK"] = TRCK(encoding=3, text=track_num)
-            # Download and embed cover art
-            if thumbnail_url:
-                try:
-                    req = urllib.request.Request(thumbnail_url, headers={"User-Agent": "Mozilla/5.0"})
-                    img_data = urllib.request.urlopen(req, timeout=15).read()
-                    mime = "image/jpeg"
-                    if thumbnail_url.endswith(".png"):
-                        mime = "image/png"
-                    if thumbnail_url.endswith(".webp"):
-                        mime = "image/webp"
-                    tags["APIC"] = APIC(encoding=3, mime=mime, type=3, desc="Cover", data=img_data)
-                except Exception:
-                    pass
-            tags.save(outfile)
+        _write_tags(str(outfile), fmt, title, artist, album, year, genre, track_num, thumbnail_url)
 
         with DOWNLOAD_LOCK:
             DOWNLOAD_JOBS[job_id]["title"] = f"{title} — {artist}"
             DOWNLOAD_JOBS[job_id]["status"] = "importing"
-        # Trigger a scan to pick up the new file
-        scan_existing()
+        process_file(str(outfile))
         with DOWNLOAD_LOCK:
             DOWNLOAD_JOBS[job_id]["status"] = "done"
     except Exception as e:
+        if outfile and outfile.exists():
+            try:
+                outfile.unlink()
+            except Exception:
+                pass
         with DOWNLOAD_LOCK:
             DOWNLOAD_JOBS[job_id]["status"] = "error"
             DOWNLOAD_JOBS[job_id]["error"] = str(e)
@@ -130,6 +216,23 @@ def _make_progress_hook(job_id: str):
 router = APIRouter(tags=["admin"])
 
 AUDIO_EXTS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.aac', '.wma'}
+AUDIO_MAGIC = [
+    b'\x49\x44\x33',     # ID3v2 (MP3)
+    b'\xff\xfb',          # MPEG sync word (MP3 without ID3)
+    b'fLaC',              # FLAC
+    b'OggS',              # OGG
+    b'RIFF',              # WAV
+]
+
+def _is_audio_content(data: bytes) -> bool:
+    if len(data) < 8:
+        return False
+    if data[4:8] == b'ftyp':  # M4A/MP4
+        return True
+    for magic in AUDIO_MAGIC:
+        if data[:len(magic)] == magic:
+            return True
+    return False
 
 _DISK_CACHE = {"bytes": 0, "by_format": {}, "timestamp": 0}
 _DISK_CACHE_TTL = 300
@@ -188,14 +291,26 @@ async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str]
         if ext not in ['.mp3','.flac','.ogg','.m4a','.wav','.aac','.wma']:
             continue
         dest = MUSIC_DIR / Path(f.filename).name
-        content = await f.read()
-        total += len(content)
-        if total > MAX_UPLOAD_SIZE:
-            raise HTTPException(413, f"Upload too large (max {limit_gb:.1f} GB total)")
+        # Stream in 64KB chunks to avoid loading entire file into memory
+        chunks = []
+        first_chunk = True
+        while True:
+            chunk = await f.read(65536)
+            if not chunk:
+                break
+            if first_chunk and not _is_audio_content(chunk):
+                raise HTTPException(415, f"Invalid audio file: {f.filename}")
+            first_chunk = False
+            total += len(chunk)
+            if total > MAX_UPLOAD_SIZE:
+                raise HTTPException(413, f"Upload too large (max {limit_gb:.1f} GB total)")
+            chunks.append(chunk)
         try:
             if dest.exists():
                 dest.unlink()
-            dest.write_bytes(content)
+            with open(dest, "wb") as fh:
+                for c in chunks:
+                    fh.write(c)
             conn = get_connection()
             conn.execute("DELETE FROM tracks WHERE file_path = ?", (str(dest),))
             conn.commit()
@@ -503,13 +618,14 @@ def admin_delete_user(user_id: int, token: Optional[str] = Header(None)):
 @router.post("/api/admin/import-url")
 def import_from_url(body: ImportUrlBody, token: Optional[str] = Header(None)):
     _require_admin(token)
+    _validate_import_url(body.url)
     _cleanup_old_jobs()
     job_id = uuid.uuid4().hex[:12]
     with DOWNLOAD_LOCK:
         if len(DOWNLOAD_JOBS) >= _MAX_DOWNLOAD_JOBS:
             raise HTTPException(503, "Too many download jobs. Wait for some to complete.")
         DOWNLOAD_JOBS[job_id] = {"status": "queued", "progress": 0, "title": None, "error": None}
-    threading.Thread(target=_download_worker, args=(job_id, body.url), daemon=True).start()
+    threading.Thread(target=_download_worker, args=(job_id, body.url, body.format), daemon=True).start()
     return {"job_id": job_id, "status": "queued"}
 
 

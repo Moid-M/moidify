@@ -8,6 +8,7 @@ from routes.deps import (
     _get_user_from_token, _safe_name,
     CreatePlaylistBody, AddTrackBody, ReorderPlaylistBody,
     CreateFolderBody, RenameFolderBody, SetPlaylistFolderBody, RatingBody,
+    ShareAlbumBody, UnshareAlbumBody,
 )
 
 router = APIRouter(tags=["playlists"])
@@ -268,9 +269,9 @@ def get_shared_playlist(token: str):
 # Shared albums
 
 @router.post("/api/albums/share")
-def share_album(body: dict, token: Optional[str] = Header(None)):
-    album = body.get("album", "").strip()
-    artist = body.get("artist", "").strip() or None
+def share_album(body: ShareAlbumBody, token: Optional[str] = Header(None)):
+    album = body.album.strip()
+    artist = body.artist.strip() or None if body.artist else None
     if not album:
         raise HTTPException(400, "Album name required")
     user = _get_user_from_token(token)
@@ -322,9 +323,9 @@ def get_shared_album(token: str):
 
 
 @router.delete("/api/albums/share")
-def unshare_album(body: dict, token: Optional[str] = Header(None)):
-    album = body.get("album", "").strip()
-    artist = body.get("artist", "").strip() or None
+def unshare_album(body: UnshareAlbumBody, token: Optional[str] = Header(None)):
+    album = body.album.strip()
+    artist = body.artist.strip() or None if body.artist else None
     if not album:
         raise HTTPException(400, "Album name required")
     user = _get_user_from_token(token)
