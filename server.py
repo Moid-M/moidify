@@ -94,6 +94,15 @@ def health():
 # Static pages
 @app.get("/setup")
 def setup_page():
+    from database import get_connection
+    conn = get_connection()
+    has_admin = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0] > 0
+    conn.close()
+    if has_admin:
+        return Response(
+            "<html><body><script>window.location.href='/'</script></body></html>",
+            media_type="text/html",
+        )
     return FileResponse(str(STATIC_DIR / "setup.html"))
 
 @app.get("/admin")

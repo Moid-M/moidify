@@ -159,53 +159,8 @@ fi
 # Convert to bytes
 MAX_UPLOAD_SIZE_BYTES=$(python3 -c "print(int(float('$MAX_UPLOAD_SIZE_GB') * 1024 * 1024 * 1024))")
 
-# ─── Admin account prompt ────────────────────────────────────────────────────
-if [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -p "  Admin username [admin]: " ADMIN_USER </dev/tty
-fi
-ADMIN_USER="${ADMIN_USER:-admin}"
-ADMIN_PASS=""
-if [[ $INTERACTIVE -eq 1 ]]; then
-  while true; do
-    read -r -s -p "  Admin password (blank = skip): " ADMIN_PASS </dev/tty
-    echo ""
-    if [[ -z "$ADMIN_PASS" ]]; then
-      warn "No password set — use setup wizard at http://<ip>:$PORT/setup"
-      break
-    fi
-    if [[ ${#ADMIN_PASS} -lt 8 ]]; then
-      err "Password must be at least 8 characters"; continue
-    fi
-    if ! [[ "$ADMIN_PASS" =~ [a-z] ]]; then
-      err "Password must contain a lowercase letter"; continue
-    fi
-    if ! [[ "$ADMIN_PASS" =~ [A-Z] ]]; then
-      err "Password must contain an uppercase letter"; continue
-    fi
-    if ! [[ "$ADMIN_PASS" =~ [0-9] ]]; then
-      err "Password must contain a digit"; continue
-    fi
-    read -r -s -p "  Confirm password: " ADMIN_PASS2 </dev/tty
-    echo ""
-    if [[ "$ADMIN_PASS" == "$ADMIN_PASS2" ]]; then
-      break
-    fi
-    err "Passwords do not match, try again."
-  done
-fi
-if [[ -z "$ADMIN_PASS" ]]; then
-  warn "No password set — use setup wizard at http://<ip>:$PORT/setup"
-  ADMIN_SALT=""; ADMIN_HASH=""
-else
-  ADMIN_SALT="$(python3 -c "import secrets; print(secrets.token_hex(16))")"
-  ADMIN_HASH="$(python3 -c "
-import hashlib, sys
-salt = '$ADMIN_SALT'
-pwd = sys.stdin.readline().strip()
-h = hashlib.pbkdf2_hmac('sha256', pwd.encode(), salt.encode(), 100000)
-print(h.hex())
-" <<< "$ADMIN_PASS")"
-fi
+# ─── Admin account ────────────────────────────────────────────────────────────
+info "Admin account will be created via the web wizard at http://<ip>:$PORT/setup"
 
 # ─── Source files ─────────────────────────────────────────────────────────────
 if [[ -f "$SCRIPT_DIR/server.py" ]]; then
@@ -330,27 +285,6 @@ import sys; sys.path.insert(0, '$APP_DIR')
 from database import init_db; init_db()
 " 2>&1 || warn "Database init had issues (may be fine on first start)"
 chown "$SERVICE_USER":"$SERVICE_USER" "$DATA_DIR/music.db" 2>/dev/null || true
-
-# ─── Create admin user ───────────────────────────────────────────────────────
-if [[ -n "${ADMIN_SALT:-}" && -n "${ADMIN_HASH:-}" ]]; then
-  info "Creating admin user '$ADMIN_USER'..."
-  ADMIN_USER="$ADMIN_USER" ADMIN_HASH="$ADMIN_HASH" ADMIN_SALT="$ADMIN_SALT" "$APP_DIR/venv/bin/python" -c "
-import os, sys; sys.path.insert(0, '$APP_DIR')
-from database import get_connection
-conn = get_connection()
-u = os.environ['ADMIN_USER']
-h = os.environ['ADMIN_HASH']
-s = os.environ['ADMIN_SALT']
-existing = conn.execute('SELECT id FROM users WHERE username = ?', (u,)).fetchone()
-if not existing:
-    conn.execute('INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, 1)', (u, h, s))
-    conn.commit()
-    print('Admin user created.')
-else:
-    print('Admin user already exists, skipping.')
-conn.close()
-" 2>&1 || warn "Failed to create admin user (you can use setup wizard)"
-fi
 
 # ─── Systemd ─────────────────────────────────────────────────────────────────
 sed "s/--port 8000/--port $PORT/" "$APP_DIR/moidify.service" > "$SERVICE_FILE"

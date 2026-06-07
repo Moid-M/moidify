@@ -696,6 +696,11 @@ function escHtml(s) {
   return d.innerHTML;
 }
 
+// Setup redirect — if no admin exists, send to setup wizard
+fetch('/api/setup/status').then(function(r) { return r.json(); }).then(function(d) {
+  if (d.setup_needed) { window.location.href = '/setup'; }
+}).catch(function(){});
+
 var scanPollTimer = null;
 
 async function rescanMusic(clean) {
