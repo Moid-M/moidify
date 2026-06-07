@@ -254,17 +254,12 @@ chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/extra-pkgs" 2>/dev/null || tr
 if ! command -v ffmpeg &>/dev/null && [[ -n "$PKG_MANAGER" ]]; then
   info "Installing ffmpeg..."
   case "$PKG_MANAGER" in
-    apt) FFMPEG_PKG="ffmpeg" ;;
-    dnf) FFMPEG_PKG="ffmpeg" ;;
-    pacman) FFMPEG_PKG="ffmpeg" ;;
-    zypper) FFMPEG_PKG="ffmpeg" ;;
-    apk) FFMPEG_PKG="ffmpeg" ;;
+    apt) DEBIAN_FRONTEND=noninteractive apt install -y ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped (install manually: sudo apt install ffmpeg)" ;;
+    dnf) dnf install -y ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped" ;;
+    pacman) pacman -S --noconfirm ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped" ;;
+    zypper) zypper install -y ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped" ;;
+    apk) apk add ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped" ;;
   esac
-  if $VERBOSE; then
-    $INSTALL_CMD $FFMPEG_PKG && ok "ffmpeg installed." || warn "ffmpeg install failed"
-  else
-    $INSTALL_CMD $FFMPEG_PKG >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install failed"
-  fi
 fi
 
 # ─── Config ──────────────────────────────────────────────────────────────────
