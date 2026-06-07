@@ -8,33 +8,22 @@ CONFIG_DIR="/etc/moidify"
 SERVICE_USER="moidify"
 SERVICE_FILE="/etc/systemd/system/moidify.service"
 PYTHON="python3"
+PORT=8000
+MAX_UPLOAD_SIZE_GB="2.5"
 REPO_URL="https://github.com/Moid-M/moidify"
 GIT_REPO_URL="${REPO_URL}.git"
 
 # ─── Parse flags ─────────────────────────────────────────────────────────────
 VERBOSE=false
-SHOW_VERSION=false
 CLI_MUSIC_DIR=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v|--verbose) VERBOSE=true; shift ;;
-    -V|--version) SHOW_VERSION=true; shift ;;
     --music-dir) CLI_MUSIC_DIR="$2"; shift 2 ;;
     --music-dir=*) CLI_MUSIC_DIR="${1#*=}"; shift ;;
     *) shift ;;
   esac
 done
-
-# Quick version display (no installation)
-if $SHOW_VERSION; then
-  # Try to get version from local copy first, then GitHub
-  if [[ -f "$(dirname "$0")/version.txt" ]]; then
-    cat "$(dirname "$0")/version.txt"
-  else
-    curl -sL "${REPO_URL}/raw/main/version.txt" 2>/dev/null || echo "unknown"
-  fi
-  exit 0
-fi
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -44,9 +33,11 @@ warn()  { echo -e "${YELLOW}!!${NC} $1"; }
 err()   { echo -e "${RED}!!${NC} $1"; }
 
 if $VERBOSE; then
-  LOG=""     # show everything
+  LOG=""
+  REDIR=""
 else
-  LOG="--quiet"  # suppress subcommand output
+  LOG="--quiet"
+  REDIR=">/dev/null 2>&1"
 fi
 
 cleanup() {
@@ -62,13 +53,6 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-INTERACTIVE=0
-if [[ -t 0 ]]; then
-  INTERACTIVE=1
-elif [ -c /dev/tty ] 2>/dev/null; then
-  # stdin is piped but we can still prompt via /dev/tty
-  INTERACTIVE=1
-fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ─── Header ──────────────────────────────────────────────────────────────────
@@ -127,40 +111,13 @@ fi
 install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$APP_DIR" "$DATA_DIR" "$DATA_DIR/music" "$DATA_DIR/covers"
 install -d -o root -g root "$CONFIG_DIR"
 
-# ─── Port ────────────────────────────────────────────────────────────────────
-if [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -p "  Server port [8000]: " PORT </dev/tty
-fi
-PORT="${PORT:-8000}"
-
 # ─── Music dir ───────────────────────────────────────────────────────────────
-if [[ -n "$CLI_MUSIC_DIR" ]]; then
-  MUSIC_DIR_INPUT="$CLI_MUSIC_DIR"
-  info "Using music dir from --music-dir: $MUSIC_DIR_INPUT"
-elif [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -p "  Music folder path [${DATA_DIR}/music]: " MUSIC_DIR_INPUT </dev/tty
-  MUSIC_DIR_INPUT="${MUSIC_DIR_INPUT:-${DATA_DIR}/music}"
-else
-  MUSIC_DIR_INPUT="${DATA_DIR}/music"
-fi
-MUSIC_DIR_INPUT="${MUSIC_DIR_INPUT/#\~/$HOME}"
+MUSIC_DIR_INPUT="${CLI_MUSIC_DIR:-${DATA_DIR}/music}"
 if [[ ! -d "$MUSIC_DIR_INPUT" ]]; then
   install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$MUSIC_DIR_INPUT"
 else
   chown "$SERVICE_USER":"$SERVICE_USER" "$MUSIC_DIR_INPUT"
 fi
-
-# ─── Upload size limit ────────────────────────────────────────────────────────
-MAX_UPLOAD_SIZE_GB="2.5"
-if [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -p "  Max upload size in GB [2.5]: " MAX_UPLOAD_SIZE_GB_INPUT </dev/tty
-  MAX_UPLOAD_SIZE_GB="${MAX_UPLOAD_SIZE_GB_INPUT:-$MAX_UPLOAD_SIZE_GB}"
-fi
-# Convert to bytes
-MAX_UPLOAD_SIZE_BYTES=$(python3 -c "print(int(float('$MAX_UPLOAD_SIZE_GB') * 1024 * 1024 * 1024))")
-
-# ─── Admin account ────────────────────────────────────────────────────────────
-info "Admin account will be created via the web wizard at http://<ip>:$PORT/setup"
 
 # ─── Source files ─────────────────────────────────────────────────────────────
 if [[ -f "$SCRIPT_DIR/server.py" ]]; then
@@ -263,6 +220,7 @@ if ! command -v ffmpeg &>/dev/null && [[ -n "$PKG_MANAGER" ]]; then
 fi
 
 # ─── Config ──────────────────────────────────────────────────────────────────
+MAX_UPLOAD_SIZE_BYTES=$(python3 -c "print(int(float('$MAX_UPLOAD_SIZE_GB') * 1024 * 1024 * 1024))")
 cat > "$CONFIG_DIR/config.json" <<CONF
 {
   "music_dir": "$MUSIC_DIR_INPUT",
@@ -309,7 +267,6 @@ echo -e "  ${GREEN}${APP_NAME} v${VERSION}${NC} running at:"
 echo -e "  ${CYAN}http://${IP}:${PORT}${NC}"
 echo ""
 echo -e "  ${YELLOW}Music folder:${NC}  $MUSIC_DIR_INPUT"
-echo -e "  ${YELLOW}Upload limit:${NC}  ${MAX_UPLOAD_SIZE_GB} GB"
 echo -e "  ${YELLOW}Config:${NC}       $CONFIG_DIR/config.json"
 echo -e "  ${YELLOW}Data:${NC}         $DATA_DIR"
 echo -e "  ${YELLOW}Logs:${NC}         journalctl -u moidify.service -f"
@@ -327,8 +284,8 @@ echo -e "    reset-password: moidify reset-password"
 echo -e "    download: moidify download <url>"
 echo -e "    uninstall: ${APP_DIR}/uninstall.sh"
 echo ""
-echo -e "  Drop music into your folder — files appear automatically."
-echo -e "  Open setup wizard: ${CYAN}http://${IP}:${PORT}/setup${NC}"
+echo -e "  ${YELLOW}Next:${NC} Open the setup wizard to create your admin account:"
+echo -e "  ${CYAN}http://${IP}:${PORT}/setup${NC}"
 echo ""
 
 if ! $VERBOSE; then

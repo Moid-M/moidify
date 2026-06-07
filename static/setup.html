@@ -73,6 +73,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <input type="password" id="setup-password" placeholder="At least 3 characters">
       <label>Confirm Password</label>
       <input type="password" id="setup-password-confirm" placeholder="Repeat password">
+      <label>Music directory</label>
+      <input type="text" id="setup-music-dir" value="/var/lib/moidify/music" autocomplete="off">
+      <div class="hint">Path where your music files are stored (e.g. /var/lib/moidify/music)</div>
       <label>Max upload size (GB)</label>
       <input type="number" id="setup-max-upload" value="2.5" min="0.1" step="0.1">
       <div class="hint">Largest single file size allowed when uploading through the browser (default: 2.5 GB)</div>
@@ -164,6 +167,7 @@ async function createAdmin() {
       body: JSON.stringify({
         username: username,
         password: password,
+        music_dir: document.getElementById('setup-music-dir').value.trim(),
         max_upload_size: Math.round(parseFloat(document.getElementById('setup-max-upload').value || '2.5') * 1024 * 1024 * 1024),
       }),
     });
