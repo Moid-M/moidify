@@ -342,43 +342,16 @@ def scan_existing(clean=False):
         count = 0
 
         if clean:
-            db_paths = set(
-                row[0] for row in conn.execute("SELECT file_path FROM tracks").fetchall()
-            )
-            existing_paths = set()
-            for root, _, files in os.walk(str(MUSIC_DIR)):
-                for f in files:
-                    fp = os.path.join(root, f)
-                    if Path(f).suffix.lower() in AUDIO_EXTENSIONS:
-                        existing_paths.add(fp)
-
-            orphaned = db_paths - existing_paths
-            for fp in orphaned:
-                conn.execute("DELETE FROM tracks WHERE file_path = ?", (fp,))
-                with SCAN_LOCK:
-                    SCAN_STATUS["files_found"] += 1
-                    SCAN_STATUS["files_imported"] += 1
-            if orphaned:
-                conn.commit()
-
-            stale_covers = set()
-            used_covers = set(
-                row[0] for row in conn.execute(
-                    "SELECT cover_hash FROM tracks WHERE cover_hash IS NOT NULL"
-                ).fetchall() if row[0]
-            )
+            conn.execute("DELETE FROM playlist_tracks")
+            conn.execute("DELETE FROM favorites")
+            conn.execute("DELETE FROM tracks")
             if COVERS_DIR.exists():
                 for cf in COVERS_DIR.iterdir():
-                    if cf.is_file() and cf.stem not in used_covers:
-                        stale_covers.add(cf)
-                for cf in stale_covers:
                     try:
                         cf.unlink()
                     except Exception:
                         pass
-
-            existing_paths = existing_paths - orphaned
-            SCAN_STATUS["files_found"] = len(existing_paths)
+            conn.commit()
             SCAN_STATUS["files_imported"] = 0
 
         try:
@@ -386,9 +359,8 @@ def scan_existing(clean=False):
                 for f in files:
                     if Path(f).suffix.lower() not in AUDIO_EXTENSIONS:
                         continue
-                    if not clean:
-                        with SCAN_LOCK:
-                            SCAN_STATUS["files_found"] += 1
+                    with SCAN_LOCK:
+                        SCAN_STATUS["files_found"] += 1
                     was = len(SCAN_STATUS["errors"])
                     process_file(os.path.join(root, f), conn=conn, force=clean)
                     with SCAN_LOCK:

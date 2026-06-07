@@ -285,44 +285,30 @@ else
 fi
 ok "Python dependencies installed."
 
-# ─── Optional: yt-dlp (for URL imports) ───────────────────────────────────────
-YTDLP_SKIP=false
-if [[ $INTERACTIVE -eq 1 ]]; then
-  read -r -p "  Install yt-dlp for YouTube/SoundCloud imports? [Y/n]: " YTDLP_CHOICE </dev/tty
-  if [[ "$YTDLP_CHOICE" =~ ^[Nn] ]]; then YTDLP_SKIP=true; fi
+# ─── yt-dlp (for URL imports) ────────────────────────────────────────────────
+info "Installing yt-dlp..."
+mkdir -p "$APP_DIR/extra-pkgs"
+if $VERBOSE; then
+  "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp && ok "yt-dlp installed." || warn "yt-dlp install failed"
+else
+  "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp >/dev/null 2>&1 && ok "yt-dlp installed." || warn "yt-dlp install failed"
 fi
-if ! $YTDLP_SKIP; then
-  info "Installing yt-dlp..."
-  mkdir -p "$APP_DIR/extra-pkgs"
-  if $VERBOSE; then
-    "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp && ok "yt-dlp installed." || warn "yt-dlp install failed"
-  else
-    "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp >/dev/null 2>&1 && ok "yt-dlp installed." || warn "yt-dlp install failed"
-  fi
-  chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/extra-pkgs" 2>/dev/null || true
-fi
+chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/extra-pkgs" 2>/dev/null || true
 
-# ─── Optional: ffmpeg (for audio transcoding) ────────────────────────────────
-if ! command -v ffmpeg &>/dev/null; then
-  FFMPEG_SKIP=false
-  if [[ $INTERACTIVE -eq 1 ]]; then
-    read -r -p "  Install ffmpeg for audio transcoding? [Y/n]: " FFMPEG_CHOICE </dev/tty
-    if [[ "$FFMPEG_CHOICE" =~ ^[Nn] ]]; then FFMPEG_SKIP=true; fi
-  fi
-  if ! $FFMPEG_SKIP && [[ -n "$PKG_MANAGER" ]]; then
-    info "Installing ffmpeg..."
-    case "$PKG_MANAGER" in
-      apt) FFMPEG_PKG="ffmpeg" ;;
-      dnf) FFMPEG_PKG="ffmpeg" ;;
-      pacman) FFMPEG_PKG="ffmpeg" ;;
-      zypper) FFMPEG_PKG="ffmpeg" ;;
-      apk) FFMPEG_PKG="ffmpeg" ;;
-    esac
-    if $VERBOSE; then
-      $INSTALL_CMD $FFMPEG_PKG && ok "ffmpeg installed." || warn "ffmpeg install failed"
-    else
-      $INSTALL_CMD $FFMPEG_PKG >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install failed"
-    fi
+# ─── ffmpeg (for audio transcoding) ──────────────────────────────────────────
+if ! command -v ffmpeg &>/dev/null && [[ -n "$PKG_MANAGER" ]]; then
+  info "Installing ffmpeg..."
+  case "$PKG_MANAGER" in
+    apt) FFMPEG_PKG="ffmpeg" ;;
+    dnf) FFMPEG_PKG="ffmpeg" ;;
+    pacman) FFMPEG_PKG="ffmpeg" ;;
+    zypper) FFMPEG_PKG="ffmpeg" ;;
+    apk) FFMPEG_PKG="ffmpeg" ;;
+  esac
+  if $VERBOSE; then
+    $INSTALL_CMD $FFMPEG_PKG && ok "ffmpeg installed." || warn "ffmpeg install failed"
+  else
+    $INSTALL_CMD $FFMPEG_PKG >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install failed"
   fi
 fi
 

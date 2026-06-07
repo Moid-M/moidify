@@ -64,6 +64,15 @@ def _stream_file(path: Path, quality: str):
                 proc.wait()
 
 
+def _fallback_stream(path: Path):
+    with open(str(path), "rb") as f:
+        while True:
+            chunk = f.read(65536)
+            if not chunk:
+                break
+            yield chunk
+
+
 def _media_type_for(path: Path, quality: str) -> str:
     if quality != "original" and quality in TRANSCODE_MAP and TRANSCODE_MAP[quality]["codec"] == "libopus":
         return "audio/ogg"
@@ -102,7 +111,23 @@ def stream_track(track_id: int, quality: Optional[str] = Query("high")):
 
         def stream_with_cleanup():
             try:
-                yield from _stream_file(path, quality)
+                proc = _transcode_stream(str(path), quality)
+                if proc:
+                    first = proc.stdout.read(65536)
+                    if first:
+                        yield first
+                        for chunk in iter(lambda: proc.stdout.read(65536), b""):
+                            yield chunk
+                    else:
+                        yield from _fallback_stream(path)
+                    proc.kill()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait()
+                else:
+                    yield from _fallback_stream(path)
             finally:
                 with _transcode_lock:
                     global _active_transcodes
