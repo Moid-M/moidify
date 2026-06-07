@@ -68,9 +68,82 @@ def _fetch_cover(thumbnail_url):
     except Exception:
         return None
 
-def _write_tags(outfile, fmt, title, artist, album, year, genre, track_num, thumbnail_url):
+def _caption_to_text(data: str, fmt: str) -> str:
+    """Convert YouTube caption format to plain text."""
+    import re
+    lines = []
+
+    if fmt == 'json3':
+        import json
+        try:
+            events = json.loads(data).get('events', [])
+            for ev in events:
+                segs = ev.get('segs', [])
+                for s in segs:
+                    t = s.get('utf8', '').strip()
+                    if t:
+                        lines.append(t)
+        except Exception:
+            pass
+        return '\n'.join(lines)
+
+    raw = data.split('\n')
+    for line in raw:
+        s = line.strip()
+        if not s:
+            continue
+        if s.startswith('WEBVTT') or s.startswith('Kind:') or s.startswith('Language:'):
+            continue
+        if '-->' in s:
+            continue
+        if re.match(r'^\d+$', s):
+            continue
+        if re.match(r'^\d{2}:\d{2}:\d{2}', s):
+            continue
+        # Remove VTT tags like <c> </c>
+        s = re.sub(r'<[^>]+>', '', s)
+        # Unescape HTML entities
+        s = s.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
+        lines.append(s)
+    return '\n'.join(lines)
+
+def _fetch_yt_lyrics(info: dict) -> str:
+    """Extract lyrics from yt-dlp info dict: captions/subtitles, fallback to description."""
+    import urllib.request
+
+    captions = info.get('subtitles') or info.get('automatic_captions') or {}
+    if captions:
+        for lang in ('en', 'en-US', 'en-GB'):
+            if lang in captions:
+                tracks = captions[lang]
+                break
+        else:
+            tracks = list(captions.values())[0] if captions else []
+        if tracks:
+            for pref in ('vtt', 'srt', 'json3', 'srv1', 'srv2', 'srv3'):
+                for t in tracks:
+                    if t.get('ext') == pref and t.get('url'):
+                        try:
+                            req = urllib.request.Request(t['url'], headers={"User-Agent": "Mozilla/5.0"})
+                            with urllib.request.urlopen(req, timeout=15) as resp:
+                                text = resp.read().decode('utf-8', errors='replace')
+                            result = _caption_to_text(text, pref)
+                            if result.strip():
+                                return result
+                        except Exception:
+                            continue
+
+    desc = info.get('description', '')
+    if desc:
+        desc_lines = [l.strip() for l in desc.split('\n') if l.strip() and not l.strip().startswith('http')]
+        if len(desc_lines) >= 4:
+            return '\n'.join(desc_lines)
+
+    return ""
+
+def _write_tags(outfile, fmt, title, artist, album, year, genre, track_num, thumbnail_url, lyrics=""):
     if fmt == 'mp3':
-        from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, TDRC, TCON, TRCK
+        from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, TDRC, TCON, TRCK, USLT
         try:
             tags = ID3(outfile)
         except Exception:
@@ -85,6 +158,8 @@ def _write_tags(outfile, fmt, title, artist, album, year, genre, track_num, thum
         if cover:
             mime, data = cover
             tags["APIC"] = APIC(encoding=3, mime=mime, type=3, desc="Cover", data=data)
+        if lyrics:
+            tags["USLT"] = USLT(encoding=3, lang='eng', desc='', text=lyrics)
         tags.save(outfile)
 
     elif fmt in ('flac', 'opus'):
@@ -98,6 +173,8 @@ def _write_tags(outfile, fmt, title, artist, album, year, genre, track_num, thum
         if year: audio['date'] = [year]
         if genre: audio['genre'] = [genre]
         if track_num: audio['tracknumber'] = [track_num]
+        if lyrics:
+            audio['lyrics'] = [lyrics]
         cover = _fetch_cover(thumbnail_url)
         if cover:
             mime, data = cover
@@ -126,6 +203,8 @@ def _write_tags(outfile, fmt, title, artist, album, year, genre, track_num, thum
                 audio['trkn'] = [(int(track_num), 0)]
             except ValueError:
                 pass
+        if lyrics:
+            audio['\xa9lyr'] = lyrics
         cover = _fetch_cover(thumbnail_url)
         if cover:
             mime, data = cover
@@ -176,6 +255,7 @@ def _download_worker(job_id: str, url: str, fmt: str = "mp3"):
             genre = info.get("genre") or ""
             track_num = str(info.get("track_number") or info.get("playlist_index") or "")
             thumbnail_url = info.get("thumbnail") or ""
+            lyrics = _fetch_yt_lyrics(info)
 
         if not outfile.exists():
             for f in MUSIC_DIR.iterdir():
@@ -185,7 +265,7 @@ def _download_worker(job_id: str, url: str, fmt: str = "mp3"):
             if not outfile or not outfile.exists():
                 raise FileNotFoundError(f"Downloaded file not found for video ID {video_id}")
 
-        _write_tags(str(outfile), fmt, title, artist, album, year, genre, track_num, thumbnail_url)
+        _write_tags(str(outfile), fmt, title, artist, album, year, genre, track_num, thumbnail_url, lyrics)
 
         with DOWNLOAD_LOCK:
             DOWNLOAD_JOBS[job_id]["title"] = f"{title} — {artist}"
