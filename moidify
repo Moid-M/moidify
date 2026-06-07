@@ -52,10 +52,12 @@ help() {
   echo ""
   echo -e "${BOLD}Import:${NC}"
   echo -e "  ${GREEN}download${NC}  Download a song/video by URL"
+  echo -e "           ${YELLOW}[--format mp3|flac|opus|aac|wav]${NC}"
   echo ""
   echo -e "${BOLD}Maintenance:${NC}"
   echo -e "  ${GREEN}reload${NC}    Reload (restart) service"
   echo -e "  ${GREEN}update${NC}    Run update script"
+  echo -e "  ${GREEN}reset-password${NC}  Reset admin password"
   echo ""
   echo -e "${BOLD}Options:${NC}"
   echo -e "  ${GREEN}-h, --help${NC}     Show this help"
@@ -66,6 +68,7 @@ help() {
   echo -e "  moidify logs"
   echo -e "  moidify config"
   echo -e "  moidify download ${YELLOW}<url>${NC}"
+  echo -e "  moidify reset-password"
 }
 
 url() {
@@ -193,16 +196,95 @@ case "${1:-}" in
       exit 1
     fi
     ;;
+  reset-password)
+    if [[ $EUID -ne 0 ]]; then
+      err "This command must be run as root (sudo)."
+      exit 1
+    fi
+    DB_PATH=$(python3 -c "
+import json
+try:
+    with open('$CONFIG_DIR/config.json') as f:
+        cfg = json.load(f)
+    print(cfg.get('db_path', '$DATA_DIR/music.db'))
+except Exception:
+    print('$DATA_DIR/music.db')
+" 2>/dev/null || echo "$DATA_DIR/music.db")
+    if [[ ! -f "$DB_PATH" ]]; then
+      err "Database not found at $DB_PATH"
+      exit 1
+    fi
+    echo ""
+    info "Reset admin password for Moidify"
+    echo ""
+    while true; do
+      read -r -s -p "  New admin password: " ADMIN_PASS </dev/tty
+      echo ""
+      if [[ -z "$ADMIN_PASS" ]]; then
+        err "Password cannot be empty"; continue
+      fi
+      if [[ ${#ADMIN_PASS} -lt 8 ]]; then
+        err "Password must be at least 8 characters"; continue
+      fi
+      if ! [[ "$ADMIN_PASS" =~ [a-z] ]]; then
+        err "Password must contain a lowercase letter"; continue
+      fi
+      if ! [[ "$ADMIN_PASS" =~ [A-Z] ]]; then
+        err "Password must contain an uppercase letter"; continue
+      fi
+      if ! [[ "$ADMIN_PASS" =~ [0-9] ]]; then
+        err "Password must contain a digit"; continue
+      fi
+      read -r -s -p "  Confirm password: " ADMIN_PASS2 </dev/tty
+      echo ""
+      if [[ "$ADMIN_PASS" == "$ADMIN_PASS2" ]]; then
+        break
+      fi
+      err "Passwords do not match, try again."
+    done
+    NEW_SALT=$(python3 -c "import secrets; print(secrets.token_hex(16))")
+    NEW_HASH=$(DB_PATH="$DB_PATH" NEW_SALT="$NEW_SALT" NEW_PASS="$ADMIN_PASS" python3 -c "
+import hashlib, os
+p = os.environ['NEW_PASS']
+s = os.environ['NEW_SALT']
+print(hashlib.pbkdf2_hmac('sha256', p.encode(), s.encode(), 600000).hex())
+")
+    DB_PATH="$DB_PATH" NEW_HASH="$NEW_HASH" NEW_SALT="$NEW_SALT" python3 -c "
+import sqlite3, sys, os
+
+conn = sqlite3.connect(os.environ['DB_PATH'])
+admin = conn.execute('SELECT id, username FROM users WHERE is_admin = 1 LIMIT 1').fetchone()
+if not admin:
+    print('No admin user found in database.')
+    sys.exit(1)
+
+conn.execute('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?',
+    (os.environ['NEW_HASH'], os.environ['NEW_SALT'], admin[0]))
+conn.commit()
+conn.close()
+print(f'Updated password for admin user \"{admin[1]}\" (id={admin[0]})')
+"
+    ok "Admin password reset successfully."
+    ;;
   download)
-    # Join all remaining args in case URL has unquoted & or other shell metacharacters
+    # Parse --format flag and collect URL
+    DOWNLOAD_FMT="mp3"
     URL=""
+    NEXT_IS_FMT=false
     for arg in "${@:2}"; do
+      if $NEXT_IS_FMT; then DOWNLOAD_FMT="$arg"; NEXT_IS_FMT=false; continue; fi
+      if [[ "$arg" == "--format" ]]; then NEXT_IS_FMT=true; continue; fi
+      if [[ "$arg" == --format=* ]]; then DOWNLOAD_FMT="${arg#*=}"; continue; fi
       URL="${URL}${URL:+ }${arg}"
     done
     if [[ -z "$URL" ]]; then
-      err "Usage: moidify download <url>"
+      err "Usage: moidify download [--format mp3|flac|opus|aac|wav] <url>"
       echo ""
       echo "Download a song from YouTube/SoundCloud/etc and import it into your library."
+      echo ""
+      echo -e "${YELLOW}Options:${NC}"
+      echo -e "  ${GREEN}--format${NC}  Output format (default: mp3)"
+      echo -e "              ${YELLOW}mp3, flac, opus, aac, wav${NC}"
       echo ""
       echo -e "${YELLOW}Tip:${NC} Quote the URL if it contains ${YELLOW}&${NC} or other special characters:"
       echo -e "  moidify download ${YELLOW}'${NC}https://...${YELLOW}'${NC}"
@@ -229,8 +311,8 @@ case "${1:-}" in
       chmod 600 "$TOKEN_FILE"
       ok "Logged in. Token cached."
     fi
-    info "Submitting download: $URL"
-    JOB=$(curl -s http://localhost:${SERVER_PORT}/api/admin/import-url -X POST -H 'Content-Type: application/json' -H "token: $TOKEN" -d "{\"url\":\"$URL\"}" 2>/dev/null)
+    info "Submitting download: $URL (format: $DOWNLOAD_FMT)"
+    JOB=$(curl -s http://localhost:${SERVER_PORT}/api/admin/import-url -X POST -H 'Content-Type: application/json' -H "token: $TOKEN" -d "{\"url\":\"$URL\",\"format\":\"$DOWNLOAD_FMT\"}" 2>/dev/null)
     JOB_ID=$(echo "$JOB" | python3 -c "import sys,json; print(json.load(sys.stdin).get('job_id',''))" 2>/dev/null || echo "")
     if [[ -z "$JOB_ID" ]]; then
       err "Failed to submit download. Response: $JOB"
