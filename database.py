@@ -169,7 +169,6 @@ def init_db():
         "ALTER TABLE users ADD COLUMN failed_attempts INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN locked_until INTEGER DEFAULT NULL",
         "ALTER TABLE tracks ADD COLUMN play_count INTEGER DEFAULT 0",
-        "ALTER TABLE tracks ADD COLUMN rating INTEGER DEFAULT 0",
         "ALTER TABLE tracks ADD COLUMN disc_number INTEGER DEFAULT 1",
         "ALTER TABLE tracks ADD COLUMN album_artist TEXT DEFAULT NULL",
         "ALTER TABLE tracks ADD COLUMN lyrics TEXT DEFAULT NULL",

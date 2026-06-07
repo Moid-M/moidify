@@ -33,18 +33,3 @@ body.light-mode #context-menu { box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
 .context-menu-item .cmi-icon svg { width: 16px; height: 16px; display: block; }
 .context-menu-divider { height: 1px; background: var(--player-border); margin: 4px 0; }
 
-/* ---- Context menu rating stars ---- */
-.context-menu-rating {
-  display: flex;
-  gap: 2px;
-  padding: 6px 14px 10px;
-  justify-content: center;
-}
-.cm-rating-star {
-  font-size: 18px;
-  cursor: pointer;
-  color: var(--text-muted);
-  transition: color 0.15s, transform 0.1s;
-}
-.cm-rating-star.filled { color: var(--accent); }
-.cm-rating-star:hover { color: var(--accent-hover); transform: scale(1.2); }

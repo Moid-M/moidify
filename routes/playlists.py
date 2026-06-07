@@ -7,7 +7,7 @@ from database import get_connection
 from routes.deps import (
     _get_user_from_token, _safe_name,
     CreatePlaylistBody, AddTrackBody, ReorderPlaylistBody,
-    CreateFolderBody, RenameFolderBody, SetPlaylistFolderBody, RatingBody,
+    CreateFolderBody, RenameFolderBody, SetPlaylistFolderBody,
     ShareAlbumBody, UnshareAlbumBody,
 )
 
@@ -516,7 +516,7 @@ def check_favorite(track_id: int, token: Optional[str] = Header(None)):
     return {"favorite": row is not None}
 
 
-# Play count & rating
+# Play count
 
 @router.post("/api/play/{track_id}")
 def increment_play_count(track_id: int):

@@ -9,12 +9,6 @@ function showAlbumContextMenu(event, album) {
   html += '<div class="context-menu-divider"></div>';
   if (album.artist) html += '<div class="context-menu-item" data-action="album-go-artist"><span class="cmi-icon">'+iconArtist()+'</span> Go to Artist</div>';
   html += '<div class="context-menu-item" data-action="album-download"><span class="cmi-icon">'+iconDownload()+'</span> Download Album</div>';
-  html += '<div class="context-menu-divider"></div>';
-  html += '<div class="context-menu-item" style="cursor:default;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px;">Rate All Tracks</div>';
-  for (var ari = 1; ari <= 5; ari++) {
-    html += '<div class="context-menu-item" data-action="album-rate" data-rating="'+ari+'"><span class="cmi-icon" style="color:var(--accent);">★</span> '+ari+' Star'+(ari>1?'s':'')+'</div>';
-  }
-
   menu.innerHTML = html;
   menu.style.display = 'block';
   var mw = Math.min(260, menu.offsetWidth||220);
@@ -54,21 +48,6 @@ function showAlbumContextMenu(event, album) {
       } else if (action === 'album-download') {
         hideContextMenu();
         showDownloadMenu(e.clientX, e.clientY, 'album', {album: album.album, artist: album.artist});
-      } else if (action === 'album-rate') {
-        var rateVal = parseInt(this.dataset.rating);
-        apiJson('/api/albums/tracks?album='+encodeURIComponent(album.album)+(album.artist?'&artist='+encodeURIComponent(album.artist):'')).then(function(tracks) {
-          var done = 0;
-          tracks.forEach(function(t) {
-            api('/api/tracks/'+t.id+'/rating', { method:'PUT', body:{ rating: rateVal } }).then(function() {
-              done++;
-              if (done === tracks.length) {
-                if (state.currentView === 'album' && state.currentData && state.currentData.album === album.album) {
-                  navigate('album', state.currentData);
-                }
-              }
-            }).catch(function(){ done++; });
-          });
-        });
       }
       hideContextMenu();
     });
@@ -152,15 +131,6 @@ function showContextMenu(event, track, queue, index) {
   }
   html += '<div class="context-menu-item" data-action="share-track"><span class="cmi-icon">'+iconShare()+'</span> Copy Track Link</div>';
 
-  html += '<div class="context-menu-divider"></div>';
-  var curRating = track.rating || 0;
-  html += '<div class="context-menu-item" style="cursor:default;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:1px;">Rate</div>';
-  html += '<div class="context-menu-rating" data-track="'+track.id+'">';
-  for (var ri = 1; ri <= 5; ri++) {
-    html += '<span class="cm-rating-star'+(ri<=curRating?' filled':'')+'" data-rating="'+ri+'">'+(ri<=curRating?'★':'☆')+'</span>';
-  }
-  html += '</div>';
-
   if (queue===state.queue && state.currentIndex>=0 && index>state.currentIndex) {
     html += '<div class="context-menu-divider"></div>';
     html += '<div class="context-menu-item" data-action="remove-queue" data-qi="'+index+'"><span class="cmi-icon">'+iconClose()+'</span> Remove from Queue</div>';
@@ -200,40 +170,6 @@ function showContextMenu(event, track, queue, index) {
       else if (action==='download') { hideContextMenu(); showDownloadMenu(x, y, 'track', {id: track.id, title: track.title}); return; }
       else if (action==='download-album') { hideContextMenu(); showDownloadMenu(x, y, 'album', {album: track.album, artist: track.artist}); return; }
       else if (action==='share-track') { copyTrackLink(track); }
-      hideContextMenu();
-    });
-  });
-  qsa('.cm-rating-star', menu).forEach(function(el) {
-    el.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var newRating = parseInt(this.dataset.rating);
-      var currentRating = track.rating || 0;
-      var finalRating = newRating === currentRating ? 0 : newRating;
-      track.rating = finalRating;
-      api('/api/tracks/'+track.id+'/rating', { method:'PUT', body:{ rating: finalRating } }).then(function() {
-        qsa('.cm-rating-star', menu).forEach(function(st) {
-          var r = parseInt(st.dataset.rating);
-          st.textContent = r <= finalRating ? '★' : '☆';
-          st.classList.toggle('filled', r <= finalRating);
-        });
-        var row = qs('[data-track-id="'+track.id+'"]');
-        if (row) {
-          qsa('.star-rating-star', row).forEach(function(st) {
-            var r = parseInt(st.dataset.rating);
-            st.textContent = r <= finalRating ? '★' : '☆';
-            st.classList.toggle('filled', r <= finalRating);
-          });
-        }
-        var favRow = qs('.fav-btn[data-track="'+track.id+'"]');
-        if (favRow && favRow.closest('.track-row')) {
-          var row2 = favRow.closest('.track-row');
-          qsa('.star-rating-star', row2).forEach(function(st) {
-            var r = parseInt(st.dataset.rating);
-            st.textContent = r <= finalRating ? '★' : '☆';
-            st.classList.toggle('filled', r <= finalRating);
-          });
-        }
-      }).catch(function() { track.rating = currentRating; });
       hideContextMenu();
     });
   });

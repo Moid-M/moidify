@@ -216,9 +216,6 @@ class LoginBody(BaseModel):
     username: str
     password: str
 
-class RatingBody(BaseModel):
-    rating: int
-
 class CreatePlaylistBody(BaseModel):
     name: str
 

@@ -235,7 +235,6 @@ body.sidebar-open #sidebar {
   }
   .track-header .sortable[data-sort="artist"],
   .track-header .sortable[data-sort="album"],
-  .track-header .sortable[data-sort="rating"],
   .track-header > span:last-child {
     display: none;
   }
@@ -253,8 +252,7 @@ body.sidebar-open #sidebar {
   .track-row .track-cover { width: 24px; height: 24px; flex-shrink: 0; }
   .track-row .track-title { flex: 1; min-width: 0; }
   .track-row .track-artist,
-  .track-row .track-album,
-  .track-row .track-rating { display: none; }
+  .track-row .track-album { display: none; }
   .track-row .track-dur { flex-shrink: 0; font-size: 11px; }
 
   /* --- Album grid --- */

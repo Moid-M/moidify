@@ -47,18 +47,12 @@ function createTrackRow(track, index, queue) {
   if (state.selectedTrackIds.indexOf(track.id) !== -1) row.classList.add('selected');
   var dur = formatTime(track.duration);
   var isFav = state._favedFlag||false;
-  var rating = track.rating || 0;
-  var stars = '';
-  for (var s = 1; s <= 5; s++) {
-    stars += '<span class="star-rating-star'+(s<=rating?' filled':'')+'" data-rating="'+s+'">'+(s<=rating?'\u2605':'\u2606')+'</span>';
-  }
   var numLabel = (track.disc_number && track.disc_number > 1) ? (track.disc_number+'-'+(track.track_number||(index+1))) : ((track.track_number||0) > 0 ? track.track_number : (index+1));
   row.innerHTML = '<span class="track-num">'+numLabel+'</span>'+
     (state.showTrackCovers ? '<img class="track-cover" src="/api/cover/'+track.id+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '')+
     '<span class="track-title">'+esc(track.title)+'</span>'+
     '<span class="track-artist clickable" data-navigate-artist="'+escAttr(track.artist||'')+'">'+esc(track.artist||'Unknown')+'</span>'+
     '<span class="track-album clickable" data-navigate-album="'+escAttr(track.album||'')+'" data-navigate-artist="'+escAttr(track.artist||'')+'">'+esc(track.album||'')+'</span>'+
-    '<span class="track-rating">'+stars+'</span>'+
     '<span class="track-dur">'+dur+'</span>'+
     '';
   row.addEventListener('click',function(e){
@@ -76,22 +70,6 @@ function createTrackRow(track, index, queue) {
   row.addEventListener('dragstart', function(e) { e.dataTransfer.setData('text/plain', String(track.id)); e.dataTransfer.effectAllowed = 'copy'; row.classList.add('dragging'); });
   row.addEventListener('dragend', function() { row.classList.remove('dragging'); });
   setupLongPress(row, function(e) { showContextMenu({ clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY }, track, queue, index); });
-  qsa('.star-rating-star', row).forEach(function(el) {
-    el.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var newRating = parseInt(this.dataset.rating);
-      var currentRating = track.rating || 0;
-      var finalRating = newRating === currentRating ? 0 : newRating;
-      track.rating = finalRating;
-      api('/api/tracks/'+track.id+'/rating', { method:'PUT', body:{ rating: finalRating } }).then(function() {
-        qsa('.star-rating-star', row).forEach(function(st) {
-          var r = parseInt(st.dataset.rating);
-          st.textContent = r <= finalRating ? '\u2605' : '\u2606';
-          st.classList.toggle('filled', r <= finalRating);
-        });
-      }).catch(function() { track.rating = currentRating; });
-    });
-  });
   return row;
 }
 
@@ -102,7 +80,6 @@ function trackHeaderHTML() {
     '<span class="sortable" data-sort="title">Title<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="artist">Artist<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="album">Album<span class="sort-indicator"></span></span>'+
-    '<span class="sortable" data-sort="rating">Rating<span class="sort-indicator"></span></span>'+
     '<span class="sortable" data-sort="duration">Duration<span class="sort-indicator"></span></span>'+
     '</div></div>';
 }
@@ -116,7 +93,6 @@ function sortTracks(tracks, field, dir) {
       case 'title': va = (a.title||'').toLowerCase(); vb = (b.title||'').toLowerCase(); break;
       case 'artist': va = (a.artist||'').toLowerCase(); vb = (b.artist||'').toLowerCase(); break;
       case 'album': va = (a.album||'').toLowerCase(); vb = (b.album||'').toLowerCase(); break;
-      case 'rating': va = a.rating || 0; vb = b.rating || 0; break;
       case 'duration': va = a.duration || 0; vb = b.duration || 0; break;
       default: return 0;
     }

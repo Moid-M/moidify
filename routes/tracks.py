@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 
 from database import get_connection
 from config import COVERS_DIR
-from routes.deps import _normalize, _get_user_from_token, _fetch_lyrics_from_lrclib, RatingBody, UpdateLyricsBody
+from routes.deps import _normalize, _get_user_from_token, _fetch_lyrics_from_lrclib, UpdateLyricsBody
 
 router = APIRouter(tags=["tracks"])
 
@@ -379,30 +379,6 @@ def home_feed(token: Optional[str] = Header(None)):
         "recommended_artists": [dict(r) for r in recommended_artists],
         "playlists": [dict(r) for r in playlists],
     }
-
-
-@router.get("/api/tracks/{track_id}/rating")
-def get_track_rating(track_id: int):
-    conn = get_connection()
-    row = conn.execute("SELECT rating FROM tracks WHERE id = ?", (track_id,)).fetchone()
-    conn.close()
-    if row is None:
-        raise HTTPException(404, "Track not found")
-    return {"rating": row["rating"] or 0}
-
-
-@router.put("/api/tracks/{track_id}/rating")
-def set_track_rating(track_id: int, body: RatingBody, token: Optional[str] = Header(None)):
-    user = _get_user_from_token(token)
-    if user is None:
-        raise HTTPException(401, "Login required")
-    if body.rating < 0 or body.rating > 5:
-        raise HTTPException(400, "Rating must be 0-5")
-    conn = get_connection()
-    conn.execute("UPDATE tracks SET rating = ? WHERE id = ?", (body.rating, track_id))
-    conn.commit()
-    conn.close()
-    return {"ok": True, "rating": body.rating}
 
 
 @router.get("/api/duplicates")

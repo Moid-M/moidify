@@ -364,7 +364,7 @@ moidify/
 │   ├── __init__.py
 │   ├── deps.py               # Shared utilities, auth helpers, Pydantic models
 │   ├── auth.py               # Register, login, me, setup wizard
-│   ├── tracks.py             # Tracks, albums, artists, genres, home, ratings
+│   ├── tracks.py             # Tracks, albums, artists, genres, home
 │   ├── streaming.py          # Transcode, stream, cover art, download album
 │   ├── playlists.py          # Playlists CRUD, share, folders, favorites, export
 │   ├── admin.py              # Dashboard, stats, users, rescan scheduler
