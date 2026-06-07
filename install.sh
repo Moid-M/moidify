@@ -63,7 +63,12 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 INTERACTIVE=0
-[[ -t 0 ]] && INTERACTIVE=1
+if [[ -t 0 ]]; then
+  INTERACTIVE=1
+elif cp /dev/tty /dev/null 2>/dev/null; then
+  # stdin is piped but we can still prompt via /dev/tty
+  INTERACTIVE=1
+fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ─── Header ──────────────────────────────────────────────────────────────────
@@ -280,16 +285,46 @@ else
 fi
 ok "Python dependencies installed."
 
-# ─── yt-dlp (for URL imports) ────────────────────────────────────────────────
-info "Installing yt-dlp for YouTube/SoundCloud imports..."
-mkdir -p "$APP_DIR/extra-pkgs"
-if "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp 2>/dev/null; then
-  ok "yt-dlp installed."
-else
-  warn "yt-dlp installation failed (URL import won't work). Install manually:"
-  warn "  sudo $PYTHON -m pip install --target=$APP_DIR/extra-pkgs yt-dlp"
+# ─── Optional: yt-dlp (for URL imports) ───────────────────────────────────────
+YTDLP_SKIP=false
+if [[ $INTERACTIVE -eq 1 ]]; then
+  read -r -p "  Install yt-dlp for YouTube/SoundCloud imports? [Y/n]: " YTDLP_CHOICE </dev/tty
+  if [[ "$YTDLP_CHOICE" =~ ^[Nn] ]]; then YTDLP_SKIP=true; fi
 fi
-chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/extra-pkgs" 2>/dev/null || true
+if ! $YTDLP_SKIP; then
+  info "Installing yt-dlp..."
+  mkdir -p "$APP_DIR/extra-pkgs"
+  if $VERBOSE; then
+    "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp && ok "yt-dlp installed." || warn "yt-dlp install failed"
+  else
+    "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp >/dev/null 2>&1 && ok "yt-dlp installed." || warn "yt-dlp install failed"
+  fi
+  chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/extra-pkgs" 2>/dev/null || true
+fi
+
+# ─── Optional: ffmpeg (for audio transcoding) ────────────────────────────────
+if ! command -v ffmpeg &>/dev/null; then
+  FFMPEG_SKIP=false
+  if [[ $INTERACTIVE -eq 1 ]]; then
+    read -r -p "  Install ffmpeg for audio transcoding? [Y/n]: " FFMPEG_CHOICE </dev/tty
+    if [[ "$FFMPEG_CHOICE" =~ ^[Nn] ]]; then FFMPEG_SKIP=true; fi
+  fi
+  if ! $FFMPEG_SKIP && [[ -n "$PKG_MANAGER" ]]; then
+    info "Installing ffmpeg..."
+    case "$PKG_MANAGER" in
+      apt) FFMPEG_PKG="ffmpeg" ;;
+      dnf) FFMPEG_PKG="ffmpeg" ;;
+      pacman) FFMPEG_PKG="ffmpeg" ;;
+      zypper) FFMPEG_PKG="ffmpeg" ;;
+      apk) FFMPEG_PKG="ffmpeg" ;;
+    esac
+    if $VERBOSE; then
+      $INSTALL_CMD $FFMPEG_PKG && ok "ffmpeg installed." || warn "ffmpeg install failed"
+    else
+      $INSTALL_CMD $FFMPEG_PKG >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install failed"
+    fi
+  fi
+fi
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 cat > "$CONFIG_DIR/config.json" <<CONF

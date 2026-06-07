@@ -40,9 +40,9 @@ fi
 # Install any new Python deps
 "$APP_DIR/venv/bin/pip" install --quiet --no-cache-dir -r "$APP_DIR/requirements.txt"
 
-# Install yt-dlp for URL imports
+# Install yt-dlp for URL imports (silent)
 mkdir -p "$APP_DIR/extra-pkgs"
-python3 -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp 2>/dev/null || true
+python3 -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp >/dev/null 2>&1 || true
 
 # Reinstall CLI binary
 install -m 755 "$APP_DIR/moidify" /usr/local/bin/moidify 2>/dev/null || true
