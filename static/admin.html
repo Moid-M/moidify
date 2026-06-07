@@ -78,6 +78,8 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
 .admin-btn:hover{background:var(--accent-dim)}
 .admin-btn.active{background:var(--accent);color:#fff}
 .admin-btn.active:hover{opacity:.8}
+.admin-btn-danger{border-color:var(--danger);color:var(--danger)}
+.admin-btn-danger:hover{background:var(--danger);color:#fff}
 .add-btn{width:28px;height:28px;border-radius:50%;border:2px solid var(--accent);background:transparent;color:var(--accent);font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:.15s;line-height:1}
 .add-btn:hover{background:var(--accent);color:#fff}
 
@@ -143,10 +145,16 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
           <progress id="scan-progress-bar" style="width:100%;height:6px;border-radius:3px;accent-color:var(--accent)" max="100" value="0"></progress>
           <div id="scan-progress-text" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
         </div>
-        <button onclick="rescanMusic()" class="admin-btn" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;" id="rescan-btn">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-          Rescan Music Folder
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button onclick="rescanMusic(false)" class="admin-btn" style="display:inline-flex;align-items:center;gap:6px;" id="rescan-btn">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+            Rescan
+          </button>
+          <button onclick="rescanMusic(true)" class="admin-btn admin-btn-danger" style="display:inline-flex;align-items:center;gap:6px;" id="clean-rescan-btn">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            Clean Rescan
+          </button>
+        </div>
         <div id="rescan-msg" style="font-size:12px;color:var(--accent);margin-top:4px;display:none"></div>
       </div>
 
@@ -624,17 +632,16 @@ function escHtml(s) {
 
 var scanPollTimer = null;
 
-async function rescanMusic() {
+async function rescanMusic(clean) {
   var msg = document.getElementById('rescan-msg');
-  var btn = document.getElementById('rescan-btn');
+  var btns = document.querySelectorAll('#rescan-btn, #clean-rescan-btn');
   var progressBar = document.getElementById('scanner-progress');
-  btn.disabled = true;
-  btn.style.opacity = '0.5';
+  btns.forEach(function(b){ b.disabled = true; b.style.opacity = '0.5'; });
   progressBar.style.display = 'block';
   msg.style.display = 'block';
-  msg.textContent = 'Starting scan...';
+  msg.textContent = clean ? 'Cleaning and rescanning...' : 'Starting scan...';
   try {
-    var r = await api('/api/admin/rescan', {method:'POST'});
+    var r = await api('/api/admin/rescan', {method:'POST', body:{clean: !!clean}});
     if (!r.ok) { msg.textContent = 'Scan failed'; return; }
     msg.textContent = 'Scan in progress...';
     if (scanPollTimer) clearInterval(scanPollTimer);
@@ -663,8 +670,7 @@ async function rescanMusic() {
         if (!ps.running) {
           clearInterval(scanPollTimer);
           scanPollTimer = null;
-          btn.disabled = false;
-          btn.style.opacity = '';
+          btns.forEach(function(b){ b.disabled = false; b.style.opacity = ''; });
           msg.textContent = 'Done. Found ' + ps.files_found + ' files, imported ' + ps.files_imported + '.';
           setTimeout(function(){ msg.style.display = 'none'; progressBar.style.display = 'none'; }, 5000);
           loadStats();
@@ -674,8 +680,7 @@ async function rescanMusic() {
     }, 1000);
   } catch(e) {
     msg.textContent = 'Error: '+e.message;
-    btn.disabled = false;
-    btn.style.opacity = '';
+    btns.forEach(function(b){ b.disabled = false; b.style.opacity = ''; });
   }
 }
 

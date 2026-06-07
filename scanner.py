@@ -198,7 +198,7 @@ def get_file_hash(file_path):
     return h.hexdigest()
 
 
-def process_file(file_path, conn=None):
+def process_file(file_path, conn=None, force=False):
     path = Path(file_path)
     if path.suffix.lower() not in AUDIO_EXTENSIONS:
         return
@@ -212,7 +212,7 @@ def process_file(file_path, conn=None):
         existing = conn.execute(
             "SELECT id FROM tracks WHERE file_path = ?", (str(path),)
         ).fetchone()
-        if existing:
+        if existing and not force:
             return
 
         metadata = extract_metadata(str(path))
@@ -252,31 +252,53 @@ def process_file(file_path, conn=None):
                     with open(cover_path, 'wb') as f:
                         f.write(cover_data)
 
-        cursor = conn.execute(
-            """INSERT OR IGNORE INTO tracks
-            (file_path, file_hash, title, artist, album_artist, album, track_number, disc_number, genre, year, duration, has_cover, lyrics, cover_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                str(path),
-                file_hash,
-                metadata['title'],
-                metadata['artist'],
-                metadata['album_artist'],
-                metadata['album'],
-                metadata['track_number'],
-                metadata['disc_number'],
-                metadata['genre'],
-                metadata['year'],
-                metadata['duration'],
-                1 if metadata['cover_data'] else 0,
-                metadata['lyrics'],
-                cover_hash,
-            ),
-        )
-        if cursor.rowcount == 0:
-            return
-
-        track_id = cursor.lastrowid
+        if existing and force:
+            conn.execute(
+                """UPDATE tracks SET
+                file_hash=?, title=?, artist=?, album_artist=?, album=?, track_number=?,
+                disc_number=?, genre=?, year=?, duration=?, has_cover=?, lyrics=?, cover_hash=?
+                WHERE file_path=?""",
+                (
+                    file_hash,
+                    metadata['title'],
+                    metadata['artist'],
+                    metadata['album_artist'],
+                    metadata['album'],
+                    metadata['track_number'],
+                    metadata['disc_number'],
+                    metadata['genre'],
+                    metadata['year'],
+                    metadata['duration'],
+                    1 if metadata['cover_data'] else 0,
+                    metadata['lyrics'],
+                    cover_hash,
+                    str(path),
+                ),
+            )
+        else:
+            cursor = conn.execute(
+                """INSERT OR IGNORE INTO tracks
+                (file_path, file_hash, title, artist, album_artist, album, track_number, disc_number, genre, year, duration, has_cover, lyrics, cover_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    str(path),
+                    file_hash,
+                    metadata['title'],
+                    metadata['artist'],
+                    metadata['album_artist'],
+                    metadata['album'],
+                    metadata['track_number'],
+                    metadata['disc_number'],
+                    metadata['genre'],
+                    metadata['year'],
+                    metadata['duration'],
+                    1 if metadata['cover_data'] else 0,
+                    metadata['lyrics'],
+                    cover_hash,
+                ),
+            )
+            if cursor.rowcount == 0:
+                return
     except Exception:
         with SCAN_LOCK:
             SCAN_STATUS["errors"].append(f"Error processing: {path.name}")
@@ -289,7 +311,7 @@ def process_file(file_path, conn=None):
 
 
 
-def scan_existing():
+def scan_existing(clean=False):
     global SCAN_STATUS, _SCAN_RUNNING
     with _SCAN_RUNNING_LOCK:
         if _SCAN_RUNNING:
@@ -307,15 +329,57 @@ def scan_existing():
             SCAN_STATUS["files_imported"] = 0
         conn = get_connection()
         count = 0
+
+        if clean:
+            db_paths = set(
+                row[0] for row in conn.execute("SELECT file_path FROM tracks").fetchall()
+            )
+            existing_paths = set()
+            for root, _, files in os.walk(str(MUSIC_DIR)):
+                for f in files:
+                    fp = os.path.join(root, f)
+                    if Path(f).suffix.lower() in AUDIO_EXTENSIONS:
+                        existing_paths.add(fp)
+
+            orphaned = db_paths - existing_paths
+            for fp in orphaned:
+                conn.execute("DELETE FROM tracks WHERE file_path = ?", (fp,))
+                with SCAN_LOCK:
+                    SCAN_STATUS["files_found"] += 1
+                    SCAN_STATUS["files_imported"] += 1
+            if orphaned:
+                conn.commit()
+
+            stale_covers = set()
+            used_covers = set(
+                row[0] for row in conn.execute(
+                    "SELECT cover_hash FROM tracks WHERE cover_hash IS NOT NULL"
+                ).fetchall() if row[0]
+            )
+            if COVERS_DIR.exists():
+                for cf in COVERS_DIR.iterdir():
+                    if cf.is_file() and cf.stem not in used_covers:
+                        stale_covers.add(cf)
+                for cf in stale_covers:
+                    try:
+                        cf.unlink()
+                    except Exception:
+                        pass
+
+            existing_paths = existing_paths - orphaned
+            SCAN_STATUS["files_found"] = len(existing_paths)
+            SCAN_STATUS["files_imported"] = 0
+
         try:
             for root, _, files in os.walk(str(MUSIC_DIR)):
                 for f in files:
                     if Path(f).suffix.lower() not in AUDIO_EXTENSIONS:
                         continue
-                    with SCAN_LOCK:
-                        SCAN_STATUS["files_found"] += 1
-                        was = len(SCAN_STATUS["errors"])
-                    process_file(os.path.join(root, f), conn=conn)
+                    if not clean:
+                        with SCAN_LOCK:
+                            SCAN_STATUS["files_found"] += 1
+                    was = len(SCAN_STATUS["errors"])
+                    process_file(os.path.join(root, f), conn=conn, force=clean)
                     with SCAN_LOCK:
                         if len(SCAN_STATUS["errors"]) == was:
                             SCAN_STATUS["files_imported"] += 1

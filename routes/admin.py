@@ -400,10 +400,14 @@ def admin_scanner_status(token: Optional[str] = Header(None)):
     return get_scan_status()
 
 
+class RescanBody(BaseModel):
+    clean: bool = False
+
 @router.post("/api/admin/rescan")
-def admin_rescan(token: Optional[str] = Header(None)):
+def admin_rescan(body: RescanBody = None, token: Optional[str] = Header(None)):
     _require_admin(token)
-    scan_existing()
+    clean = body.clean if body else False
+    scan_existing(clean=clean)
     return get_scan_status()
 
 
