@@ -60,6 +60,29 @@ else
   info "Data kept at /var/lib/moidify"
 fi
 
+# Optional: remove ffmpeg (installed by installer if it wasn't present)
+if command -v ffmpeg &>/dev/null; then
+  read -r -p "Remove ffmpeg (audio transcoding)? [y/N] " RM_FFMPEG
+  if [[ "$RM_FFMPEG" =~ ^[Yy]$ ]]; then
+    if command -v apt &>/dev/null; then
+      apt remove -y ffmpeg 2>/dev/null && ok "ffmpeg removed." || warn "Could not remove ffmpeg"
+    elif command -v dnf &>/dev/null; then
+      dnf remove -y ffmpeg 2>/dev/null && ok "ffmpeg removed." || warn "Could not remove ffmpeg"
+    elif command -v pacman &>/dev/null; then
+      pacman -R --noconfirm ffmpeg 2>/dev/null && ok "ffmpeg removed." || warn "Could not remove ffmpeg"
+    elif command -v zypper &>/dev/null; then
+      zypper remove -y ffmpeg 2>/dev/null && ok "ffmpeg removed." || warn "Could not remove ffmpeg"
+    elif command -v apk &>/dev/null; then
+      apk del ffmpeg 2>/dev/null && ok "ffmpeg removed." || warn "Could not remove ffmpeg"
+    else
+      warn "Unknown package manager — remove ffmpeg manually"
+    fi
+  fi
+fi
+
 echo ""
 ok "${GREEN}Moidify has been uninstalled.${NC}"
 echo ""
+echo -e "  ${YELLOW}To remove system dependencies (python3, pip, sqlite3, git, curl, rsync):${NC}"
+echo -e "  These may be used by other software — review before removing."
+echo -e "  Check what depends on them first with: apt depends <package>"
