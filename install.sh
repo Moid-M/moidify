@@ -65,7 +65,7 @@ fi
 INTERACTIVE=0
 if [[ -t 0 ]]; then
   INTERACTIVE=1
-elif cp /dev/tty /dev/null 2>/dev/null; then
+elif [ -c /dev/tty ] 2>/dev/null; then
   # stdin is piped but we can still prompt via /dev/tty
   INTERACTIVE=1
 fi
