@@ -220,7 +220,24 @@ def _write_tags(outfile, fmt, title, artist, album, year, genre, track_num, thum
 def _download_worker(job_id: str, url: str, fmt: str = "mp3"):
     outfile = None
     try:
-        import yt_dlp
+        try:
+            import yt_dlp
+        except ModuleNotFoundError:
+            raise RuntimeError(
+                "yt-dlp is not installed. Install it with:\n"
+                "  sudo python3 -m pip install --target=/opt/moidify/extra-pkgs yt-dlp\n"
+                "Or run the installer with: sudo moidify update"
+            )
+
+        from shutil import which
+        if not which("ffmpeg"):
+            raise RuntimeError(
+                "ffmpeg is required for audio downloads. Install it with:\n"
+                "  sudo apt install ffmpeg    (Debian/Ubuntu)\n"
+                "  sudo dnf install ffmpeg    (Fedora)\n"
+                "  sudo pacman -S ffmpeg      (Arch)\n"
+                "Then try again."
+            )
 
         fmt_cfg = _FORMAT_OPTIONS.get(fmt)
         if not fmt_cfg:

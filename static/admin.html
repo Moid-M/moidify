@@ -807,7 +807,7 @@ async function submitImportUrl() {
             loadStats();
             loadTracks();
           } else if (ps.status === 'error') {
-            statusEl.innerHTML = '<span style="color:var(--danger)">Error: '+esc(ps.error||'Unknown')+'</span>';
+            statusEl.innerHTML = '<div style="color:var(--danger);white-space:pre-wrap;font-size:13px;">Error: '+(esc(ps.error)||'Unknown')+'</div>';
             input.disabled = false;
           } else if (ps.status === 'importing') {
             statusEl.innerHTML = 'Importing to library...';
