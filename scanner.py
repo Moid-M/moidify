@@ -217,11 +217,19 @@ def process_file(file_path, conn=None, force=False):
 
         metadata = extract_metadata(str(path))
         if metadata is None:
-            with SCAN_LOCK:
-                SCAN_STATUS["errors"].append(f"Failed to parse: {path.name}")
-                if len(SCAN_STATUS["errors"]) > _MAX_ERRORS:
-                    SCAN_STATUS["errors"] = SCAN_STATUS["errors"][-_MAX_ERRORS:]
-            return
+            metadata = {
+                'title': path.stem,
+                'artist': 'Unknown',
+                'album_artist': None,
+                'album': 'Unknown',
+                'track_number': None,
+                'disc_number': None,
+                'genre': None,
+                'year': None,
+                'duration': 0,
+                'cover_data': None,
+                'lyrics': None,
+            }
 
         try:
             file_hash = get_file_hash(str(path))

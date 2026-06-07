@@ -150,7 +150,7 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
             Rescan
           </button>
-          <button onclick="rescanMusic(true)" class="admin-btn admin-btn-danger" style="display:inline-flex;align-items:center;gap:6px;" id="clean-rescan-btn">
+          <button onclick="openModal('clean-modal')" class="admin-btn admin-btn-danger" style="display:inline-flex;align-items:center;gap:6px;" id="clean-rescan-btn">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
             Clean Rescan
           </button>
@@ -314,6 +314,27 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
     <div class="modal-row">
       <button class="modal-cancel" onclick="closeModal('password-modal')">Cancel</button>
       <button class="modal-confirm" onclick="changePassword()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clean rescan confirmation modal -->
+<div class="modal-overlay" id="clean-modal">
+  <div class="modal">
+    <h3>Clean Rescan</h3>
+    <p style="font-size:13px;color:var(--text2);line-height:1.5;margin:0 0 12px">
+      This will <strong>rewrite all track metadata</strong> from file tags and
+      <strong>remove dead entries</strong> for deleted files.
+    </p>
+    <ul style="font-size:13px;color:var(--text2);line-height:1.7;padding-left:18px;margin:0 0 8px">
+      <li>Files not found on disk will be removed from the library</li>
+      <li>All metadata (title, artist, album, cover art) will be refreshed from file tags</li>
+      <li>Unrecognized files will be added with their filename as the title</li>
+      <li>Orphaned cover files will be cleaned up</li>
+    </ul>
+    <div class="modal-row">
+      <button class="modal-cancel" onclick="closeModal('clean-modal')">Cancel</button>
+      <button class="modal-confirm" onclick="closeModal('clean-modal');rescanMusic(true)" style="background:var(--danger);color:#fff">Continue</button>
     </div>
   </div>
 </div>
