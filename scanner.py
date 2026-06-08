@@ -94,22 +94,7 @@ def extract_metadata(file_path):
             if audio.pictures:
                 info['cover_data'] = audio.pictures[0].data
 
-        elif isinstance(audio, OggVorbis):
-            info['title'] = audio.get('title', [''])[0]
-            info['artist'] = audio.get('artist', [''])[0]
-            info['album_artist'] = audio.get('albumartist', [''])[0]
-            if not info['album_artist']:
-                info['album_artist'] = audio.get('album_artist', [''])[0]
-            info['album'] = audio.get('album', [''])[0]
-            info['track_number'] = audio.get('tracknumber', [''])[0]
-            info['disc_number'] = audio.get('discnumber', [''])[0]
-            info['genre'] = audio.get('genre', [''])[0]
-            info['year'] = audio.get('date', [''])[0]
-            info['lyrics'] = audio.get('lyrics', [''])[0]
-            if hasattr(audio, 'pictures') and audio.pictures:
-                info['cover_data'] = audio.pictures[0].data
-
-        elif isinstance(audio, OggOpus):
+        elif isinstance(audio, (OggVorbis, OggOpus)):
             info['title'] = audio.get('title', [''])[0]
             info['artist'] = audio.get('artist', [''])[0]
             info['album_artist'] = audio.get('albumartist', [''])[0]

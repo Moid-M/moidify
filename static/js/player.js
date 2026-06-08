@@ -99,8 +99,12 @@ function togglePlay() {
 function fetchSimilarAndAppend(lastTrackId) {
   fetch('/api/tracks/' + lastTrackId + '/similar?limit=10').then(function(r) { return r.json(); }).then(function(tracks) {
     if (tracks && tracks.length) {
+      var prevLen = state.queue.length;
       tracks.forEach(function(t) { addTrackToQueueEnd(t); });
       renderQueuePanel();
+      if (state.queue.length > prevLen) {
+        playFromQueue(state.queue, prevLen);
+      }
     }
   }).catch(function() {});
 }
@@ -109,7 +113,11 @@ function nextTrack() {
   if (state.queue.length===0) return;
   clearCrossfadeTimer();
   if (state.repeatMode === 'one' && state.currentIndex >= 0) {
-    audio.currentTime = 0; audio.play().catch(function() {}); return;
+    audio.currentTime = 0; audio.play().catch(function() {});
+    state.repeatMode = 'off';
+    localStorage.setItem('moidify_repeat', 'off');
+    renderRepeatShuffleButtons();
+    return;
   }
 
   if (state.currentIndex >= 0) state.playHistory.push(state.currentIndex);
@@ -123,8 +131,10 @@ function nextTrack() {
     if (state.shuffleIndex >= state.shuffleOrder.length) {
       if (state.autoplay && lastTrackId != null) {
         fetchSimilarAndAppend(lastTrackId);
-        state.shuffleIndex = 0;
-        next = state.shuffleOrder[state.shuffleIndex];
+        qs('#play-btn').innerHTML = iconPlay();
+        document.getElementById('np-play').innerHTML = iconPlay();
+        saveSession();
+        renderQueuePanel(); checkSleepTimer('ended'); clearAnimations(); return;
       } else {
         state.shuffleIndex = 0;
         if (state.repeatMode === 'off') {
@@ -140,7 +150,10 @@ function nextTrack() {
       if (state.repeatMode === 'all') { next = 0; }
       else if (state.autoplay && lastTrackId != null) {
         fetchSimilarAndAppend(lastTrackId);
-        next = state.currentIndex + 1;
+        qs('#play-btn').innerHTML = iconPlay();
+        document.getElementById('np-play').innerHTML = iconPlay();
+        saveSession();
+        renderQueuePanel(); checkSleepTimer('ended'); clearAnimations(); return;
       } else {
         state.currentIndex = -1; audio.src = ''; qs('#play-btn').innerHTML = iconPlay();
         renderQueuePanel(); checkSleepTimer('ended'); clearAnimations(); return;
@@ -148,7 +161,7 @@ function nextTrack() {
     }
   }
 
-  if (next == null) {
+  if (next == null || next >= state.queue.length) {
     state.currentIndex = -1; audio.src = ''; qs('#play-btn').innerHTML = iconPlay();
     renderQueuePanel(); checkSleepTimer('ended'); clearAnimations(); return;
   }

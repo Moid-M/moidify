@@ -61,4 +61,8 @@ logger.info("MAX_UPLOAD_SIZE=%s (%s GB)", MAX_UPLOAD_SIZE, round(MAX_UPLOAD_SIZE
 
 STATIC_DIR = BASE_DIR / "static"
 
+# Last.fm API keys (for scrobbling) — set in /etc/moidify/config.json or env vars
+LASTFM_KEY = os.environ.get("MOIDIFY_LASTFM_KEY", "")
+LASTFM_SECRET = os.environ.get("MOIDIFY_LASTFM_SECRET", "")
+
 

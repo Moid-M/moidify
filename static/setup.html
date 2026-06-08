@@ -158,6 +158,7 @@ async function createAdmin() {
   if (!/[a-z]/.test(password)) { errEl.textContent = 'Password must contain a lowercase letter'; errEl.style.display = 'block'; return; }
   if (!/[A-Z]/.test(password)) { errEl.textContent = 'Password must contain an uppercase letter'; errEl.style.display = 'block'; return; }
   if (!/[0-9]/.test(password)) { errEl.textContent = 'Password must contain a digit'; errEl.style.display = 'block'; return; }
+  if (!/[!@#$%^&*(),.?":{}|<>_\-]/.test(password)) { errEl.textContent = 'Password must contain a special character'; errEl.style.display = 'block'; return; }
   if (password !== confirm) { errEl.textContent = 'Passwords do not match'; errEl.style.display = 'block'; return; }
 
   try {

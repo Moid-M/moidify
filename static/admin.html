@@ -1175,6 +1175,7 @@ async function changePassword() {
   if (!/[a-z]/.test(pw)) { alert('Password must contain a lowercase letter'); return; }
   if (!/[A-Z]/.test(pw)) { alert('Password must contain an uppercase letter'); return; }
   if (!/[0-9]/.test(pw)) { alert('Password must contain a digit'); return; }
+  if (!/[!@#$%^&*(),.?":{}|<>_\-]/.test(pw)) { alert('Password must contain a special character'); return; }
   try {
     var r = await api('/api/admin/users/'+contextUserId+'/password', { method:'POST', body: { password: pw } });
     if (!r.ok) { var e = await r.json(); alert(e.detail||'Error'); return; }
@@ -1206,6 +1207,7 @@ async function createUser() {
   if (!/[a-z]/.test(password)) { alert('Password must contain a lowercase letter'); return; }
   if (!/[A-Z]/.test(password)) { alert('Password must contain an uppercase letter'); return; }
   if (!/[0-9]/.test(password)) { alert('Password must contain a digit'); return; }
+  if (!/[!@#$%^&*(),.?":{}|<>_\-]/.test(password)) { alert('Password must contain a special character'); return; }
   try {
     var r = await api('/api/admin/users', { method:'POST', body: { username: username, password: password, is_admin: isAdmin } });
     if (!r.ok) { var e = await r.json(); alert(e.detail||'Error'); return; }

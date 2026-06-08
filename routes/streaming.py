@@ -4,12 +4,12 @@ import zipfile
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Header, Query
 from fastapi.responses import FileResponse, StreamingResponse
 
 from config import MUSIC_DIR, COVERS_DIR, STATIC_DIR
 from database import get_connection
-from routes.deps import TRANSCODE_MAP, FFMPEG_PATH
+from routes.deps import TRANSCODE_MAP, FFMPEG_PATH, _get_user_from_token
 
 router = APIRouter(tags=["streaming"])
 
@@ -47,23 +47,6 @@ def _transcode_stream(file_path: str, quality: str):
     return process
 
 
-def _stream_file(path: Path, quality: str):
-    proc = None
-    try:
-        proc = _transcode_stream(str(path), quality)
-        if proc:
-            for chunk in iter(lambda: proc.stdout.read(65536), b""):
-                yield chunk
-    finally:
-        if proc:
-            proc.kill()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-
-
 def _fallback_stream(path: Path):
     with open(str(path), "rb") as f:
         while True:
@@ -81,6 +64,7 @@ def _media_type_for(path: Path, quality: str) -> str:
         ".mp3": "audio/mpeg",
         ".flac": "audio/flac",
         ".ogg": "audio/ogg",
+        ".opus": "audio/ogg",
         ".m4a": "audio/mp4",
         ".wav": "audio/wav",
         ".wma": "audio/x-ms-wma",
@@ -171,7 +155,9 @@ def get_cover(track_id: int):
 
 
 @router.get("/api/download/album")
-def download_album(album: str = Query(...), artist: Optional[str] = Query(None)):
+def download_album(album: str = Query(...), artist: Optional[str] = Query(None), token: Optional[str] = Header(None)):
+    if not _get_user_from_token(token):
+        raise HTTPException(401, "Authentication required")
     import io
 
     conn = get_connection()
@@ -213,7 +199,9 @@ def download_album(album: str = Query(...), artist: Optional[str] = Query(None))
 
 
 @router.get("/api/download/tracks-zip")
-def download_tracks_zip(ids: str = Query(...)):
+def download_tracks_zip(ids: str = Query(...), token: Optional[str] = Header(None)):
+    if not _get_user_from_token(token):
+        raise HTTPException(401, "Authentication required")
     import io
 
     track_ids = [int(x) for x in ids.split(",") if x.strip().isdigit()]
@@ -242,7 +230,9 @@ def download_tracks_zip(ids: str = Query(...)):
 
 
 @router.get("/api/download/track-zip/{track_id}")
-def download_track_zip(track_id: int):
+def download_track_zip(track_id: int, token: Optional[str] = Header(None)):
+    if not _get_user_from_token(token):
+        raise HTTPException(401, "Authentication required")
     import io
 
     conn = get_connection()
@@ -269,7 +259,9 @@ def download_track_zip(track_id: int):
 
 
 @router.get("/api/download/playlist/{playlist_id}")
-def download_playlist(playlist_id: int):
+def download_playlist(playlist_id: int, token: Optional[str] = Header(None)):
+    if not _get_user_from_token(token):
+        raise HTTPException(401, "Authentication required")
     import io
 
     conn = get_connection()

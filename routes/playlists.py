@@ -275,6 +275,8 @@ def share_album(body: ShareAlbumBody, token: Optional[str] = Header(None)):
     if not album:
         raise HTTPException(400, "Album name required")
     user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
     conn = get_connection()
     existing = conn.execute(
         "SELECT token FROM shared_albums WHERE album = ? AND (artist IS ? OR artist = ?)",

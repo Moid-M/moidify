@@ -57,8 +57,8 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 
 
-# CORS — restrict to same-origin since this is a self-hosted app
-# For external access, users configure their reverse proxy
+# CORS — allow all origins since this is a self-hosted app
+# Users configure their reverse proxy for external access restrictions
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

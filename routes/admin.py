@@ -366,7 +366,7 @@ def admin_stats(token: Optional[str] = Header(None)):
     conn = get_connection()
     tracks = conn.execute("SELECT COUNT(*) FROM tracks").fetchone()[0]
     artists = conn.execute("SELECT COUNT(DISTINCT COALESCE(NULLIF(album_artist,''), artist)) FROM tracks").fetchone()[0]
-    albums = conn.execute("SELECT COUNT(DISTINCT album || COALESCE(NULLIF(album_artist,''), artist)) FROM tracks").fetchone()[0]
+    albums = conn.execute("SELECT COUNT(*) FROM (SELECT DISTINCT album, COALESCE(NULLIF(album_artist,''), artist) FROM tracks WHERE album IS NOT NULL)").fetchone()[0]
     total_dur = conn.execute("SELECT COALESCE(SUM(duration),0) FROM tracks").fetchone()[0]
     conn.close()
 
@@ -388,26 +388,24 @@ async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str]
         if ext not in ['.mp3','.flac','.ogg','.m4a','.wav','.aac','.wma']:
             continue
         dest = MUSIC_DIR / Path(f.filename).name
-        # Stream in 64KB chunks to avoid loading entire file into memory
-        chunks = []
+        temp = dest.with_suffix(dest.suffix + ".part")
         first_chunk = True
-        while True:
-            chunk = await f.read(65536)
-            if not chunk:
-                break
-            if first_chunk and not _is_audio_content(chunk):
-                raise HTTPException(415, f"Invalid audio file: {f.filename}")
-            first_chunk = False
-            total += len(chunk)
-            if total > MAX_UPLOAD_SIZE:
-                raise HTTPException(413, f"Upload too large (max {limit_gb:.1f} GB total)")
-            chunks.append(chunk)
         try:
+            with open(temp, "wb") as fh:
+                while True:
+                    chunk = await f.read(65536)
+                    if not chunk:
+                        break
+                    if first_chunk and not _is_audio_content(chunk):
+                        raise HTTPException(415, f"Invalid audio file: {f.filename}")
+                    first_chunk = False
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_SIZE:
+                        raise HTTPException(413, f"Upload too large (max {limit_gb:.1f} GB total)")
+                    fh.write(chunk)
             if dest.exists():
                 dest.unlink()
-            with open(dest, "wb") as fh:
-                for c in chunks:
-                    fh.write(c)
+            temp.rename(dest)
             conn = get_connection()
             conn.execute("DELETE FROM tracks WHERE file_path = ?", (str(dest),))
             conn.commit()
@@ -415,6 +413,8 @@ async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str]
             process_file(str(dest))
             imported.append(f.filename)
         except Exception as e:
+            if temp.exists():
+                temp.unlink()
             if dest.exists():
                 dest.unlink()
             imported.append(f"{f.filename}: error - {e}")
@@ -496,8 +496,6 @@ def admin_artists(token: Optional[str] = Header(None)):
 def admin_album_tracks(album_name: str, token: Optional[str] = Header(None)):
     _require_admin(token)
     conn = get_connection()
-    from urllib.parse import unquote
-    album_name = unquote(album_name)
     rows = conn.execute(
         """SELECT id, title, artist, album, duration, track_number, has_cover
            FROM tracks WHERE album = ?

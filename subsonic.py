@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Optional
 from xml.etree.ElementTree import Element, SubElement, tostring
@@ -124,22 +125,14 @@ def _authenticate(request: Request):
         if token.lower() == expected:
             return dict(row)
 
-    # password auth: p = "enc:" + hex(md5(password))  or plaintext
-    if p:
-        if p.startswith("enc:"):
-            given_hash = p[4:].lower()
-            # compare with md5 of the stored password_hash
-            stored_md5 = hashlib.md5(row["password_hash"].encode()).hexdigest()
-            if given_hash == stored_md5:
-                return dict(row)
-        else:
-            # plaintext password - verify against stored hash
-            import secrets
-            pwd_hash_check = hashlib.pbkdf2_hmac(
-                "sha256", p.encode(), salt_db.encode(), PBKDF2_ITERATIONS
-            ).hex()
-            if pwd_hash_check == row["password_hash"]:
-                return dict(row)
+    # password auth: plaintext only (enc: token is not supported — use t+s token auth instead)
+    if p and not p.startswith("enc:"):
+        import secrets
+        pwd_hash_check = hashlib.pbkdf2_hmac(
+            "sha256", p.encode(), salt_db.encode(), PBKDF2_ITERATIONS
+        ).hex()
+        if pwd_hash_check == row["password_hash"]:
+            return dict(row)
 
     return None
 
@@ -152,6 +145,11 @@ def _require_auth(request: Request):
 
 
 def _track_to_child(track):
+    size = 0
+    try:
+        size = os.path.getsize(track["file_path"]) if track.get("file_path") else 0
+    except Exception:
+        pass
     return {
         "id": str(track["id"]),
         "parent": str(track["id"]),
@@ -160,7 +158,7 @@ def _track_to_child(track):
         "album": track["album"] or "Unknown",
         "year": str(track["year"] or ""),
         "genre": track["genre"] or "",
-        "size": "0",
+        "size": str(size),
         "duration": str(int(track["duration"] or 0)),
         "track": str(track["track_number"] or 1),
         "discNumber": str(track["disc_number"] or 1),
@@ -209,10 +207,6 @@ def _artist_to_child(artist_name, track_count=0, album_count=0):
 
 @router.api_route("/ping", methods=["GET", "POST"])
 def ping(request: Request):
-    user = _authenticate(request)
-    if user:
-        root = _ok()
-        return _xml_response(root, request.query_params.get("f", "xml"), request.query_params.get("callback"))
     return _xml_response(_ok(), request.query_params.get("f", "xml"), request.query_params.get("callback"))
 
 
@@ -595,6 +589,7 @@ def stream(request: Request, id: str = Query(...)):
         ".mp3": "audio/mpeg",
         ".flac": "audio/flac",
         ".ogg": "audio/ogg",
+        ".opus": "audio/ogg",
         ".m4a": "audio/mp4",
         ".wav": "audio/wav",
         ".aac": "audio/aac",

@@ -148,32 +148,39 @@ def setup_status():
 def setup_init(body: SetupInitBody):
     _validate_password(body.password)
     conn = get_connection()
-    conn.execute("BEGIN IMMEDIATE")
-    admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
-    if admin_count > 0:
-        conn.close()
-        raise HTTPException(400, "Setup already completed")
-    existing = conn.execute("SELECT id FROM users WHERE username = ?", (body.username,)).fetchone()
-    if existing:
-        conn.close()
-        raise HTTPException(400, "Username already taken")
-    if body.music_dir:
-        conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-            ("music_dir", body.music_dir),
+    try:
+        existing = conn.execute("SELECT id FROM users WHERE username = ?", (body.username,)).fetchone()
+        if existing:
+            raise HTTPException(400, "Username already taken")
+        admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
+        if admin_count > 0:
+            raise HTTPException(400, "Setup already completed")
+        conn.execute("BEGIN IMMEDIATE")
+        if body.music_dir:
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                ("music_dir", body.music_dir),
+            )
+        if body.max_upload_size is not None:
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                ("max_upload_size", str(body.max_upload_size)),
+            )
+        pwd_hash, salt = _hash_password(body.password)
+        cursor = conn.execute(
+            "INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, 1)",
+            (body.username, pwd_hash, salt),
         )
-    if body.max_upload_size is not None:
-        conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-            ("max_upload_size", str(body.max_upload_size)),
-        )
-    pwd_hash, salt = _hash_password(body.password)
-    cursor = conn.execute(
-        "INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, 1)",
-        (body.username, pwd_hash, salt),
-    )
-    user_id = cursor.lastrowid
-    conn.commit()
+        user_id = cursor.lastrowid
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        conn.close()
+        raise
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise HTTPException(500, "Setup failed")
     conn.close()
     token = _create_session(user_id)
     return {"token": token, "user": {"id": user_id, "username": body.username}}
