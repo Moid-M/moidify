@@ -1,10 +1,14 @@
+import asyncio
 import json
+import logging
 import os
 import threading
 import time
 import uuid
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException, Header, UploadFile, File
 
@@ -315,7 +319,6 @@ router = APIRouter(tags=["admin"])
 AUDIO_EXTS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.aac', '.wma'}
 AUDIO_MAGIC = [
     b'\x49\x44\x33',     # ID3v2 (MP3)
-    b'\xff\xfb',          # MPEG sync word (MP3 without ID3)
     b'fLaC',              # FLAC
     b'OggS',              # OGG
     b'RIFF',              # WAV
@@ -325,6 +328,8 @@ def _is_audio_content(data: bytes) -> bool:
     if len(data) < 8:
         return False
     if data[4:8] == b'ftyp':  # M4A/MP4
+        return True
+    if len(data) >= 2 and data[0] == 0xFF and (data[1] & 0xE0) == 0xE0:  # MPEG sync (any bitrate/layer)
         return True
     for magic in AUDIO_MAGIC:
         if data[:len(magic)] == magic:
@@ -379,8 +384,6 @@ def admin_stats(token: Optional[str] = Header(None)):
 async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str] = Header(None)):
     _require_admin(token)
     imported = []
-    total = 0
-    limit_gb = MAX_UPLOAD_SIZE / (1024 * 1024 * 1024)
     for f in files:
         if not f.filename:
             continue
@@ -390,6 +393,7 @@ async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str]
         dest = MUSIC_DIR / Path(f.filename).name
         temp = dest.with_suffix(dest.suffix + ".part")
         first_chunk = True
+        file_size = 0
         try:
             with open(temp, "wb") as fh:
                 while True:
@@ -399,9 +403,10 @@ async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str]
                     if first_chunk and not _is_audio_content(chunk):
                         raise HTTPException(415, f"Invalid audio file: {f.filename}")
                     first_chunk = False
-                    total += len(chunk)
-                    if total > MAX_UPLOAD_SIZE:
-                        raise HTTPException(413, f"Upload too large (max {limit_gb:.1f} GB total)")
+                    file_size += len(chunk)
+                    if file_size > MAX_UPLOAD_SIZE:
+                        limit_gb = MAX_UPLOAD_SIZE / (1024 * 1024 * 1024)
+                        raise HTTPException(413, f"File too large (max {limit_gb:.1f} GB)")
                     fh.write(chunk)
             if dest.exists():
                 dest.unlink()
@@ -410,8 +415,15 @@ async def admin_upload(files: list[UploadFile] = File(...), token: Optional[str]
             conn.execute("DELETE FROM tracks WHERE file_path = ?", (str(dest),))
             conn.commit()
             conn.close()
-            process_file(str(dest))
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, process_file, str(dest))
             imported.append(f.filename)
+        except HTTPException:
+            if temp.exists():
+                temp.unlink()
+            if dest.exists():
+                dest.unlink()
+            raise
         except Exception as e:
             if temp.exists():
                 temp.unlink()
@@ -453,6 +465,54 @@ def admin_update_track_metadata(track_id: int, body: MetadataBody, token: Option
     conn.commit()
     conn.close()
     return {"ok": True, "updated": fields}
+
+
+@router.post("/api/admin/tracks/{track_id}/lyrics-upload")
+def admin_upload_lrc(track_id: int, file: UploadFile = File(...), token: Optional[str] = Header(None)):
+    _require_admin(token)
+    if not file.filename or not file.filename.lower().endswith('.lrc'):
+        raise HTTPException(400, "Only .lrc files are accepted")
+    conn = get_connection()
+    row = conn.execute("SELECT id, file_path FROM tracks WHERE id = ?", (track_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Track not found")
+    try:
+        content = file.file.read().decode('utf-8', errors='replace')
+    except Exception as e:
+        conn.close()
+        raise HTTPException(400, f"Failed to read LRC file: {e}")
+    conn.execute("UPDATE tracks SET lyrics = ? WHERE id = ?", (content, track_id))
+    conn.commit()
+    audio_path = Path(row["file_path"])
+    lrc_dest = audio_path.with_suffix('.lrc')
+    try:
+        lrc_dest.write_text(content, encoding='utf-8')
+    except Exception as e:
+        logger.warning("Could not write companion .lrc at %s: %s", lrc_dest, e)
+    conn.close()
+    return {"ok": True, "lyrics": content}
+
+
+@router.delete("/api/admin/tracks/{track_id}/lyrics")
+def admin_delete_lrc(track_id: int, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    row = conn.execute("SELECT id, file_path FROM tracks WHERE id = ?", (track_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Track not found")
+    conn.execute("UPDATE tracks SET lyrics = NULL WHERE id = ?", (track_id,))
+    conn.commit()
+    audio_path = Path(row["file_path"])
+    lrc_path = audio_path.with_suffix('.lrc')
+    if lrc_path.exists():
+        try:
+            lrc_path.unlink()
+        except Exception as e:
+            logger.warning("Could not remove companion .lrc at %s: %s", lrc_path, e)
+    conn.close()
+    return {"ok": True}
 
 
 @router.get("/api/admin/albums")

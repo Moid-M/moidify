@@ -12,7 +12,7 @@ var state = {
   queue: [],
   currentIndex: -1,
   playlists: [],
-  accentColor: localStorage.getItem('moidify_accent') || '#a855f7',
+  accentColor: localStorage.getItem('moidify_accent') || '#a0a0a0',
   eq: safeJSON('moidify_eq', null),
   eqPreset: localStorage.getItem('moidify_eq_preset') || 'Normal',
   crossfade: parseFloat(localStorage.getItem('moidify_crossfade') || '0'),
@@ -84,7 +84,7 @@ var EQ_PRESETS = {
 };
 
 var PALETTE = {
-  '#a855f7': '#c084fc', '#7c3aed': '#a78bfa', '#d946ef': '#f0abfc', '#ec4899': '#f472b6',
+  '#a0a0a0': '#c8c8c8', '#808080': '#a0a0a0', '#606060': '#808080', '#ec4899': '#f472b6',
   '#be185d': '#ec4899', '#f43f5e': '#fb7185', '#ef4444': '#f87171', '#f97316': '#fb923c',
   '#eab308': '#facc15', '#1db954': '#22c55e', '#06b6d4': '#22d3ee', '#14b8a6': '#2dd4bf',
   '#3b82f6': '#60a5fa', '#8b5cf6': '#a78bfa',

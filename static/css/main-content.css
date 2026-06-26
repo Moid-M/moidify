@@ -28,7 +28,7 @@
   cursor: pointer;
   transition: 0.2s;
 }
-.album-card:hover { background: var(--bg-hover); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(168,85,247,0.1); }
+.album-card:hover { background: var(--bg-hover); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(160,160,160,0.1); }
 
 .album-card img {
   width: 100%;

@@ -161,6 +161,14 @@ def extract_metadata(file_path):
             else:
                 info['year'] = None
 
+        if not info['lyrics']:
+            lrc_path = Path(file_path).with_suffix('.lrc')
+            if lrc_path.is_file():
+                try:
+                    info['lyrics'] = lrc_path.read_text(encoding='utf-8', errors='replace')
+                except Exception as e:
+                    logger.warning("Failed to read companion .lrc file %s: %s", lrc_path, e)
+
         return info
 
     except Exception as e:

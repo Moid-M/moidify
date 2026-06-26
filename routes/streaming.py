@@ -1,5 +1,4 @@
-import subprocess
-import threading
+import asyncio
 import zipfile
 from pathlib import Path
 from typing import Optional
@@ -15,10 +14,7 @@ router = APIRouter(tags=["streaming"])
 
 MUSIC_DIR_RESOLVED = Path(MUSIC_DIR).resolve(strict=False)
 
-# Limit concurrent transcodes to prevent resource exhaustion
-_active_transcodes = 0
-_MAX_TRANSCODES = 10
-_transcode_lock = threading.Lock()
+_transcode_semaphore = asyncio.Semaphore(10)
 
 
 def _within_music_dir(path: Path) -> bool:
@@ -29,7 +25,7 @@ def _within_music_dir(path: Path) -> bool:
         return False
 
 
-def _transcode_stream(file_path: str, quality: str):
+async def _transcode_stream(file_path: str, quality: str):
     if not FFMPEG_PATH or quality == "original" or quality not in TRANSCODE_MAP:
         return None
     cfg = TRANSCODE_MAP[quality]
@@ -41,16 +37,17 @@ def _transcode_stream(file_path: str, quality: str):
         "-ab", cfg["bitrate"],
         "-vn", "-nostdin", "-loglevel", "error", "-",
     ]
-    process = subprocess.Popen(
-        args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+    process = await asyncio.create_subprocess_exec(
+        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
     )
     return process
 
 
-def _fallback_stream(path: Path):
+async def _fallback_stream(path: Path):
+    loop = asyncio.get_event_loop()
     with open(str(path), "rb") as f:
         while True:
-            chunk = f.read(65536)
+            chunk = await loop.run_in_executor(None, f.read, 65536)
             if not chunk:
                 break
             yield chunk
@@ -73,7 +70,7 @@ def _media_type_for(path: Path, quality: str) -> str:
 
 
 @router.get("/api/stream/{track_id}")
-def stream_track(track_id: int, quality: Optional[str] = Query("high")):
+async def stream_track(track_id: int, quality: Optional[str] = Query("high")):
     conn = get_connection()
     row = conn.execute("SELECT file_path FROM tracks WHERE id = ?", (track_id,)).fetchone()
     conn.close()
@@ -88,34 +85,27 @@ def stream_track(track_id: int, quality: Optional[str] = Query("high")):
         raise HTTPException(403, "Forbidden")
 
     if quality != "original" and quality in TRANSCODE_MAP and FFMPEG_PATH:
-        with _transcode_lock:
-            if _active_transcodes >= _MAX_TRANSCODES:
-                raise HTTPException(503, "Too many concurrent transcodes. Try again later.")
-            _active_transcodes += 1
-
-        def stream_with_cleanup():
-            try:
-                proc = _transcode_stream(str(path), quality)
+        async def stream_with_cleanup():
+            async with _transcode_semaphore:
+                proc = await _transcode_stream(str(path), quality)
                 if proc:
-                    first = proc.stdout.read(65536)
+                    first = await proc.stdout.read(65536)
                     if first:
                         yield first
-                        for chunk in iter(lambda: proc.stdout.read(65536), b""):
+                        while True:
+                            chunk = await proc.stdout.read(65536)
+                            if not chunk:
+                                break
                             yield chunk
                     else:
-                        yield from _fallback_stream(path)
-                    proc.kill()
-                    try:
-                        proc.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
+                        async for chunk in _fallback_stream(path):
+                            yield chunk
+                    if proc.returncode is None:
                         proc.kill()
-                        proc.wait()
+                        await proc.wait()
                 else:
-                    yield from _fallback_stream(path)
-            finally:
-                with _transcode_lock:
-                    global _active_transcodes
-                    _active_transcodes -= 1
+                    async for chunk in _fallback_stream(path):
+                        yield chunk
 
         return StreamingResponse(
             stream_with_cleanup(),

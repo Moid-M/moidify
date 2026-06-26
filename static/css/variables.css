@@ -12,10 +12,10 @@
   --text-primary: #fff;
   --text-secondary: #b3b3b3;
   --text-muted: #6a6a6a;
-  --accent: #a855f7;
-  --accent-hover: #c084fc;
-  --accent-dim: rgba(168, 85, 247, 0.15);
-  --accent-glow: rgba(168, 85, 247, 0.3);
+  --accent: #a0a0a0;
+  --accent-hover: #c8c8c8;
+  --accent-dim: rgba(160, 160, 160, 0.15);
+  --accent-glow: rgba(160, 160, 160, 0.3);
   --danger: #e74c3c;
   --radius: 8px;
   --radius-lg: 12px;

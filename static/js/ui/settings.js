@@ -49,7 +49,7 @@ function showSettings() {
 
 function renderThemeTab() {
   var container = document.getElementById('tab-theme');
-  var colors = ['#a855f7','#ef4444','#f97316','#eab308','#1db954','#3b82f6','#14b8a6'];
+  var colors = ['#a0a0a0','#ef4444','#f97316','#eab308','#1db954','#3b82f6','#14b8a6'];
   var swatches = '';
   colors.forEach(function(c) {
     swatches += '<div class="color-swatch'+(c===state.accentColor?' active':'')+'" data-color="'+c+'" style="background:'+c+';"></div>';

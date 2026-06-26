@@ -155,10 +155,10 @@ def shared_track_page(track_id: int, request: Request):
 <meta property="og:url" content="{app_url}">
 <meta property="og:type" content="music.song">
 <meta property="og:site_name" content="Moidify">
-<meta name="theme-color" content="#a855f7">
+<meta name="theme-color" content="#a0a0a0">
 <style>
 *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
-:root{{--bg:#0d0d0d;--bg-el:#131313;--text:#fff;--text2:#b3b3b3;--text3:#6a6a6a;--accent:#a855f7}}
+:root{{--bg:#0d0d0d;--bg-el:#131313;--text:#fff;--text2:#b3b3b3;--text3:#6a6a6a;--accent:#a0a0a0}}
 body{{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}}
 .wrap{{max-width:400px;width:100%;text-align:center}}
 img{{width:200px;height:200px;border-radius:16px;object-fit:cover;margin-bottom:20px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}}

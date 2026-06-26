@@ -25,7 +25,7 @@
   <p align="center">
     <img src="https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python">
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
-    <img src="https://img.shields.io/badge/version-1.8-purple?style=flat-square">
+    <img src="https://img.shields.io/badge/version-2.0-gray?style=flat-square">
     <img src="https://img.shields.io/badge/status-stable-brightgreen?style=flat-square">
   </p>
   <br>
@@ -55,9 +55,9 @@
 
 **🎛️ 10-Band Equalizer** — presets included (Rock, Jazz, Dance, Classical…)
 
-**📜 Lyrics** — auto-fetched from LRCLIB, synced scrolling
+**📜 Lyrics** — auto-fetched from LRCLIB, companion `.lrc` file support, synced scrolling; upload lyrics per-track from the admin panel
 
-**🛡️ Admin Dashboard** — rescan library, manage users, view play stats, upload files via drag-and-drop
+**🛡️ Admin Dashboard** — rescan library, manage users, view play stats, upload files via drag-and-drop, upload `.lrc` lyrics per track
 
 **📥 YouTube / SoundCloud Import** — download any audio URL via the admin panel or `moidify download <url>` CLI command (uses yt-dlp, converts to 192kbps MP3)
 
@@ -358,6 +358,9 @@ python3 server.py
 
 ```
 moidify/
+├── .github/
+│   └── workflows/
+│       └── test.yml              # CI/CD pipeline (push/PR)
 ├── contrib/
 │   └── discord-presence.py   # Discord RPC companion script
 ├── routes/
@@ -367,13 +370,16 @@ moidify/
 │   ├── tracks.py             # Tracks, albums, artists, genres, home
 │   ├── streaming.py          # Transcode, stream, cover art, download album
 │   ├── playlists.py          # Playlists CRUD, share, folders, favorites, export
-│   ├── admin.py              # Dashboard, stats, users, rescan scheduler
+│   ├── admin.py              # Dashboard, stats, users, rescan, LRC upload
 │   ├── lastfm.py             # Last.fm scrobbling (now playing, scrobble, connect)
 │   └── subsonic.py           # Subsonic API compatibility layer (23 endpoints)
+├── tests/
+│   ├── __init__.py
+│   └── test_api.py           # 30+ API tests (pytest + httpx)
 ├── Dockerfile                # Container image
 ├── docker-compose.yml        # Docker orchestration
 ├── server.py                 # FastAPI app (~80 lines, includes all route modules)
-├── scanner.py                # File scanner + metadata extractor
+├── scanner.py                # File scanner + metadata extractor + companion .lrc reader
 ├── database.py               # SQLite schema + migrations + indexes
 ├── config.py                 # Configuration loader
 ├── install.sh                # System installer script
@@ -385,9 +391,15 @@ moidify/
 │   ├── index.html            # Main frontend
 │   ├── setup.html            # First-run setup wizard
 │   ├── shared.html           # Public shared playlist page
+│   ├── shared-album.html     # Public shared album page
 │   ├── admin.html            # Admin dashboard
+│   ├── admin.css             # Admin dashboard styles
+│   ├── admin.js              # Admin dashboard logic
 │   ├── style.css             # @imports all CSS files
 │   ├── logo.png              # App logo
+│   ├── lang/                 # JSON translation files
+│   │   ├── en.json
+│   │   └── de.json
 │   ├── css/                  # Split CSS by feature
 │   │   ├── variables.css     # CSS vars, light mode overrides
 │   │   ├── layout.css        # App grid, html/body
@@ -409,7 +421,7 @@ moidify/
 │       ├── state.js          # App state + utility functions
 │       ├── icons.js          # SVG icon library
 │       ├── api.js            # API client + auth + favorites + playlists
-│       ├── i18n.js           # Internationalization (English/German)
+│       ├── i18n.js           # Internationalization (JSON translation loader)
 │       ├── player.js         # Audio engine + EQ + transcoding
 │       ├── queue.js          # Queue management + shuffle
 │       ├── lyrics.js         # Lyrics fetching + synced display
@@ -432,6 +444,7 @@ moidify/
 │           ├── genres.js
 │           ├── search.js
 │           └── navigate.js
+├── version.txt               # Current version
 └── music/                    # Your music goes here (local dev)
 ```
 
