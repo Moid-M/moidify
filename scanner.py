@@ -385,7 +385,17 @@ class MusicFileHandler(FileSystemEventHandler):
             return
         if event.is_directory:
             return
-        if Path(event.src_path).suffix.lower() not in AUDIO_EXTENSIONS:
+        ext = Path(event.src_path).suffix.lower()
+        if ext == '.lrc':
+            audio_path = Path(event.src_path).with_suffix('')
+            for ae in AUDIO_EXTENSIONS:
+                ap = audio_path.with_suffix(ae)
+                if ap.is_file():
+                    time.sleep(1)
+                    process_file(str(ap))
+                    break
+            return
+        if ext not in AUDIO_EXTENSIONS:
             return
         time.sleep(2)
         with SCAN_LOCK:
@@ -418,6 +428,14 @@ class MusicFileHandler(FileSystemEventHandler):
         dst_ext = Path(event.dest_path).suffix.lower()
         src_is_audio = src_ext in AUDIO_EXTENSIONS
         dst_is_audio = dst_ext in AUDIO_EXTENSIONS
+        if src_ext == '.lrc' or dst_ext == '.lrc':
+            audio_path = Path(event.dest_path if dst_ext == '.lrc' else event.src_path).with_suffix('')
+            for ae in AUDIO_EXTENSIONS:
+                ap = audio_path.with_suffix(ae)
+                if ap.is_file():
+                    process_file(str(ap))
+                    break
+            return
         if not dst_is_audio and not src_is_audio:
             return
         if src_is_audio:

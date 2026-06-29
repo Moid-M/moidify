@@ -6,6 +6,7 @@ var lyricsEditMode = false;
 var lyricsSourceText = '';
 var lyricsScrollRAF = null;
 var _lyricsGen = 0;
+var _lyricsAttempted = false;
 
 function toggleLyrics() {
   var overlay = document.getElementById('lyrics-overlay');
@@ -39,6 +40,7 @@ function clearLyricsSync() {
 
 async function fetchLyrics(track) {
   var gen = ++_lyricsGen;
+  _lyricsAttempted = true;
   var content = document.getElementById('lyrics-content');
   document.getElementById('lyrics-title').textContent = track.title || '';
   document.getElementById('lyrics-artist').textContent = (track.artist || '') + (track.album ? '  ' + track.album : '');
@@ -72,6 +74,9 @@ async function fetchLyrics(track) {
 
   if (!lyricsText) {
     content.innerHTML = '<div class="lyrics-placeholder"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><p>No lyrics found</p><p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Click retry to search again</p><button onclick="fetchLyrics(state.queue[state.currentIndex])" class="btn-secondary" style="margin-top:12px;">Retry</button></div>';
+    window.currentLyrics = [];
+    window.currentLyricsText = '';
+    if (typeof renderNowPlayingLyrics === 'function') renderNowPlayingLyrics();
     return;
   }
 

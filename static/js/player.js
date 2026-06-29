@@ -3,6 +3,7 @@ function playFromQueue(queue, index) {
     state.playHistory.push(state.currentIndex);
   }
   state.queue = queue; state.currentIndex = index;
+  if (typeof _lyricsAttempted !== 'undefined') _lyricsAttempted = false;
 
   if (state.shuffle && (!state.shuffleOrder.length || state.shuffleOrder.length !== queue.length)) {
     state.shuffleOrder = generateShuffleOrder(queue.length);
@@ -404,9 +405,11 @@ function renderNowPlayingLyrics() {
     }).join('');
   } else if (window.currentLyricsText) {
     container.innerHTML = '<div class="lyrics-line">' + esc(window.currentLyricsText).replace(/\n/g, '<br>') + '</div>';
+  } else if (_lyricsAttempted) {
+    container.innerHTML = '<div class="lyrics-line" style="color:var(--text-muted);">No lyrics available</div>';
   } else {
     container.innerHTML = '<div class="lyrics-line" style="color:var(--text-muted);">Loading lyrics...</div>';
-    fetchLyrics(track).then(function() { renderNowPlayingLyrics(); });
+    fetchLyrics(track);
   }
 }
 

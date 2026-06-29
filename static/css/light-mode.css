@@ -1,0 +1,112 @@
+/* ---- Light Mode ---- */
+body.light-mode {
+  --bg: #f2f2f5;
+  --bg-elevated: #ffffff;
+  --bg-hover: #e4e4ea;
+  --bg-card: #ffffff;
+  --sidebar-bg: #eaeaef;
+  --player-bg: #ffffff;
+  --topbar-bg: #fafafa;
+  --player-border: #d0d0d8;
+  --text-primary: #121214;
+  --text-secondary: #555558;
+  --text-muted: #8a8a90;
+  --accent-dim: color-mix(in srgb, var(--accent) 85%, white);
+  --accent-glow: color-mix(in srgb, var(--accent) 30%, white);
+  --border: #ccccd0;
+}
+
+body.light-mode #player-bar {
+  background: var(--player-bg);
+  border-top: 1px solid var(--player-border);
+}
+
+body.light-mode #topbar {
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--player-border);
+}
+
+body.light-mode .sidebar,
+body.light-mode #sidebar {
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--player-border);
+}
+
+body.light-mode #queue-panel {
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--player-border);
+}
+
+body.light-mode #content {
+  background: var(--bg);
+}
+
+body.light-mode .track-row:hover {
+  background: var(--bg-hover);
+}
+
+body.light-mode .track-row.playing {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+body.light-mode .album-card {
+  background: var(--bg-card);
+  border: 1px solid var(--player-border);
+}
+body.light-mode .album-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+body.light-mode .album-detail-header img {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+body.light-mode #nowplaying-overlay {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+body.light-mode #nowplaying-panel {
+  background: var(--bg-elevated);
+}
+
+body.light-mode #np-backdrop {
+  filter: blur(60px) brightness(1) saturate(0.8);
+}
+
+body.light-mode #np-lyrics-content {
+  color: #000;
+}
+
+body.light-mode #np-title {
+  color: var(--text-primary);
+}
+body.light-mode #np-artist {
+  color: var(--text-secondary);
+}
+
+body.light-mode #np-controls .ctrl-btn {
+  color: rgba(0,0,0,0.6);
+}
+body.light-mode #np-controls .ctrl-btn:hover {
+  color: #000;
+  background: rgba(0,0,0,0.06);
+}
+body.light-mode .np-play-btn {
+  background: rgba(0,0,0,0.08) !important;
+}
+body.light-mode .np-play-btn:hover {
+  background: rgba(0,0,0,0.14) !important;
+}
+
+body.light-mode #np-progress-wrap .seek-bar {
+  background: rgba(0,0,0,0.12);
+}
+body.light-mode #np-progress-wrap .seek-bar::-webkit-slider-thumb {
+  background: #000;
+  box-shadow: 0 0 8px rgba(0,0,0,0.2);
+}
+body.light-mode .np-times {
+  color: rgba(0,0,0,0.35);
+}
