@@ -38,7 +38,8 @@ def auth_token(client):
         "password": "TestPass123!",
     })
     data = r.json()
-    return data.get("token")
+    assert "token" in data, f"Setup init failed: {data}"
+    return data["token"]
 
 
 def test_health(client):
@@ -68,7 +69,7 @@ def test_setup_init(client):
     assert r.status_code == 200
     data = r.json()
     assert "token" in data
-    assert data.get("username") == "admin"
+    assert data["user"]["username"] == "admin"
 
 
 def test_login(client, auth_token):
