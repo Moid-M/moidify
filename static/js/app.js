@@ -59,12 +59,6 @@ function setupEvents() {
     fs.style.display = 'flex';
   });
   // Now-playing overlay navigation
-  document.getElementById('np-cover').addEventListener('click', function(e) {
-    e.stopPropagation();
-    var album = this.dataset.navigateAlbum;
-    var artist = this.dataset.navigateArtist;
-    if (album) navigate('album', {album: album, artist: artist});
-  });
   document.getElementById('np-title').addEventListener('click', function(e) {
     e.stopPropagation();
     var album = this.dataset.navigateAlbum;

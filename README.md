@@ -55,9 +55,11 @@
 
 **🎛️ 10-Band Equalizer** — presets included (Rock, Jazz, Dance, Classical…)
 
-**📜 Lyrics** — auto-fetched from LRCLIB, companion `.lrc` file support, synced scrolling; upload lyrics per-track from the admin panel
+**📜 Lyrics** — auto-fetched from LRCLIB, companion `.lrc` file support, synced scrolling; upload lyrics per-track from the admin panel, batch-download all missing lyrics at once
 
-**🛡️ Admin Dashboard** — rescan library, manage users, view play stats, upload files via drag-and-drop, upload `.lrc` lyrics per track
+**🪟 Liquid Glass Theme** — frosted glass blur effects on the player bar, modals, overlays, context menus, and hover states. Toggle in Settings → Theme → Liquid Glass
+
+**🛡️ Admin Dashboard** — rescan library, manage users, view play stats, upload files via drag-and-drop, upload `.lrc` lyrics per track, batch-scan all tracks for missing lyrics
 
 **📥 YouTube / SoundCloud Import** — download any audio URL via the admin panel or `moidify download <url>` CLI command (uses yt-dlp, converts to 192kbps MP3)
 
@@ -370,7 +372,7 @@ moidify/
 │   ├── tracks.py             # Tracks, albums, artists, genres, home
 │   ├── streaming.py          # Transcode, stream, cover art, download album
 │   ├── playlists.py          # Playlists CRUD, share, folders, favorites, export
-│   ├── admin.py              # Dashboard, stats, users, rescan, LRC upload
+│   ├── admin.py              # Dashboard, stats, users, rescan, LRC upload, lyrics batch scan
 │   ├── lastfm.py             # Last.fm scrobbling (now playing, scrobble, connect)
 │   └── subsonic.py           # Subsonic API compatibility layer (23 endpoints)
 ├── tests/
@@ -379,7 +381,7 @@ moidify/
 ├── Dockerfile                # Container image
 ├── docker-compose.yml        # Docker orchestration
 ├── server.py                 # FastAPI app (~80 lines, includes all route modules)
-├── scanner.py                # File scanner + metadata extractor + companion .lrc reader
+├── scanner.py                # File scanner + metadata extractor + companion .lrc reader + async
 ├── database.py               # SQLite schema + migrations + indexes
 ├── config.py                 # Configuration loader
 ├── install.sh                # System installer script
@@ -413,6 +415,7 @@ moidify/
 │   │   ├── nowplaying.css    # Now-playing overlay
 │   │   ├── overlays.css      # Fullscreen art, EQ panel, etc
 │   │   ├── animations.css    # All keyframes
+│   │   ├── liquid-glass.css  # Liquid Glass theme (frosted glass effects)
 │   │   ├── features.css      # Misc feature styles
 │   │   ├── mini-player.css   # Mini player
 │   │   ├── toast.css         # Toast notifications

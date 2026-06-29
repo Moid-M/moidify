@@ -30,18 +30,18 @@
 }
 
 body.light-mode {
-  --bg: #ffffff;
+  --bg: #f5f5f7;
   --bg-elevated: #ffffff;
-  --bg-hover: #eaeaea;
+  --bg-hover: #e8e8ed;
   --bg-card: #ffffff;
-  --sidebar-bg: #f2f2f2;
-  --player-bg: #ffffff;
-  --topbar-bg: #ffffff;
-  --player-border: #cccccc;
-  --text-primary: #000000;
-  --text-secondary: #444444;
-  --text-muted: #777777;
+  --sidebar-bg: #f0f0f3;
+  --player-bg: #fafafa;
+  --topbar-bg: #fafafa;
+  --player-border: #d8d8df;
+  --text-primary: #1c1c1e;
+  --text-secondary: #636366;
+  --text-muted: #8e8e93;
   --accent-dim: color-mix(in srgb, var(--accent) 85%, white);
   --accent-glow: color-mix(in srgb, var(--accent) 30%, white);
-  --border: #d4d4d4;
+  --border: #d1d1d6;
 }

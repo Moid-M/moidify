@@ -373,38 +373,17 @@ function toggleNowPlaying() {
 function updateNowPlaying() {
   var track = state.queue[state.currentIndex];
   if (!track) return;
-  var cover = document.getElementById('np-cover');
-  cover.src = '/api/cover/' + track.id;
+  var coverUrl = '/api/cover/' + track.id;
+  document.getElementById('np-backdrop').style.backgroundImage = 'url(' + coverUrl + ')';
   document.getElementById('np-title').textContent = track.title || '';
   document.getElementById('np-artist').textContent = (track.artist || 'Unknown') + (track.album ? ' \u2022 ' + track.album : '');
   document.getElementById('np-total-time').textContent = formatTime(audio.duration || track.duration || 0);
   // Store nav data for click handlers
-  cover.dataset.navigateAlbum = track.album || '';
-  cover.dataset.navigateArtist = track.artist || '';
   document.getElementById('np-title').dataset.navigateAlbum = track.album || '';
   document.getElementById('np-title').dataset.navigateArtist = track.artist || '';
   document.getElementById('np-artist').dataset.navigateArtist = track.artist || '';
   updateNowPlayingProgress();
   renderNowPlayingLyrics();
-  // Extract dominant color from cover art
-  cover.onload = function() { extractAlbumColor(cover); };
-  if (cover.complete && cover.naturalWidth) extractAlbumColor(cover);
-}
-
-function extractAlbumColor(img) {
-  var canvas = document.createElement('canvas');
-  canvas.width = 8; canvas.height = 8;
-  var ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0, 8, 8);
-  var data = ctx.getImageData(0, 0, 8, 8).data;
-  var r = 0, g = 0, b = 0, count = 0;
-  for (var i = 0; i < data.length; i += 16) {
-    r += data[i]; g += data[i+1]; b += data[i+2]; count++;
-  }
-  if (!count) return;
-  r = Math.round(r / count); g = Math.round(g / count); b = Math.round(b / count);
-  document.getElementById('nowplaying-panel').style.setProperty('--np-accent', 'rgba(' + r + ',' + g + ',' + b + ',0.3)');
-  document.getElementById('nowplaying-overlay').style.setProperty('--np-accent', 'rgba(' + r + ',' + g + ',' + b + ',0.15)');
 }
 
 function updateNowPlayingProgress() {

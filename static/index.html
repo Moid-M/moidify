@@ -233,32 +233,30 @@
   <div id="fs-art" style="display:none"><img id="fs-art-img"><button id="fs-art-close">&times;</button></div>
 
   <div id="nowplaying-overlay" style="display:none">
+    <div id="np-backdrop"></div>
     <div id="nowplaying-panel">
-      <div class="nowplaying-header">
+      <div class="np-header">
+        <div class="np-info">
+          <span id="np-title"></span>
+          <span id="np-artist"></span>
+        </div>
         <button id="close-np-btn" class="icon-btn" title="Close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
-      <div id="nowplaying-body">
-        <div id="np-art-section">
-          <img id="np-cover" src="/static/logo.png" alt="Now playing cover">
-          <div id="np-info">
-            <span id="np-title"></span>
-            <span id="np-artist"></span>
-          </div>
-          <div id="np-controls">
-            <button id="np-prev" class="ctrl-btn"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="19,20 9,12 19,4"/><polygon points="5,4 5,20 7,20 7,4"/></svg></button>
-            <button id="np-play" class="ctrl-btn" style="width:56px;height:56px;font-size:28px;"><svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg></button>
-            <button id="np-next" class="ctrl-btn"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="5,20 15,12 5,4"/><polygon points="17,4 17,20 19,20 19,4"/></svg></button>
-          </div>
-          <div id="np-progress-wrap">
-            <input type="range" id="np-seek" min="0" max="100" value="0" class="seek-bar">
-            <div class="np-times">
-              <span id="np-current-time">0:00</span>
-              <span id="np-total-time">0:00</span>
-            </div>
+      <div id="np-body">
+        <div id="np-lyrics-content" class="lyrics-content"></div>
+      </div>
+      <div class="np-footer">
+        <div id="np-progress-wrap">
+          <input type="range" id="np-seek" min="0" max="100" value="0" class="seek-bar">
+          <div class="np-times">
+            <span id="np-current-time">0:00</span>
+            <span id="np-total-time">0:00</span>
           </div>
         </div>
-        <div id="np-lyrics-section">
-          <div id="np-lyrics-content" class="lyrics-content"></div>
+        <div id="np-controls">
+          <button id="np-prev" class="ctrl-btn"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="19,20 9,12 19,4"/><polygon points="5,4 5,20 7,20 7,4"/></svg></button>
+          <button id="np-play" class="ctrl-btn np-play-btn"><svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg></button>
+          <button id="np-next" class="ctrl-btn"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="5,20 15,12 5,4"/><polygon points="17,4 17,20 19,20 19,4"/></svg></button>
         </div>
       </div>
     </div>

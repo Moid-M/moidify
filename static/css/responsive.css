@@ -355,22 +355,16 @@ body.sidebar-open #sidebar {
     max-width: none;
     border-radius: 0;
   }
-  #nowplaying-body { flex-direction: column; }
-  #np-art-section {
-    width: 100%;
-    padding: 20px;
-    gap: 10px;
-  }
-  #np-art-section img { width: 60%; max-width: 200px; }
-  #np-title { font-size: 18px; }
+  #np-body { padding: 0 16px; }
+  #np-lyrics-content { font-size: 16px; line-height: 2; }
+  .np-header { padding: 16px; }
+  #np-title { font-size: 16px; }
   #np-artist { font-size: 13px; }
-  #np-controls { gap: 12px; }
-  #np-lyrics-section {
-    width: 100%;
-    padding: 20px;
-    max-height: 40vh;
-  }
-  #np-lyrics-content { font-size: 15px; }
+  #np-progress-wrap { width: 80%; }
+  #np-controls { gap: 20px; }
+  .np-footer { padding: 12px 16px 20px; }
+  #np-lyrics-content .lyrics-line.active .lyrics-text { font-size: 20px; }
+  #np-lyrics-content .lyrics-line { padding: 4px 0; }
 
   /* --- Genres --- */
   .genre-grid {
