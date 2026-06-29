@@ -72,6 +72,21 @@ if (isLight) { document.documentElement.style.setProperty('--bg', '#f5f5f5'); do
       </div>
 
       <div class="chart-card" style="margin-bottom:32px;">
+        <h3 style="margin-bottom:12px">Lyrics</h3>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <button onclick="scanAllLyrics()" class="admin-btn" style="display:inline-flex;align-items:center;gap:6px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Download All Missing
+          </button>
+          <button onclick="scanAllLyrics(true)" class="admin-btn" style="display:inline-flex;align-items:center;gap:6px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+            Download All (Force)
+          </button>
+        </div>
+        <div id="lyrics-scan-result" style="font-size:12px;color:var(--text2);margin-top:8px;"></div>
+      </div>
+
+      <div class="chart-card" style="margin-bottom:32px;">
         <h3 style="margin-bottom:12px">Registration</h3>
         <div style="display:flex;align-items:center;gap:12px;">
           <span id="registration-status-label" style="font-size:13px;color:var(--text2);">Open</span>

@@ -58,7 +58,8 @@ function renderThemeTab() {
   var lightChecked = state.lightMode ? ' checked' : '';
   var autoChecked = state.autoTheme ? ' checked' : '';
   var currentLang = getLanguage();
-  var langOpts = Object.keys(TRANSLATIONS).map(function(code) {
+  var availableLangs = ['en', 'de'];
+  var langOpts = availableLangs.map(function(code) {
     var label = code === 'en' ? 'English' : (code === 'de' ? 'Deutsch' : code);
     return '<option value="'+code+'"'+(currentLang===code?' selected':'')+'>'+label+'</option>';
   }).join('');
@@ -77,6 +78,9 @@ function renderThemeTab() {
     '<div class="settings-section"><h3 data-i18n="settings.appearance">Appearance</h3>'+
     '<label class="toggle-row" data-i18n-row="light"><span data-i18n="settings.lightMode">Light Mode</span><input type="checkbox" id="light-toggle"'+lightChecked+'><span class="toggle-slider"></span></label>'+
     '<label class="toggle-row" data-i18n-row="autoTheme"><span data-i18n="settings.autoTheme">Follow system theme</span><input type="checkbox" id="auto-theme-toggle"'+autoChecked+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="settings-section"><h3>Theme Style</h3>'+
+    '<label class="toggle-row"><span>Liquid Glass</span><input type="checkbox" id="liquid-glass-toggle"'+(state.liquidGlass?' checked':'')+'><span class="toggle-slider"></span></label>'+
+    '<p style="color:var(--text-muted);font-size:12px;margin-top:-4px;">Frosted glass effects on the player bar, overlays, modals, and hover states.</p></div>'+
     '<div class="settings-section"><h3>Background Brightness</h3>'+
     '<div class="crossfade-wrap"><span style="font-size:12px;color:var(--text-muted);min-width:30px;" id="bg-brightness-label">'+bgBrightness+'%</span>'+
     '<input type="range" id="bg-brightness-slider" min="50" max="150" step="5" value="'+bgBrightness+'"><span style="font-size:12px;color:var(--text-muted);">150%</span></div></div>'+
@@ -132,6 +136,14 @@ function renderThemeTab() {
       applyTheme();
     });
     if (state.autoTheme) document.getElementById('light-toggle').disabled = true;
+  }
+
+  var lg = document.getElementById('liquid-glass-toggle');
+  if (lg) {
+    lg.addEventListener('change', function() {
+      state.liquidGlass = this.checked;
+      applyLiquidGlass();
+    });
   }
 
   var ls = document.getElementById('lang-select');

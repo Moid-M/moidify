@@ -558,7 +558,8 @@ function renderTracks() {
     var hasLyrics = t.lyrics ? 'lyrics-has' : 'lyrics-none';
     html += '<tr data-track-id="'+t.id+'"><td><input type="checkbox" class="track-check" data-id="'+t.id+'" '+checked+'></td>'+
       '<td>'+t.id+'</td><td>'+esc(t.title||'')+'</td><td>'+esc(t.artist||'')+'</td><td>'+esc(t.album||'')+'</td><td>'+dur+'</td>'+
-      '<td><button class="lrc-btn '+hasLyrics+'" data-id="'+t.id+'">♪</button></td>'+
+      '<td><button class="lrc-btn '+hasLyrics+'" data-id="'+t.id+'" title="Left-click: upload LRC, Right-click: remove lyrics">♪</button>'+
+      '<button class="fetch-lyrics-btn" data-id="'+t.id+'" title="Fetch from LRCLib">↻</button></td>'+
       '<td><button class="del-btn" data-id="'+t.id+'" data-title="'+esc(t.title||'')+'">Delete</button></td></tr>';
   }
   document.getElementById('track-body').innerHTML = html;
@@ -591,6 +592,12 @@ function renderTracks() {
       if (this.classList.contains('lyrics-has')) {
         deleteTrackLrc(this.dataset.id);
       }
+    });
+  });
+
+  document.querySelectorAll('.fetch-lyrics-btn').forEach(function(b) {
+    b.addEventListener('click', function() {
+      fetchTrackLyrics(this.dataset.id);
     });
   });
 
@@ -680,6 +687,33 @@ async function reloadTrack(id) {
     }
     filterTracks();
   } catch(e) {}
+}
+
+async function scanAllLyrics(force) {
+  var resultEl = document.getElementById('lyrics-scan-result');
+  resultEl.textContent = 'Scanning...';
+  resultEl.style.color = 'var(--text2)';
+  try {
+    var r = await api('/api/admin/lyrics/scan-all'+(force?'?force=true':''), {method:'POST'});
+    if (!r.ok) { var e = await r.json(); resultEl.textContent = 'Error: '+(e.detail||'Request failed'); resultEl.style.color = 'var(--danger)'; return; }
+    var d = await r.json();
+    resultEl.textContent = 'Scanned '+d.scanned+' track(s), found '+d.found+' lyrics'+(d.errors?' ('+d.errors+' errors)':'');
+    resultEl.style.color = d.found > 0 ? 'var(--accent)' : 'var(--text2)';
+    loadTracks();
+  } catch(e) { resultEl.textContent = 'Error: '+e.message; resultEl.style.color = 'var(--danger)'; }
+}
+
+async function fetchTrackLyrics(id) {
+  try {
+    var r = await api('/api/admin/tracks/'+id+'/lyrics/fetch', {method:'POST'});
+    if (!r.ok) { var e = await r.json(); alert(e.detail||'Error'); return; }
+    var d = await r.json();
+    if (d.lyrics) {
+      reloadTrack(parseInt(id));
+    } else {
+      alert('No lyrics found for this track on LRCLib');
+    }
+  } catch(e) { alert('Error: '+e.message); }
 }
 
 async function deleteTrackLrc(id) {

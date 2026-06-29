@@ -10,13 +10,14 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, HTTPException, Header, UploadFile, File
+from fastapi import APIRouter, HTTPException, Header, Query, UploadFile, File
 
 from config import BASE_DIR, MUSIC_DIR, COVERS_DIR, MAX_UPLOAD_SIZE
 from database import get_connection
 from scanner import scan_existing, get_scan_status, process_file
 from routes.deps import (
     _require_admin, _hash_password, _create_session, _validate_password,
+    _fetch_lyrics_from_lrclib,
     ScheduleBody, ToggleAdminBody, CreateUserBody, ChangePasswordBody,
 )
 from pydantic import BaseModel
@@ -513,6 +514,65 @@ def admin_delete_lrc(track_id: int, token: Optional[str] = Header(None)):
             logger.warning("Could not remove companion .lrc at %s: %s", lrc_path, e)
     conn.close()
     return {"ok": True}
+
+
+def _save_lyrics_to_track(track_id: int, content: str, file_path: str):
+    conn = get_connection()
+    conn.execute("UPDATE tracks SET lyrics = ? WHERE id = ?", (content, track_id))
+    conn.commit()
+    conn.close()
+    audio_path = Path(file_path)
+    lrc_dest = audio_path.with_suffix('.lrc')
+    try:
+        lrc_dest.write_text(content, encoding='utf-8')
+    except Exception as e:
+        logger.warning("Could not write companion .lrc at %s: %s", lrc_dest, e)
+
+
+@router.post("/api/admin/lyrics/scan-all")
+def admin_scan_all_lyrics(force: bool = Query(False), token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    if force:
+        rows = conn.execute("SELECT id, artist, title, album, file_path FROM tracks").fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, artist, title, album, file_path FROM tracks WHERE lyrics IS NULL OR lyrics = ''"
+        ).fetchall()
+    conn.close()
+    scanned = 0
+    found = 0
+    errors = 0
+    for row in rows:
+        scanned += 1
+        try:
+            lyrics = _fetch_lyrics_from_lrclib(
+                row["artist"] or "", row["title"] or "", row["album"] or ""
+            )
+            if lyrics:
+                _save_lyrics_to_track(row["id"], lyrics, row["file_path"])
+                found += 1
+        except Exception:
+            errors += 1
+    return {"scanned": scanned, "found": found, "errors": errors}
+
+
+@router.post("/api/admin/tracks/{track_id}/lyrics/fetch")
+def admin_fetch_track_lyrics(track_id: int, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, artist, title, album, file_path FROM tracks WHERE id = ?", (track_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "Track not found")
+    lyrics = _fetch_lyrics_from_lrclib(
+        row["artist"] or "", row["title"] or "", row["album"] or ""
+    )
+    if lyrics:
+        _save_lyrics_to_track(row["id"], lyrics, row["file_path"])
+    return {"ok": True, "lyrics": lyrics}
 
 
 @router.get("/api/admin/albums")

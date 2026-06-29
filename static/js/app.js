@@ -299,6 +299,13 @@ function setupEvents() {
       if (npOverlay && npOverlay.style.display !== 'none') {
         updateNowPlayingProgress();
       }
+      if (state.crossfade > 0 && !state.gapless && !isCrossfading && state.currentIndex >= 0 && !audio.paused) {
+        var remaining = audio.duration - audio.currentTime;
+        if (remaining > 0 && remaining <= state.crossfade) {
+          var nextIdx = getNextTrackIndex();
+          if (nextIdx != null) startCrossfade(state.queue, nextIdx);
+        }
+      }
     }
   });
 
@@ -596,6 +603,7 @@ function restoreLocalSession() {
 function init() {
   applyAccent(state.accentColor);
   applyTheme();
+  applyLiquidGlass();
   applyAnimationSettings();
   applyLanguage();
   applyFontSize(localStorage.getItem('moidify_font_size') || 'normal');

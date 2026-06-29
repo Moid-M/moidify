@@ -111,6 +111,7 @@ function fetchSimilarAndAppend(lastTrackId) {
 
 function nextTrack() {
   if (state.queue.length===0) return;
+  if (isCrossfading) return;
   clearCrossfadeTimer();
   if (state.repeatMode === 'one' && state.currentIndex >= 0) {
     audio.currentTime = 0; audio.play().catch(function() {});
@@ -202,33 +203,51 @@ function seekRelative(seconds) {
   audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
 }
 
+function startCrossfade(queue, index) {
+  if (isCrossfading) return;
+  isCrossfading = true;
+  var duration = state.crossfade;
+  var fadeInterval = 50;
+  var targetVol = audio.muted ? 0 : (parseFloat(document.getElementById('volume').value) || 1);
+
+  var steps = Math.floor((duration * 1000) / fadeInterval);
+  var step = 0;
+  var timer = setInterval(function() {
+    step++;
+    var progress = step / steps;
+    audio.volume = targetVol * Math.max(0, 1 - progress);
+    if (progress >= 1) {
+      clearInterval(timer);
+      audio.volume = 0;
+      playFromQueue(queue, index);
+      var fadeSteps = Math.max(8, Math.floor(duration * 1000 / fadeInterval / 3));
+      var fadeStep = 0;
+      var fadeIn = setInterval(function() {
+        fadeStep++;
+        var p = fadeStep / fadeSteps;
+        audio.volume = Math.min(targetVol, p * targetVol);
+        if (audio.volume + 0.01 >= targetVol) { clearInterval(fadeIn); isCrossfading = false; }
+      }, fadeInterval);
+    }
+  }, fadeInterval);
+}
+
 function crossfadeTo(queue, index) {
   if (isCrossfading) return;
   isCrossfading = true;
   var duration = state.crossfade;
   var fadeInterval = 50;
-  var steps = Math.floor((duration * 1000) / fadeInterval);
-  var step = 0;
-  var wasMuted = audio.muted;
+  var targetVol = audio.muted ? 0 : (parseFloat(document.getElementById('volume').value) || 1);
 
-  var timer = setInterval(function() {
-    step++;
-    var progress = step / steps;
-    var vol = Math.max(0, 1 - progress);
-    try { audio.volume = vol; } catch(e) {}
-    if (progress >= 1) {
-      clearInterval(timer);
-      if (!wasMuted) audio.volume = parseFloat(document.getElementById('volume').value) || 1;
-      playFromQueue(queue, index);
-      var fadeIn = setInterval(function() {
-        if (wasMuted) { clearInterval(fadeIn); isCrossfading = false; return; }
-        var target = parseFloat(document.getElementById('volume').value) || 1;
-        if (!audio.muted) {
-          audio.volume = Math.min(target, audio.volume + 0.05);
-        }
-        if (audio.volume >= target) { clearInterval(fadeIn); isCrossfading = false; }
-      }, fadeInterval);
-    }
+  audio.volume = 0;
+  playFromQueue(queue, index);
+  var fadeSteps = Math.max(8, Math.floor(duration * 1000 / fadeInterval / 3));
+  var fadeStep = 0;
+  var fadeIn = setInterval(function() {
+    fadeStep++;
+    var p = fadeStep / fadeSteps;
+    audio.volume = Math.min(targetVol, p * targetVol);
+    if (audio.volume + 0.01 >= targetVol) { clearInterval(fadeIn); isCrossfading = false; }
   }, fadeInterval);
 }
 

@@ -1,0 +1,515 @@
+/* ---- Liquid Glass Theme ---- */
+body.theme-liquid-glass {
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.15);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --glass-blur: 20px;
+}
+
+body.theme-liquid-glass.light-mode {
+  --glass-bg: rgba(255, 255, 255, 0.5);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-border-hover: rgba(0, 0, 0, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* ---- Player Bar ---- */
+body.theme-liquid-glass #player-bar {
+  background: rgba(16, 16, 18, 0.75);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border-top: 1px solid var(--glass-border);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+}
+
+body.theme-liquid-glass.light-mode #player-bar {
+  background: rgba(240, 240, 245, 0.7);
+}
+
+/* Player seek bar */
+body.theme-liquid-glass .seek-wrap #seek {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+body.theme-liquid-glass .seek-wrap .seek-dot {
+  box-shadow: 0 0 8px rgba(160, 160, 160, 0.5);
+}
+
+/* ---- Player Controls ---- */
+body.theme-liquid-glass .ctrl-btn {
+  background: transparent;
+  border-radius: 12px;
+  transition: background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+}
+
+body.theme-liquid-glass .ctrl-btn:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 var(--glass-border);
+  transform: translateY(-1px);
+}
+
+body.theme-liquid-glass .ctrl-btn:active {
+  transform: scale(0.95);
+}
+
+body.theme-liquid-glass .play-btn {
+  background: linear-gradient(135deg, rgba(160, 160, 160, 0.8), rgba(200, 200, 200, 0.4));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+body.theme-liquid-glass .play-btn:hover {
+  background: linear-gradient(135deg, rgba(200, 200, 200, 0.9), rgba(220, 220, 220, 0.5));
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), 0 0 40px rgba(160, 160, 160, 0.1);
+  transform: scale(1.06) translateY(-1px);
+}
+
+/* Volume slider */
+body.theme-liquid-glass #volume {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+body.theme-liquid-glass #volume::-webkit-slider-thumb {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+body.theme-liquid-glass #volume::-moz-range-thumb {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Modal Overlay ---- */
+body.theme-liquid-glass #modal-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+body.theme-liquid-glass #modal {
+  background: rgba(26, 26, 30, 0.85);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode #modal {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* Modal buttons */
+body.theme-liquid-glass .btn-primary {
+  background: linear-gradient(135deg, rgba(160, 160, 160, 0.8), rgba(180, 180, 180, 0.4));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.25s ease;
+}
+
+body.theme-liquid-glass .btn-primary:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+body.theme-liquid-glass .btn-secondary {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, box-shadow 0.25s ease;
+}
+
+body.theme-liquid-glass .btn-secondary:hover {
+  background: var(--glass-bg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+/* ---- Context Menu ---- */
+body.theme-liquid-glass .context-menu {
+  background: rgba(26, 26, 30, 0.85);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode .context-menu {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+body.theme-liquid-glass .context-menu-item:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ---- EQ Overlay ---- */
+body.theme-liquid-glass #eq-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+body.theme-liquid-glass #eq-panel {
+  background: rgba(26, 26, 30, 0.85);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode #eq-panel {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* ---- Lyrics Panel ---- */
+body.theme-liquid-glass #lyrics-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+body.theme-liquid-glass #lyrics-panel {
+  background: rgba(26, 26, 30, 0.85);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode #lyrics-panel {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* ---- Now Playing Overlay ---- */
+body.theme-liquid-glass #nowplaying-overlay {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+body.theme-liquid-glass #nowplaying-panel {
+  background: rgba(20, 20, 24, 0.8);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode #nowplaying-panel {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+body.theme-liquid-glass #np-controls .ctrl-btn:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+body.theme-liquid-glass #np-play.ctrl-btn:hover {
+  background: linear-gradient(135deg, rgba(160, 160, 160, 0.8), rgba(200, 200, 200, 0.4));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Mini Player ---- */
+body.theme-liquid-glass #mini-player {
+  background: rgba(26, 26, 30, 0.85);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode #mini-player {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+body.theme-liquid-glass #mini-controls .ctrl-btn:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ---- Full-Screen Art ---- */
+body.theme-liquid-glass #fs-art {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+body.theme-liquid-glass #fs-art-close {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  transition: background 0.25s ease, transform 0.2s ease;
+}
+
+body.theme-liquid-glass #fs-art-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.08);
+}
+
+/* ---- Keyboard Hint ---- */
+body.theme-liquid-glass .kbd-hint {
+  background: rgba(26, 26, 30, 0.85);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode .kbd-hint {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* ---- Topbar / Header ---- */
+body.theme-liquid-glass #topbar {
+  background: rgba(13, 13, 13, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode #topbar {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* ---- Sidebar ---- */
+body.theme-liquid-glass .sidebar,
+body.theme-liquid-glass #sidebar {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode .sidebar,
+body.theme-liquid-glass.light-mode #sidebar {
+  background: rgba(242, 242, 245, 0.7);
+}
+
+body.theme-liquid-glass .nav-item:hover,
+body.theme-liquid-glass .playlist-item:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+body.theme-liquid-glass .nav-item.active,
+body.theme-liquid-glass .playlist-item.active {
+  background: rgba(160, 160, 160, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ---- Album / Track Cards ---- */
+body.theme-liquid-glass .album-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+body.theme-liquid-glass .album-card:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--glass-border);
+  transform: translateY(-4px);
+}
+
+body.theme-liquid-glass .track-row:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+body.theme-liquid-glass .track-row.active,
+body.theme-liquid-glass .track-row.playing {
+  background: rgba(160, 160, 160, 0.1);
+}
+
+/* ---- Settings Modal ---- */
+body.theme-liquid-glass .settings-sidebar-item:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass .settings-sidebar-item.active {
+  background: rgba(160, 160, 160, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ---- Selection Bar ---- */
+body.theme-liquid-glass #selection-bar {
+  background: rgba(26, 26, 30, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--glass-border);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+}
+
+body.theme-liquid-glass.light-mode #selection-bar {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* ---- Track Row Buttons ---- */
+body.theme-liquid-glass .track-row .action-btn {
+  transition: transform 0.2s ease, box-shadow 0.25s ease;
+}
+
+body.theme-liquid-glass .track-row .action-btn:hover {
+  transform: scale(1.12);
+  filter: drop-shadow(0 2px 8px rgba(160, 160, 160, 0.3));
+}
+
+/* ---- User Table Rows ---- */
+body.theme-liquid-glass .user-table tr:hover td {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ---- Drag Handle ---- */
+body.theme-liquid-glass .drag-handle:hover {
+  box-shadow: 0 0 12px rgba(160, 160, 160, 0.3);
+}
+
+/* ---- Pagination Buttons ---- */
+body.theme-liquid-glass .pagination button:hover:not(:disabled) {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+/* ---- Color Swatches ---- */
+body.theme-liquid-glass .color-swatch {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+body.theme-liquid-glass .color-swatch:hover {
+  transform: scale(1.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+body.theme-liquid-glass .color-swatch.active {
+  box-shadow: 0 0 0 3px var(--glass-border), 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Animations ---- */
+@keyframes glass-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+body.theme-liquid-glass .play-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: glass-shimmer 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+body.theme-liquid-glass .btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: glass-shimmer 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+body.theme-liquid-glass .play-btn,
+body.theme-liquid-glass .btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+/* ---- Toast ---- */
+body.theme-liquid-glass #toast-container .toast {
+  background: rgba(26, 26, 30, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode #toast-container .toast {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* ---- Search Box Dropdown ---- */
+body.theme-liquid-glass .search-results {
+  background: rgba(26, 26, 30, 0.85);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode .search-results {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* ---- Play Queue ---- */
+body.theme-liquid-glass #queue-panel {
+  background: rgba(13, 13, 13, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-left: 1px solid var(--glass-border);
+}
+
+body.theme-liquid-glass.light-mode #queue-panel {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+body.theme-liquid-glass .qitem:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ---- Admin Page ---- */
+body.theme-liquid-glass .sidebar {
+  background: rgba(19, 19, 19, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--glass-border);
+}
+
+body.theme-liquid-glass .stat:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--glass-border);
+  transform: translateY(-2px);
+}
+
+body.theme-liquid-glass .admin-btn {
+  transition: transform 0.2s ease, box-shadow 0.25s ease;
+}
+
+body.theme-liquid-glass .admin-btn:hover {
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}

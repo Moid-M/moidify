@@ -23,6 +23,7 @@ var state = {
   shuffle: localStorage.getItem('moidify_shuffle') === 'true',
   lightMode: localStorage.getItem('moidify_light') === 'true',
   autoTheme: localStorage.getItem('moidify_auto_theme') !== 'false',
+  liquidGlass: localStorage.getItem('moidify_liquid_glass') === 'true',
   sleepTimer: null,
   pinnedPlaylists: safeJSON('moidify_pinned', []),
   viewMode: localStorage.getItem('moidify_view') || 'grid',
@@ -156,6 +157,11 @@ function applyTheme() {
   localStorage.setItem('moidify_light', state.lightMode);
   localStorage.setItem('moidify_auto_theme', state.autoTheme);
   applyCustomThemeColors();
+}
+
+function applyLiquidGlass() {
+  document.body.classList.toggle('theme-liquid-glass', state.liquidGlass);
+  localStorage.setItem('moidify_liquid_glass', state.liquidGlass);
 }
 
 function applyCustomThemeColors() {
