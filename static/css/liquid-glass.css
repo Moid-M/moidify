@@ -8,18 +8,35 @@ body.theme-liquid-glass #app {
   background: var(--bg);
 }
 
+body.theme-liquid-glass #app {
+  grid-template-rows: 1fr;
+}
+
+body.theme-liquid-glass #content,
+body.theme-liquid-glass #sidebar {
+  padding-bottom: var(--player-h);
+}
+
 /* ---- Player Bar (Bottom Dock) ---- */
 body.theme-liquid-glass #player-bar {
-  background: rgba(12, 12, 14, 0.3);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(12, 12, 14, 0.35);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  box-shadow: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+  grid-column: auto;
+  grid-row: auto;
 }
 
 body.theme-liquid-glass.light-mode #player-bar {
-  background: rgba(255, 255, 255, 0.35);
-  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.4);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
 }
 
 /* ---- Sidebar (Left Dock) ---- */
@@ -70,9 +87,7 @@ body.theme-liquid-glass #content {
 
 /* ---- Modal ---- */
 body.theme-liquid-glass #modal-overlay {
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.45);
 }
 
 body.theme-liquid-glass #modal {
@@ -110,9 +125,7 @@ body.theme-liquid-glass .context-menu-item:hover {
 
 /* ---- EQ Panel ---- */
 body.theme-liquid-glass #eq-overlay {
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.45);
 }
 
 body.theme-liquid-glass #eq-panel {
@@ -130,9 +143,7 @@ body.theme-liquid-glass.light-mode #eq-panel {
 
 /* ---- Lyrics Overlay ---- */
 body.theme-liquid-glass #lyrics-overlay {
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.45);
 }
 
 body.theme-liquid-glass #lyrics-panel {
@@ -150,9 +161,7 @@ body.theme-liquid-glass.light-mode #lyrics-panel {
 
 /* ---- Now Playing ---- */
 body.theme-liquid-glass #nowplaying-overlay {
-  background: rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(0, 0, 0, 0.35);
 }
 
 body.theme-liquid-glass #nowplaying-panel {
@@ -237,16 +246,12 @@ body.theme-liquid-glass.light-mode .kbd-hint {
 
 /* ---- Full-Screen Art ---- */
 body.theme-liquid-glass #fs-art {
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(0, 0, 0, 0.45);
 }
 
 body.theme-liquid-glass #fs-art-close {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* ---- Album Cards ---- */

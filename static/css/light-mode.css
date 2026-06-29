@@ -64,15 +64,11 @@ body.light-mode .album-detail-header img {
 }
 
 body.light-mode #nowplaying-overlay {
-  background: rgba(255, 255, 255, 0.85);
-}
-
-body.light-mode #nowplaying-panel {
-  background: var(--bg-elevated);
+  background: rgba(255, 255, 255, 0.75);
 }
 
 body.light-mode #np-backdrop {
-  filter: blur(60px) brightness(1) saturate(0.8);
+  filter: brightness(0.7);
 }
 
 body.light-mode #np-lyrics-content {

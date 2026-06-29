@@ -374,8 +374,6 @@ function toggleNowPlaying() {
 function updateNowPlaying() {
   var track = state.queue[state.currentIndex];
   if (!track) return;
-  var coverUrl = '/api/cover/' + track.id;
-  document.getElementById('np-backdrop').style.backgroundImage = 'url(' + coverUrl + ')';
   document.getElementById('np-title').textContent = track.title || '';
   document.getElementById('np-artist').textContent = (track.artist || 'Unknown') + (track.album ? ' \u2022 ' + track.album : '');
   document.getElementById('np-total-time').textContent = formatTime(audio.duration || track.duration || 0);

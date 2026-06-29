@@ -3,17 +3,16 @@
   position: fixed; inset: 0; z-index: 200;
   display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity 0.6s ease;
-  background: rgba(0,0,0,0.85);
+  background: rgba(0,0,0,0.75);
 }
 #nowplaying-overlay.visible { opacity: 1; }
 
 #np-backdrop {
   position: absolute; inset: 0;
-  background-size: cover; background-position: center;
-  filter: blur(60px) brightness(0.3) saturate(1.2);
-  transform: scale(1.15);
+  background: var(--accent);
+  filter: brightness(0.25);
   opacity: 0;
-  transition: opacity 1s ease;
+  transition: opacity 0.8s ease;
   pointer-events: none;
 }
 #nowplaying-overlay.visible #np-backdrop { opacity: 1; }
