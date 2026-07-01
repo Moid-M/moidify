@@ -11,7 +11,7 @@ async function renderArtists(navId) {
   try {
     var artists = await apiJson('/api/artists');
     if (state._navId !== navId) return;
-    if (artists.length===0) { content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div><p style="color:#727272;">No artists found.</p>'; return; }
+    if (artists.length===0) { content.innerHTML = '<div class="content-header"><div class="view-title">Artists</div></div><p style="color:var(--text-muted);">No artists found.</p>'; return; }
     qs('.skeleton-grid', content).remove();
     artists.sort(function(a, b) {
       var aPinned = state.pinnedArtists.indexOf(a.artist) !== -1 ? 0 : 1;
@@ -29,7 +29,7 @@ async function renderArtists(navId) {
       grid.appendChild(card);
     });
     content.appendChild(grid);
-  } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+  } catch(e) { content.innerHTML = '<p style="color:var(--danger);">Error: '+esc(e.message)+'</p>'; }
 }
 
 async function renderArtistTracks(artist, navId) {
@@ -38,7 +38,7 @@ async function renderArtistTracks(artist, navId) {
   try {
     var filtered = await apiJson('/api/artists/tracks?artist='+encodeURIComponent(artist));
     if (state._navId !== navId) return;
-    if (filtered.length===0) { content.innerHTML += '<p style="color:#727272;">No tracks found.</p>'; return; }
+    if (filtered.length===0) { content.innerHTML += '<p style="color:var(--text-muted);">No tracks found.</p>'; return; }
     var list = document.createElement('div'); list.className = 'track-list';
     list.id = 'current-track-list';
     list.innerHTML = trackHeaderHTML();
@@ -49,5 +49,5 @@ async function renderArtistTracks(artist, navId) {
     addShuffleButton(filtered, 'Artist');
     var filterInput = document.getElementById('track-filter-input');
     if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
-  } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+  } catch(e) { content.innerHTML += '<p style="color:var(--danger);">Error: '+esc(e.message)+'</p>'; }
 }

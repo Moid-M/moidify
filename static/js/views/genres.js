@@ -5,7 +5,7 @@ async function renderGenres(navId) {
     var genres = await apiJson('/api/genres');
     if (state._navId !== navId) return;
     if (genres.length === 0) {
-      content.innerHTML += '<p style="color:#727272;padding:20px 0;">No genre tags found in your music.</p>';
+      content.innerHTML += '<p style="color:var(--text-muted);padding:20px 0;">No genre tags found in your music.</p>';
       return;
     }
     var grid = document.createElement('div'); grid.className = 'genre-grid';
@@ -18,7 +18,7 @@ async function renderGenres(navId) {
       grid.appendChild(card);
     });
     content.appendChild(grid);
-  } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+  } catch(e) { content.innerHTML += '<p style="color:var(--danger);">Error: '+esc(e.message)+'</p>'; }
 }
 
 async function renderGenreTracks(genre, navId) {
@@ -27,7 +27,7 @@ async function renderGenreTracks(genre, navId) {
   try {
     var tracks = await apiJson('/api/genres/tracks?genre='+encodeURIComponent(genre));
     if (state._navId !== navId) return;
-    if (tracks.length === 0) { content.innerHTML += '<p style="color:#727272;">No tracks found.</p>'; return; }
+    if (tracks.length === 0) { content.innerHTML += '<p style="color:var(--text-muted);">No tracks found.</p>'; return; }
     var list = document.createElement('div'); list.className = 'track-list';
     list.id = 'current-track-list';
     list.innerHTML = trackHeaderHTML();
@@ -38,5 +38,5 @@ async function renderGenreTracks(genre, navId) {
     addShuffleButton(tracks, genre);
     var filterInput = document.getElementById('track-filter-input');
     if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
-  } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+  } catch(e) { content.innerHTML += '<p style="color:var(--danger);">Error: '+esc(e.message)+'</p>'; }
 }

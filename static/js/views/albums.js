@@ -20,7 +20,7 @@ async function renderAlbums(navId) {
     var albums = state.albumGrouping ? [] : data;
     var groups = state.albumGrouping ? data : [];
     if ((!state.albumGrouping && albums.length === 0) || (state.albumGrouping && groups.length === 0)) {
-      content.innerHTML = '<div class="content-header"><div class="view-title">Albums</div></div><p style="color:#727272;padding:20px 0;">Drop music into the <strong>music/</strong> folder.</p>'; return;
+      content.innerHTML = '<div class="content-header"><div class="view-title">Albums</div></div><p style="color:var(--text-muted);padding:20px 0;">Drop music into the <strong>music/</strong> folder.</p>'; return;
     }
     if (!state.albumGrouping) {
       albums.sort(function(a, b) {
@@ -90,7 +90,7 @@ async function renderAlbums(navId) {
         renderAlbums();
       });
     }
-  } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+  } catch(e) { content.innerHTML = '<p style="color:var(--danger);">Error: '+esc(e.message)+'</p>'; }
 }
 
 function renderAlbumItem(container, album, isGrid) {
@@ -138,7 +138,7 @@ async function renderAlbumDetail(data, navId) {
     setupAlbumPlay(albumTracks);
     setupAlbumShuffle(albumTracks);
     setupAlbumShare(data.album, data.artist);
-  } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+  } catch(e) { content.innerHTML = '<p style="color:var(--danger);">Error: '+esc(e.message)+'</p>'; }
 }
 
 function setupAlbumPlay(tracks) {

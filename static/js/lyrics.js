@@ -7,6 +7,7 @@ var lyricsSourceText = '';
 var lyricsScrollRAF = null;
 var _lyricsGen = 0;
 var _lyricsAttempted = false;
+var _lyricsLinesCache = null;
 
 function toggleLyrics() {
   var overlay = document.getElementById('lyrics-overlay');
@@ -107,6 +108,7 @@ async function fetchLyrics(track) {
       div.innerHTML = '<span class="lyrics-text">' + esc(l.text) + '</span><span class="lyrics-progress-bar"></span>';
       content.appendChild(div);
     });
+    _lyricsLinesCache = content.querySelectorAll('.lyrics-line');
     window.currentLyrics = syncedLyrics;
     window.currentLyricsText = null;
     if (syncedLyrics.length === 0) {
@@ -116,6 +118,7 @@ async function fetchLyrics(track) {
     content.innerHTML = '<div class="lyrics-plain">' + esc(lyricsText).split('\n').map(function(p) {
       return '<p>' + esc(p) + '</p>';
     }).join('') + '</div>';
+    _lyricsLinesCache = null;
     window.currentLyrics = [];
     window.currentLyricsText = lyricsText;
   }
@@ -197,7 +200,7 @@ function updateSyncedLyrics() {
     }
   }
 
-  var lines = qsa('.lyrics-line');
+  var lines = _lyricsLinesCache || qsa('.lyrics-line');
   var useFade = state.animations.lyricsFade !== false;
   var scrollTarget = null;
   lines.forEach(function(line, i) {

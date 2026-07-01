@@ -117,7 +117,7 @@ function renderQueuePanel() {
     }
   }
 
-  if (upcoming.length===0) { list.innerHTML = '<div style="color:#6a6a6a;font-size:13px;padding:20px 0;text-align:center;">Queue is empty</div>'; return; }
+  if (upcoming.length===0) { list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:20px 0;text-align:center;">Queue is empty</div>'; return; }
 
   // When shuffle is on, show upcoming tracks from pre-generated shuffle order
   if (state.shuffle && state.shuffleOrder.length) {

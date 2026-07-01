@@ -38,7 +38,7 @@ async function renderPlaylistDetail(playlistId, navId) {
     addShuffleButton(tracks, 'Playlist');
     var filterInput = document.getElementById('track-filter-input');
     if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
-  } catch(e) { content.innerHTML = '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+  } catch(e) { content.innerHTML = '<p style="color:var(--danger);">Error: '+esc(e.message)+'</p>'; }
 }
 
 function setupPlaylistShare(playlistId) {

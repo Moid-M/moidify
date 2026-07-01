@@ -201,7 +201,7 @@ async function renderTracks(searchQuery, navId) {
     if (state._navId !== navId) return;
     var tracks = Array.isArray(data) ? data : data.tracks;
     var total = Array.isArray(data) ? tracks.length : data.total;
-    if (tracks.length===0) { content.innerHTML += '<p style="color:#727272;">'+(searchQuery?'No results for "'+esc(searchQuery)+'".':'No tracks yet.')+'</p>'; return; }
+    if (tracks.length===0) { content.innerHTML += '<p style="color:var(--text-muted);">'+(searchQuery?'No results for "'+esc(searchQuery)+'".':'No tracks yet.')+'</p>'; return; }
     var skelWrap = qs('.track-skeleton-wrap', content);
     if (skelWrap) skelWrap.remove();
     var list = document.createElement('div'); list.className='track-list virtual';
@@ -251,13 +251,13 @@ async function renderTracks(searchQuery, navId) {
         })();
       }
     }
-  } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+  } catch(e) { content.innerHTML += '<p style="color:var(--danger);">Error: '+esc(e.message)+'</p>'; }
 }
 
 async function renderFavorites(navId) {
   var content = document.getElementById('content');
   content.innerHTML = '<div class="content-header"><div class="view-title">Liked Songs</div></div><div class="track-list-filter"><input type="text" id="track-filter-input" class="track-filter-input" placeholder="Filter tracks..." oninput="filterTrackList(this.value)"></div><div class="track-skeleton-wrap">'+skeletonTrackRows()+'</div>';
-  if (!state.user) { content.innerHTML += '<p style="color:#727272;padding:20px 0;">Log in to see your liked songs.</p>'; return; }
+  if (!state.user) { content.innerHTML += '<p style="color:var(--text-muted);padding:20px 0;">Log in to see your liked songs.</p>'; return; }
   try {
     var tracks = await apiJson('/api/favorites');
     if (state._navId !== navId) return;
@@ -276,7 +276,7 @@ async function renderFavorites(navId) {
     addShuffleButton(tracks, 'Liked Songs');
     var filterInput = document.getElementById('track-filter-input');
     if (filterInput && filterInput.value.trim()) filterTrackList(filterInput.value);
-  } catch(e) { content.innerHTML += '<p style="color:#e74c3c;">Error: '+e.message+'</p>'; }
+  } catch(e) { content.innerHTML += '<p style="color:var(--danger);">Error: '+esc(e.message)+'</p>'; }
 }
 
 // Wire up duplicates button after render
@@ -288,7 +288,7 @@ function wireDuplicatesBtn() {
     content.innerHTML = '<div class="content-header"><div class="view-title">Duplicate Tracks</div><button onclick="navigate(\'tracks\')" class="icon-btn">&larr;</button></div><div class="track-skeleton-wrap">'+skeletonTrackRows()+'</div>';
     apiJson('/api/duplicates').then(function(dupes) {
       if (!dupes.length) {
-        content.innerHTML = '<div class="content-header"><div class="view-title">Duplicate Tracks</div><button onclick="navigate(\'tracks\')" class="icon-btn">&larr;</button></div><p style="color:#727272;padding:20px 0;">No duplicate tracks found.</p>';
+        content.innerHTML = '<div class="content-header"><div class="view-title">Duplicate Tracks</div><button onclick="navigate(\'tracks\')" class="icon-btn">&larr;</button></div><p style="color:var(--text-muted);padding:20px 0;">No duplicate tracks found.</p>';
         return;
       }
       var html = '<div class="content-header"><div class="view-title">Duplicate Tracks ('+dupes.length+' pairs)</div><button onclick="navigate(\'tracks\')" class="icon-btn">&larr;</button></div>';
@@ -314,6 +314,6 @@ function wireDuplicatesBtn() {
           }).catch(function() { showToast('Failed to remove', 'error'); });
         });
       });
-    }).catch(function() { content.innerHTML += '<p style="color:#e74c3c;">Failed to load duplicates</p>'; });
+    }).catch(function() { content.innerHTML += '<p style="color:var(--danger);">Failed to load duplicates</p>'; });
   });
 }
