@@ -40,11 +40,13 @@ class ImportUrlBody(BaseModel):
 _ALLOWED_URL_SCHEMES = ("http", "https")
 
 _FORMAT_OPTIONS = {
-    'mp3':  {'codec': 'mp3',  'quality': '192', 'ext': 'mp3',  'label': 'MP3 192k'},
-    'flac': {'codec': 'flac', 'quality': '0',  'ext': 'flac', 'label': 'FLAC'},
-    'opus': {'codec': 'opus', 'quality': '128', 'ext': 'opus', 'label': 'Opus 128k'},
-    'aac':  {'codec': 'aac',  'quality': '192', 'ext': 'm4a',  'label': 'AAC 192k (M4A)'},
-    'wav':  {'codec': 'wav',  'quality': '0',  'ext': 'wav',  'label': 'WAV'},
+    'mp3':  {'codec': 'mp3',  'quality': '192', 'ext': 'mp3',  'label': 'MP3 192k',      'type': 'audio'},
+    'flac': {'codec': 'flac', 'quality': '0',  'ext': 'flac', 'label': 'FLAC',           'type': 'audio'},
+    'opus': {'codec': 'opus', 'quality': '128', 'ext': 'opus', 'label': 'Opus 128k',     'type': 'audio'},
+    'aac':  {'codec': 'aac',  'quality': '192', 'ext': 'm4a',  'label': 'AAC 192k (M4A)','type': 'audio'},
+    'wav':  {'codec': 'wav',  'quality': '0',  'ext': 'wav',  'label': 'WAV',            'type': 'audio'},
+    'mp4':  {'codec': 'mp4',  'quality': 'best', 'ext': 'mp4', 'label': 'MP4 (Video)',   'type': 'video'},
+    'mkv':  {'codec': 'mkv',  'quality': 'best', 'ext': 'mkv', 'label': 'MKV (Video)',   'type': 'video'},
 }
 
 
@@ -248,14 +250,15 @@ def _download_worker(job_id: str, url: str, fmt: str = "mp3"):
         if not fmt_cfg:
             raise ValueError(f"Unsupported format: {fmt}")
 
+        is_video = fmt_cfg.get('type') == 'video'
         output_template = str(MUSIC_DIR / "%(id)s.%(ext)s")
         ydl_opts = {
-            'format': 'bestaudio/best',
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best' if is_video else 'bestaudio/best',
             'outtmpl': output_template,
             'quiet': True,
             'no_warnings': True,
             'max_filesize': 500000000,
-            'postprocessors': [{
+            'postprocessors': [] if is_video else [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': fmt_cfg['codec'],
                 'preferredquality': fmt_cfg['quality'],
@@ -279,15 +282,21 @@ def _download_worker(job_id: str, url: str, fmt: str = "mp3"):
             thumbnail_url = info.get("thumbnail") or ""
             lyrics = _fetch_yt_lyrics(info)
 
-        if not outfile.exists():
+        if not outfile or not outfile.exists():
             for f in MUSIC_DIR.iterdir():
-                if f.stem == video_id and f.suffix.lower() == f".{fmt_cfg['ext']}":
-                    outfile = f
-                    break
+                if is_video:
+                    if f.stem == video_id:
+                        outfile = f
+                        break
+                else:
+                    if f.stem == video_id and f.suffix.lower() == f".{fmt_cfg['ext']}":
+                        outfile = f
+                        break
             if not outfile or not outfile.exists():
                 raise FileNotFoundError(f"Downloaded file not found for video ID {video_id}")
 
-        _write_tags(str(outfile), fmt, title, artist, album, year, genre, track_num, thumbnail_url, lyrics)
+        if not is_video:
+            _write_tags(str(outfile), fmt, title, artist, album, year, genre, track_num, thumbnail_url, lyrics)
 
         with DOWNLOAD_LOCK:
             DOWNLOAD_JOBS[job_id]["title"] = f"{title} — {artist}"
@@ -314,6 +323,150 @@ def _make_progress_hook(job_id: str):
             with DOWNLOAD_LOCK:
                 DOWNLOAD_JOBS[job_id]["progress"] = round(pct, 1)
     return hook
+
+
+def _sanitize(name: str) -> str:
+    """Sanitize a string for use as a filename component."""
+    import re
+    s = re.sub(r'[<>:"/\\|?*]', '', name)
+    s = s.strip()
+    if not s:
+        s = "Unknown"
+    return s[:200]
+
+
+def _album_download_worker(job_id: str, url: str, artist: str, album: str, fmt: str = "mp3"):
+    try:
+        try:
+            import yt_dlp
+        except ModuleNotFoundError:
+            raise RuntimeError(
+                "yt-dlp is not installed. Install it with:\n"
+                "  sudo python3 -m pip install --target=/opt/moidify/extra-pkgs yt-dlp\n"
+                "Or run the installer with: sudo moidify update"
+            )
+
+        from shutil import which
+        if not which("ffmpeg"):
+            raise RuntimeError(
+                "ffmpeg is required for audio downloads. Install it with:\n"
+                "  sudo apt install ffmpeg    (Debian/Ubuntu)\n"
+                "  sudo dnf install ffmpeg    (Fedora)\n"
+                "  sudo pacman -S ffmpeg      (Arch)\n"
+                "Then try again."
+            )
+
+        fmt_cfg = _FORMAT_OPTIONS.get(fmt)
+        if not fmt_cfg:
+            raise ValueError(f"Unsupported format: {fmt}")
+
+        album_dir = MUSIC_DIR / f"{_sanitize(artist)} - {_sanitize(album)}"
+        album_dir.mkdir(exist_ok=True, parents=True)
+
+        with DOWNLOAD_LOCK:
+            DOWNLOAD_JOBS[job_id]["status"] = "extracting"
+            DOWNLOAD_JOBS[job_id]["total"] = 0
+            DOWNLOAD_JOBS[job_id]["current"] = 0
+            DOWNLOAD_JOBS[job_id]["current_title"] = ""
+
+        # Extract playlist info without downloading
+        info_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+        }
+        with yt_dlp.YoutubeDL(info_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        entries = info.get('entries', [info]) if isinstance(info, dict) else []
+        if not entries:
+            raise ValueError("No tracks found in the provided URL")
+
+        with DOWNLOAD_LOCK:
+            DOWNLOAD_JOBS[job_id]["total"] = len(entries)
+            DOWNLOAD_JOBS[job_id]["status"] = "downloading"
+
+        downloaded_count = 0
+        for i, entry in enumerate(entries):
+            if not entry:
+                continue
+            track_url = entry.get('webpage_url') or ''
+            track_id = entry.get('id') or ''
+            if not track_url and not track_id:
+                continue
+            if not track_url:
+                track_url = f"https://www.youtube.com/watch?v={track_id}"
+
+            track_num = entry.get('playlist_index', i + 1) or (i + 1)
+            track_title = entry.get('track') or entry.get('title', '') or f'Track {track_num}'
+            track_artist = entry.get('artist') or entry.get('uploader') or entry.get('channel') or artist
+            track_album = entry.get('album') or album
+            track_year = str(entry.get('release_year') or entry.get('year') or "")
+            track_thumbnail = entry.get('thumbnail') or ""
+
+            with DOWNLOAD_LOCK:
+                DOWNLOAD_JOBS[job_id]["current"] = i + 1
+                DOWNLOAD_JOBS[job_id]["current_title"] = track_title
+
+            safe_title = _sanitize(track_title)
+            output_tmpl = str(album_dir / f"{track_num:02d} - {safe_title}.%(ext)s")
+
+            trk_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': output_tmpl,
+                'quiet': True,
+                'no_warnings': True,
+                'max_filesize': 500000000,
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': fmt_cfg['codec'],
+                    'preferredquality': fmt_cfg['quality'],
+                }],
+                'progress_hooks': [_make_progress_hook(job_id)],
+            }
+            try:
+                with yt_dlp.YoutubeDL(trk_opts) as ydl:
+                    track_info = ydl.extract_info(track_url, download=True)
+
+                # Find the downloaded file
+                outfile = None
+                for f in album_dir.iterdir():
+                    if f.stem.startswith(f"{track_num:02d} - ") and f.suffix.lower() == f".{fmt_cfg['ext']}":
+                        outfile = f
+                        break
+                if not outfile:
+                    for f in album_dir.iterdir():
+                        if f.stem.endswith(_sanitize(track_title)) or track_id in f.stem:
+                            outfile = f
+                            break
+
+                if outfile and outfile.exists():
+                    track_lyrics = _fetch_yt_lyrics(track_info)
+                    _write_tags(str(outfile), fmt, track_title, track_artist, track_album, track_year, "", str(track_num), track_thumbnail, track_lyrics)
+                    with DOWNLOAD_LOCK:
+                        DOWNLOAD_JOBS[job_id]["status"] = "importing"
+                    process_file(str(outfile))
+                    downloaded_count += 1
+            except Exception as e:
+                logger.warning("Failed to download track %d (%s): %s", i + 1, track_title, e)
+                continue
+
+        with DOWNLOAD_LOCK:
+            DOWNLOAD_JOBS[job_id]["status"] = "done"
+            DOWNLOAD_JOBS[job_id]["downloaded"] = downloaded_count
+    except Exception as e:
+        with DOWNLOAD_LOCK:
+            DOWNLOAD_JOBS[job_id]["status"] = "error"
+            DOWNLOAD_JOBS[job_id]["error"] = str(e)
+
+
+class ImportAlbumBody(BaseModel):
+    url: str
+    artist: str
+    album: str
+    format: str = "mp3"
+
 
 router = APIRouter(tags=["admin"])
 
@@ -1049,6 +1202,63 @@ def get_import_status(job_id: str, token: Optional[str] = Header(None)):
     if not job:
         raise HTTPException(404, "Job not found")
     return job
+
+
+@router.post("/api/admin/import-album")
+def import_album(body: ImportAlbumBody, token: Optional[str] = Header(None)):
+    _require_admin(token)
+    if body.url:
+        _validate_import_url(body.url)
+    if not body.artist.strip() or not body.album.strip():
+        raise HTTPException(400, "Artist and album name are required")
+    _cleanup_old_jobs()
+    job_id = uuid.uuid4().hex[:12]
+    with DOWNLOAD_LOCK:
+        if len(DOWNLOAD_JOBS) >= _MAX_DOWNLOAD_JOBS:
+            raise HTTPException(503, "Too many download jobs. Wait for some to complete.")
+        DOWNLOAD_JOBS[job_id] = {
+            "status": "queued", "progress": 0, "title": f"{body.artist} - {body.album}",
+            "error": None, "total": 0, "current": 0, "current_title": "", "downloaded": 0,
+        }
+    threading.Thread(
+        target=_album_download_worker,
+        args=(job_id, body.url, body.artist, body.album, body.format),
+        daemon=True,
+    ).start()
+    return {"job_id": job_id, "status": "queued"}
+
+
+@router.get("/api/admin/search-album")
+def search_album(q: str = Query(...), token: Optional[str] = Header(None)):
+    _require_admin(token)
+    try:
+        import yt_dlp
+    except ModuleNotFoundError:
+        raise HTTPException(503, "yt-dlp is not installed")
+    try:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            results = ydl.extract_info(f"ytsearch10:{q}", download=False)
+        entries = results.get('entries', []) if results else []
+        out = []
+        for e in entries:
+            if not e:
+                continue
+            out.append({
+                "url": e.get('webpage_url') or e.get('url', ''),
+                "title": e.get('title', ''),
+                "duration": e.get('duration', 0),
+                "thumbnail": e.get('thumbnail', ''),
+                "uploader": e.get('uploader', ''),
+                "view_count": e.get('view_count', 0),
+            })
+        return out
+    except Exception as e:
+        raise HTTPException(500, f"Search failed: {e}")
 
 
 @router.get("/api/admin/registration-status")

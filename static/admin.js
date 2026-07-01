@@ -412,6 +412,69 @@ async function submitImportUrl() {
   } catch(e) { statusEl.innerHTML = '<span style="color:var(--danger)">Error: '+e.message+'</span>'; input.disabled = false; }
 }
 
+async function submitAlbumImport() {
+  var urlInput = document.getElementById('album-url-input');
+  var artistInput = document.getElementById('album-artist-input');
+  var albumInput = document.getElementById('album-name-input');
+  var fmt = document.getElementById('album-format').value;
+  var statusEl = document.getElementById('album-import-status');
+  var url = urlInput.value.trim();
+  var artist = artistInput.value.trim();
+  var album = albumInput.value.trim();
+  if (!artist || !album) { showToast('Enter artist and album name', 'error'); return; }
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = 'Starting album import...';
+  artistInput.disabled = true;
+  albumInput.disabled = true;
+  urlInput.disabled = true;
+  try {
+    var r = await api('/api/admin/import-album', {method:'POST', body:{url: url, artist: artist, album: album, format: fmt}});
+    if (!r.ok) { var e = await r.json(); statusEl.innerHTML = '<span style="color:var(--danger)">'+(e.detail||'Error')+'</span>'; artistInput.disabled = false; albumInput.disabled = false; urlInput.disabled = false; return; }
+    var d = await r.json();
+    statusEl.innerHTML = 'Album import queued. Job ID: '+d.job_id;
+    var albumPoll = function() {
+      setTimeout(async function() {
+        try {
+          var pr = await api('/api/admin/import-status/'+d.job_id);
+          if (!pr.ok) { statusEl.innerHTML = '<span style="color:var(--danger)">Failed to check status</span>'; artistInput.disabled = false; albumInput.disabled = false; urlInput.disabled = false; return; }
+          var ps = await pr.json();
+          if (ps.status === 'done') {
+            statusEl.innerHTML = '<span style="color:var(--accent)">Complete! Downloaded '+(ps.downloaded||0)+' of '+(ps.total||'?')+' tracks.</span>';
+            artistInput.value = '';
+            albumInput.value = '';
+            urlInput.value = '';
+            artistInput.disabled = false;
+            albumInput.disabled = false;
+            urlInput.disabled = false;
+            loadStats();
+            loadTracks();
+          } else if (ps.status === 'error') {
+            statusEl.innerHTML = '<div style="color:var(--danger);white-space:pre-wrap;font-size:13px;">Error: '+(esc(ps.error)||'Unknown')+'</div>';
+            artistInput.disabled = false;
+            albumInput.disabled = false;
+            urlInput.disabled = false;
+          } else if (ps.status === 'extracting') {
+            statusEl.innerHTML = 'Fetching track list...';
+            albumPoll();
+          } else if (ps.status === 'importing') {
+            var pct = ps.current && ps.total ? Math.round(ps.current/ps.total*100) : 0;
+            statusEl.innerHTML = 'Track '+(ps.current||'?')+'/'+(ps.total||'?')+': "'+esc(ps.current_title||'')+'" — Importing to library... ('+pct+'%)';
+            albumPoll();
+          } else if (ps.status === 'downloading') {
+            var pct = ps.current && ps.total ? Math.round(ps.current/ps.total*100) : 0;
+            statusEl.innerHTML = 'Track '+(ps.current||'?')+'/'+(ps.total||'?')+': "'+esc(ps.current_title||'')+'" — Downloading... ('+pct+'%)';
+            albumPoll();
+          } else {
+            statusEl.innerHTML = 'Status: '+ps.status+(ps.current_title ? ' - '+esc(ps.current_title) : '');
+            albumPoll();
+          }
+        } catch(e) { statusEl.innerHTML = '<span style="color:var(--danger)">Error: '+esc(e.message)+'</span>'; artistInput.disabled = false; albumInput.disabled = false; urlInput.disabled = false; }
+      }, 2000);
+    };
+    albumPoll();
+  } catch(e) { statusEl.innerHTML = '<span style="color:var(--danger)">Error: '+esc(e.message)+'</span>'; artistInput.disabled = false; albumInput.disabled = false; urlInput.disabled = false; }
+}
+
 function showToast(msg, type) {
   type = type || 'info';
   var el = document.createElement('div');
