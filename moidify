@@ -29,52 +29,32 @@ version() {
   fi
 }
 
-help() {
-  APP_VER=$(version 2>/dev/null || echo "?")
-  echo -e "${BOLD}Moidify v${APP_VER}${NC} — Self-hosted music server"
-  echo ""
-  echo -e "${BOLD}Usage:${NC}"
-  echo -e "  moidify ${CYAN}<command>${NC} [options]"
-  echo ""
-  echo -e "${BOLD}Service commands:${NC}"
-  echo -e "  ${GREEN}start${NC}     Start moidify service"
-  echo -e "  ${GREEN}stop${NC}      Stop moidify service"
-  echo -e "  ${GREEN}restart${NC}   Restart moidify service"
-  echo -e "  ${GREEN}status${NC}    Show service status"
-  echo -e "  ${GREEN}enable${NC}    Enable service on boot"
-  echo -e "  ${GREEN}disable${NC}   Disable service on boot"
-  echo ""
-  echo -e "${BOLD}Info commands:${NC}"
-  echo -e "  ${GREEN}logs${NC}      Follow service logs (Ctrl+C to exit)"
-  echo -e "  ${GREEN}config${NC}    Show current configuration"
-  echo -e "  ${GREEN}version${NC}   Show installed version"
-  echo -e "  ${GREEN}url${NC}       Show server URL"
-  echo ""
-  echo -e "${BOLD}Import:${NC}"
-  echo -e "  ${GREEN}download${NC}  Download a song/video by URL"
-  echo -e "           ${YELLOW}[--format mp3|flac|opus|aac|wav]${NC}"
-  echo ""
-  echo -e "${BOLD}Maintenance:${NC}"
-  echo -e "  ${GREEN}reload${NC}    Reload (restart) service"
-  echo -e "  ${GREEN}update${NC}    Run update script"
-  echo -e "  ${GREEN}rescan${NC}    Rescan music folder"
-  echo -e "           ${YELLOW}[--clean]${NC}"
-  echo -e "  ${GREEN}reset-password${NC}  Reset admin password"
-  echo ""
-  echo -e "${BOLD}Options:${NC}"
-  echo -e "  ${GREEN}-h, --help${NC}     Show this help"
-  echo -e "  ${GREEN}-v, --version${NC}  Show version"
-  echo ""
-  echo -e "${BOLD}Examples:${NC}"
-  echo -e "  moidify start"
-  echo -e "  moidify logs"
-  echo -e "  moidify config"
-  echo -e "  moidify download ${YELLOW}<url>${NC}"
-  echo -e "  moidify download ${YELLOW}--format flac <url>${NC}"
-  echo -e "  moidify rescan"
-  echo -e "  moidify rescan ${YELLOW}--clean${NC}"
-  echo -e "  moidify reset-password"
+# ─── Command registry ─────────────────────────────────────────────────────────
+# Each command lives in its own file under moidify-commands/ and registers itself
+# via cmd_register. The help menu and dispatcher are generated from this registry,
+# so adding a command never requires editing the help text by hand.
+declare -A CMD_DESC CMD_CAT CMD_USAGE
+
+cmd_register() {
+  local name="$1" cat="$2" desc="$3" usage="${4:-}"
+  CMD_DESC["$name"]="$desc"
+  CMD_CAT["$name"]="$cat"
+  CMD_USAGE["$name"]="$usage"
 }
+
+# Locate the commands directory (works both from the repo and when installed)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -d "$SCRIPT_DIR/moidify-commands" ]]; then
+  COMMANDS_DIR="$SCRIPT_DIR/moidify-commands"
+else
+  COMMANDS_DIR="${MOIDIFY_COMMANDS_DIR:-/opt/moidify/moidify-commands}"
+fi
+
+if [[ -d "$COMMANDS_DIR" ]]; then
+  for f in "$COMMANDS_DIR"/*.sh; do
+    [[ -f "$f" ]] && source "$f"
+  done
+fi
 
 url() {
   local ip port="${SERVER_PORT}"
@@ -103,289 +83,74 @@ for k, v in cfg.items():
   echo -e "${YELLOW}URL:${NC} $(url)"
 }
 
-# ─── Parse args ───────────────────────────────────────────────────────────────
+# ─── Auto-generated help ──────────────────────────────────────────────────────
+help() {
+  local app_ver
+  app_ver=$(version 2>/dev/null || echo "?")
+  echo -e "${BOLD}Moidify v${app_ver}${NC} — Self-hosted music server"
+  echo ""
+  echo -e "${BOLD}Usage:${NC}"
+  echo -e "  moidify ${CYAN}<command>${NC} [options]"
+  echo ""
 
+  # Print commands grouped by category. Known categories are listed first in a
+  # preferred order; any new category a command registers is appended automatically
+  # so the help menu never needs manual editing when a command is added.
+  local known_cats="Service Info Import Maintenance"
+  local cats="$known_cats"
+  local name desc usage cat
+  for name in "${!CMD_CAT[@]}"; do
+    local c="${CMD_CAT[$name]}"
+    if [[ " $cats " != *" $c "* ]]; then
+      cats="$cats $c"
+    fi
+  done
+  for cat in $cats; do
+    local printed_cat=0
+    for name in "${!CMD_DESC[@]}"; do
+      if [[ "${CMD_CAT[$name]}" == "$cat" ]]; then
+        if [[ $printed_cat -eq 0 ]]; then
+          echo -e "${BOLD}${cat} commands:${NC}"
+          printed_cat=1
+        fi
+        desc="${CMD_DESC[$name]:-}"
+        usage="${CMD_USAGE[$name]:-}"
+        if [[ -n "$usage" ]]; then
+          printf "  ${GREEN}%-12s${NC} %s\n" "$name" "$desc"
+          printf "               ${YELLOW}%s${NC}\n" "$usage"
+        else
+          printf "  ${GREEN}%-12s${NC} %s\n" "$name" "$desc"
+        fi
+      fi
+    done
+    [[ $printed_cat -eq 1 ]] && echo ""
+  done
+
+  # Lines that are not direct commands (options, examples, usage)
+  echo -e "${BOLD}Options:${NC}"
+  echo -e "  ${GREEN}-h, --help${NC}     Show this help"
+  echo -e "  ${GREEN}-v, --version${NC}  Show version"
+  echo ""
+  echo -e "${BOLD}Examples:${NC}"
+  echo -e "  moidify start"
+  echo -e "  moidify logs"
+  echo -e "  moidify config"
+  echo -e "  moidify download ${YELLOW}<url>${NC}"
+  echo -e "  moidify download ${YELLOW}--format flac <url>${NC}"
+  echo -e "  moidify rescan"
+  echo -e "  moidify rescan ${YELLOW}--clean${NC}"
+  echo -e "  moidify reset-password"
+}
+
+# ─── Dispatch ─────────────────────────────────────────────────────────────────
 case "${1:-}" in
-  -h|--help|-help|help)
+  -h|--help|-help)
     help
     exit 0
     ;;
   -v|--version|version)
     echo "Moidify $(version)"
     exit 0
-    ;;
-  start)
-    info "Starting moidify..."
-    systemctl start "$SERVICE" 2>/dev/null || {
-      warn "Systemd not available; starting directly..."
-      if [[ -f "$APP_DIR/server.py" ]]; then
-        cd "$APP_DIR"
-        nohup "$APP_DIR/venv/bin/uvicorn" server:app --host "$SERVER_HOST" --port "$SERVER_PORT" > /tmp/moidify.log 2>&1 &
-        disown
-        info "Server PID: $!"
-      else
-        err "App not found at $APP_DIR"
-        exit 1
-      fi
-    }
-    sleep 1
-    if systemctl is-active --quiet "$SERVICE" 2>/dev/null || pgrep -f "uvicorn.*server:app" >/dev/null 2>&1; then
-      ok "Moidify is running → $(url)"
-    else
-      warn "Check logs: moidify logs"
-    fi
-    ;;
-  stop)
-    info "Stopping moidify..."
-    if systemctl stop "$SERVICE" 2>/dev/null; then
-      ok "Moidify stopped."
-    else
-      pkill -f "uvicorn.*server:app" 2>/dev/null && ok "Moidify stopped." || warn "No running process found."
-    fi
-    ;;
-  restart|reload)
-    info "Restarting moidify..."
-    if systemctl restart "$SERVICE" 2>/dev/null; then
-      sleep 1
-      if systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
-        ok "Moidify restarted → $(url)"
-      else
-        warn "Check logs: moidify logs"
-      fi
-    else
-      pkill -f "uvicorn.*server:app" 2>/dev/null || true
-      if [[ -f "$APP_DIR/server.py" ]]; then
-        cd "$APP_DIR"
-        nohup "$APP_DIR/venv/bin/uvicorn" server:app --host "$SERVER_HOST" --port "$SERVER_PORT" > /tmp/moidify.log 2>&1 &
-        disown
-        sleep 1
-        ok "Moidify restarted → $(url)"
-      fi
-    fi
-    ;;
-  status)
-    if systemctl status "$SERVICE" 2>/dev/null; then
-      exit 0
-    fi
-    if pgrep -f "uvicorn.*server:app" >/dev/null 2>&1; then
-      echo -e "${GREEN}●${NC} Moidify is running"
-      echo "   $(url)"
-    else
-      echo -e "${RED}●${NC} Moidify is not running"
-    fi
-    ;;
-  enable)
-    systemctl enable "$SERVICE" 2>/dev/null && ok "Service enabled on boot." || err "Failed to enable service."
-    ;;
-  disable)
-    systemctl disable "$SERVICE" 2>/dev/null && ok "Service disabled on boot." || err "Failed to disable service."
-    ;;
-  logs)
-    if command -v journalctl &>/dev/null && systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
-      exec journalctl -u "$SERVICE" -f -n 30 --no-pager
-    else
-      exec tail -f /tmp/moidify.log 2>/dev/null || err "No log file found."
-    fi
-    ;;
-  config)
-    show_config
-    ;;
-  url)
-    echo "$(url)"
-    ;;
-  update)
-    if [[ -f "$APP_DIR/update.sh" ]]; then
-      exec "$APP_DIR/update.sh"
-    else
-      err "Update script not found at $APP_DIR/update.sh"
-      exit 1
-    fi
-    ;;
-  rescan)
-    CLEAN=false
-    for arg in "${@:2}"; do
-      if [[ "$arg" == "--clean" ]]; then CLEAN=true; break; fi
-    done
-    TOKEN_FILE="$DATA_DIR/.cli_token"
-    TOKEN=""
-    if [[ -f "$TOKEN_FILE" ]]; then
-      TOKEN=$(cat "$TOKEN_FILE")
-    else
-      info "No CLI token found. Logging in as admin..."
-      read -r -p "  Admin username: " ADMIN_USER </dev/tty
-      read -r -s -p "  Admin password: " ADMIN_PASS </dev/tty
-      echo ""
-      LOGIN=$(curl -s http://localhost:${SERVER_PORT}/api/auth/login -X POST -H 'Content-Type: application/json' -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}" 2>/dev/null)
-      TOKEN=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null || echo "")
-      if [[ -z "$TOKEN" ]]; then
-        err "Login failed."
-        exit 1
-      fi
-      echo "$TOKEN" > "$TOKEN_FILE"
-      chmod 600 "$TOKEN_FILE"
-    fi
-    if $CLEAN; then
-      info "Starting clean rescan (will remove dead tracks + refresh metadata)..."
-    else
-      info "Starting rescan..."
-    fi
-    RESULT=$(curl -s http://localhost:${SERVER_PORT}/api/admin/rescan -X POST -H 'Content-Type: application/json' -H "token: $TOKEN" -d "{\"clean\":$CLEAN}" 2>/dev/null)
-    STATE=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print('running' if d.get('running') else 'idle')" 2>/dev/null || echo "unknown")
-    echo -e "  Status: ${STATE}"
-    echo -e "  Files found: $(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('files_found',0))" 2>/dev/null || echo "?")"
-    echo -e "  Imported: $(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('files_imported',0))" 2>/dev/null || echo "?")"
-    ERRORS=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('errors',[])))" 2>/dev/null || echo "0")
-    if [[ "$ERRORS" != "0" ]]; then
-      echo -e "  ${YELLOW}Errors: $ERRORS${NC}"
-      echo "$RESULT" | python3 -c "import sys,json; [print('    - '+e) for e in json.load(sys.stdin).get('errors',[])]" 2>/dev/null || true
-    fi
-    ok "Rescan completed."
-    ;;
-  reset-password)
-    if [[ $EUID -ne 0 ]]; then
-      err "This command must be run as root (sudo)."
-      exit 1
-    fi
-    DB_PATH=$(python3 -c "
-import json
-try:
-    with open('$CONFIG_DIR/config.json') as f:
-        cfg = json.load(f)
-    print(cfg.get('db_path', '$DATA_DIR/music.db'))
-except Exception:
-    print('$DATA_DIR/music.db')
-" 2>/dev/null || echo "$DATA_DIR/music.db")
-    if [[ ! -f "$DB_PATH" ]]; then
-      err "Database not found at $DB_PATH"
-      exit 1
-    fi
-    echo ""
-    info "Reset admin password for Moidify"
-    echo ""
-    while true; do
-      read -r -s -p "  New admin password: " ADMIN_PASS </dev/tty
-      echo ""
-      if [[ -z "$ADMIN_PASS" ]]; then
-        err "Password cannot be empty"; continue
-      fi
-      if [[ ${#ADMIN_PASS} -lt 8 ]]; then
-        err "Password must be at least 8 characters"; continue
-      fi
-      if ! [[ "$ADMIN_PASS" =~ [a-z] ]]; then
-        err "Password must contain a lowercase letter"; continue
-      fi
-      if ! [[ "$ADMIN_PASS" =~ [A-Z] ]]; then
-        err "Password must contain an uppercase letter"; continue
-      fi
-      if ! [[ "$ADMIN_PASS" =~ [0-9] ]]; then
-        err "Password must contain a digit"; continue
-      fi
-      read -r -s -p "  Confirm password: " ADMIN_PASS2 </dev/tty
-      echo ""
-      if [[ "$ADMIN_PASS" == "$ADMIN_PASS2" ]]; then
-        break
-      fi
-      err "Passwords do not match, try again."
-    done
-    NEW_SALT=$(python3 -c "import secrets; print(secrets.token_hex(16))")
-    NEW_HASH=$(DB_PATH="$DB_PATH" NEW_SALT="$NEW_SALT" NEW_PASS="$ADMIN_PASS" python3 -c "
-import hashlib, os
-p = os.environ['NEW_PASS']
-s = os.environ['NEW_SALT']
-print(hashlib.pbkdf2_hmac('sha256', p.encode(), s.encode(), 600000).hex())
-")
-    DB_PATH="$DB_PATH" NEW_HASH="$NEW_HASH" NEW_SALT="$NEW_SALT" python3 -c "
-import sqlite3, sys, os
-
-conn = sqlite3.connect(os.environ['DB_PATH'])
-admin = conn.execute('SELECT id, username FROM users WHERE is_admin = 1 LIMIT 1').fetchone()
-if not admin:
-    print('No admin user found in database.')
-    sys.exit(1)
-
-conn.execute('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?',
-    (os.environ['NEW_HASH'], os.environ['NEW_SALT'], admin[0]))
-conn.commit()
-conn.close()
-print(f'Updated password for admin user \"{admin[1]}\" (id={admin[0]})')
-"
-    ok "Admin password reset successfully."
-    ;;
-  download)
-    # Parse --format flag and collect URL
-    DOWNLOAD_FMT="mp3"
-    URL=""
-    NEXT_IS_FMT=false
-    for arg in "${@:2}"; do
-      if $NEXT_IS_FMT; then DOWNLOAD_FMT="$arg"; NEXT_IS_FMT=false; continue; fi
-      if [[ "$arg" == "--format" ]]; then NEXT_IS_FMT=true; continue; fi
-      if [[ "$arg" == --format=* ]]; then DOWNLOAD_FMT="${arg#*=}"; continue; fi
-      URL="${URL}${URL:+ }${arg}"
-    done
-    if [[ -z "$URL" ]]; then
-      err "Usage: moidify download [--format mp3|flac|opus|aac|wav] <url>"
-      echo ""
-      echo "Download a song from YouTube/SoundCloud/etc and import it into your library."
-      echo ""
-      echo -e "${YELLOW}Options:${NC}"
-      echo -e "  ${GREEN}--format${NC}  Output format (default: mp3)"
-      echo -e "              ${YELLOW}mp3, flac, opus, aac, wav${NC}"
-      echo ""
-      echo -e "${YELLOW}Tip:${NC} Quote the URL if it contains ${YELLOW}&${NC} or other special characters:"
-      echo -e "  moidify download ${YELLOW}'${NC}https://...${YELLOW}'${NC}"
-      exit 1
-    fi
-    # Use an API token from the CLI config for admin access
-    TOKEN_FILE="$DATA_DIR/.cli_token"
-    TOKEN=""
-    if [[ -f "$TOKEN_FILE" ]]; then
-      TOKEN=$(cat "$TOKEN_FILE")
-    else
-      # Try to login with admin credentials from config prompt
-      info "No CLI token found. Logging in as admin..."
-      read -r -p "  Admin username: " ADMIN_USER </dev/tty
-      read -r -s -p "  Admin password: " ADMIN_PASS </dev/tty
-      echo ""
-      LOGIN=$(curl -s http://localhost:${SERVER_PORT}/api/auth/login -X POST -H 'Content-Type: application/json' -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}" 2>/dev/null)
-      TOKEN=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null || echo "")
-      if [[ -z "$TOKEN" ]]; then
-        err "Login failed. Check your credentials."
-        exit 1
-      fi
-      echo "$TOKEN" > "$TOKEN_FILE"
-      chmod 600 "$TOKEN_FILE"
-      ok "Logged in. Token cached."
-    fi
-    info "Submitting download: $URL (format: $DOWNLOAD_FMT)"
-    JOB=$(curl -s http://localhost:${SERVER_PORT}/api/admin/import-url -X POST -H 'Content-Type: application/json' -H "token: $TOKEN" -d "{\"url\":\"$URL\",\"format\":\"$DOWNLOAD_FMT\"}" 2>/dev/null)
-    JOB_ID=$(echo "$JOB" | python3 -c "import sys,json; print(json.load(sys.stdin).get('job_id',''))" 2>/dev/null || echo "")
-    if [[ -z "$JOB_ID" ]]; then
-      err "Failed to submit download. Response: $JOB"
-      rm -f "$TOKEN_FILE"
-      exit 1
-    fi
-    info "Download job: $JOB_ID"
-    # Poll for progress
-    while true; do
-      STATUS=$(curl -s http://localhost:${SERVER_PORT}/api/admin/import-status/${JOB_ID} -H "token: $TOKEN" 2>/dev/null)
-      STATE=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
-      PROGRESS=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('progress',0))" 2>/dev/null || echo "0")
-      ERROR=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('error',''))" 2>/dev/null || echo "")
-      if [[ "$STATE" == "done" ]]; then
-        TITLE=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('title','Unknown'))" 2>/dev/null || echo "Unknown")
-        ok "Download complete: $TITLE"
-        break
-      elif [[ "$STATE" == "error" ]]; then
-        err "Download failed: $ERROR"
-        exit 1
-      elif [[ "$STATE" == "downloading" ]]; then
-        echo -ne "\r  Progress: ${PROGRESS}%    "
-      elif [[ "$STATE" == "importing" ]]; then
-        echo -ne "\r  Importing to library...    "
-      fi
-      sleep 2
-    done
-    echo ""
     ;;
   "")
     err "No command specified."
@@ -394,9 +159,19 @@ print(f'Updated password for admin user \"{admin[1]}\" (id={admin[0]})')
     exit 1
     ;;
   *)
-    err "Unknown command: ${1}"
-    echo ""
-    help
-    exit 1
+    if [[ -n "${CMD_DESC[$1]:-}" ]]; then
+      handler="cmd_${1//-/_}"
+      if declare -f "$handler" >/dev/null; then
+        "$handler" "${@:2}"
+      else
+        err "Command '$1' is registered but has no handler implementation."
+        exit 1
+      fi
+    else
+      err "Unknown command: $1"
+      echo ""
+      help
+      exit 1
+    fi
     ;;
 esac

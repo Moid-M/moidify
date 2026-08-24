@@ -9,9 +9,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import BASE_DIR, STATIC_DIR
-from database import init_db, get_connection
+from database import init_db, get_connection, DB_PATH as _ORIG_DB_PATH
 from server import app
 from fastapi.testclient import TestClient
+import database
+import config
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +23,10 @@ def test_db():
     os.environ["MOIDIFY_DB_PATH"] = tmp.name
     os.environ["MOIDIFY_MUSIC_DIR"] = tempfile.mkdtemp()
     os.environ["MOIDIFY_COVERS_DIR"] = tempfile.mkdtemp()
+    # Patch DB_PATH at runtime since config.py already imported it at import time
+    new_path = Path(tmp.name)
+    config.DB_PATH = new_path
+    database.DB_PATH = new_path
     init_db()
     yield
     os.unlink(tmp.name)

@@ -17,3 +17,4 @@ start.sh
 *.egg-info/
 dist/
 AGENTS.md
+.github-creds

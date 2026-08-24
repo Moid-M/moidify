@@ -182,21 +182,25 @@ After install, a `moidify` CLI is available globally:
 <br>
 
 ```bash
-moidify help          Show this help
-moidify start         Start the service
-moidify stop          Stop the service
-moidify restart       Restart the service
-moidify reload        Reload config and rescan library
-moidify status        Show service status
-moidify enable        Enable service on boot
-moidify disable       Disable service on boot
-moidify logs          Tail server logs
-moidify config        Print current configuration
-moidify version       Print version
-moidify url           Print server URL
-moidify update        Update to latest version
+moidify help             Show this help
+moidify start           Start the service
+moidify stop            Stop the service
+moidify restart         Restart the service
+moidify reload          Reload (restart) the service
+moidify status          Show service status
+moidify enable          Enable service on boot
+moidify disable         Disable service on boot
+moidify logs            Tail server logs
+moidify config          Print current configuration
+moidify version         Print version
+moidify url             Print server URL
+moidify update          Update to latest version
+moidify rescan          Rescan music folder (use --clean to remove dead tracks)
 moidify download <url>  Download and import audio from YouTube/SoundCloud/etc
+moidify reset-password  Reset the admin password
 ```
+
+> The `moidify` CLI auto-generates its help menu from a command registry — run `moidify help` to see the full, always-up-to-date list.
 
 </details>
 
