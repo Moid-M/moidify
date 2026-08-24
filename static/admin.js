@@ -475,6 +475,71 @@ async function submitAlbumImport() {
   } catch(e) { statusEl.innerHTML = '<span style="color:var(--danger)">Error: '+esc(e.message)+'</span>'; artistInput.disabled = false; albumInput.disabled = false; urlInput.disabled = false; }
 }
 
+var resTimer = null;
+
+function fmtUptime(s) {
+  if (s == null || isNaN(s)) return '—';
+  s = Math.floor(s);
+  var d = Math.floor(s / 86400); s -= d * 86400;
+  var h = Math.floor(s / 3600); s -= h * 3600;
+  var m = Math.floor(s / 60); s -= m * 60;
+  return (d > 0 ? d + 'd ' : '') + h + 'h ' + m + 'm';
+}
+
+function pctColor(pct) {
+  if (pct == null) return 'var(--accent)';
+  if (pct < 50) return '#22c55e';
+  if (pct < 80) return '#f59e0b';
+  return '#ef4444';
+}
+
+function setResBar(barId, valId, pct, label) {
+  var bar = document.getElementById(barId);
+  var val = document.getElementById(valId);
+  if (bar) { bar.style.width = Math.max(0, Math.min(100, pct || 0)) + '%'; bar.style.background = pctColor(pct); }
+  if (val) val.textContent = label;
+}
+
+async function loadResources() {
+  try {
+    var r = await api('/api/admin/resources');
+    if (!r.ok) return;
+    var d = await r.json();
+    var sys = d.system || {};
+    var proc = d.process || {};
+    var disk = d.disk || {};
+
+    setResBar('res-sys-cpu-bar', 'res-sys-cpu-val', sys.cpu_percent, (sys.cpu_percent != null ? sys.cpu_percent.toFixed(1) + '%' : '—'));
+
+    if (sys.mem_total_bytes) {
+      var ramPct = sys.mem_used_bytes != null ? (sys.mem_used_bytes / sys.mem_total_bytes * 100) : 0;
+      setResBar('res-sys-ram-bar', 'res-sys-ram-val', ramPct,
+        bytesLabel(sys.mem_used_bytes) + ' / ' + bytesLabel(sys.mem_total_bytes));
+    } else {
+      document.getElementById('res-sys-ram-val').textContent = '—';
+    }
+
+    setResBar('res-proc-cpu-bar', 'res-proc-cpu-val', proc.cpu_percent, (proc.cpu_percent != null ? proc.cpu_percent.toFixed(1) + '%' : '—'));
+
+    if (proc.rss_bytes != null) {
+      var pramPct = sys.mem_total_bytes ? (proc.rss_bytes / sys.mem_total_bytes * 100) : 0;
+      setResBar('res-proc-ram-bar', 'res-proc-ram-val', pramPct, bytesLabel(proc.rss_bytes));
+    } else {
+      document.getElementById('res-proc-ram-val').textContent = '—';
+    }
+
+    var meta = [];
+    if (sys.load_avg) meta.push('Load ' + sys.load_avg.map(function(x){ return x.toFixed(2); }).join(' / '));
+    if (sys.cpu_count) meta.push(sys.cpu_count + ' cores');
+    if (proc.threads != null) meta.push(proc.threads + ' threads');
+    if (sys.uptime_seconds != null) meta.push('Uptime ' + fmtUptime(sys.uptime_seconds));
+    if (proc.uptime_seconds != null) meta.push('Proc ' + fmtUptime(proc.uptime_seconds));
+    if (disk.total_bytes) meta.push('Disk ' + bytesLabel(disk.free_bytes) + ' free / ' + bytesLabel(disk.total_bytes));
+    document.getElementById('res-meta').textContent = meta.join('   •   ');
+    document.getElementById('res-updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+  } catch(e) {}
+}
+
 function showToast(msg, type) {
   type = type || 'info';
   var el = document.createElement('div');
@@ -1276,5 +1341,7 @@ checkAdmin().then(function(ok) {
     loadLib(); loadDbStats(); loadServerInfo();
     document.getElementById('lib-albums-btn').style.opacity = '1';
     document.getElementById('lib-artists-btn').style.opacity = '0.5';
+    loadResources();
+    resTimer = setInterval(loadResources, 2000);
   }
 });

@@ -519,6 +519,150 @@ def _walk_music_dir():
     return total, fmt
 
 
+_RES_CACHE = {"ts": 0.0, "sys_total": None, "sys_idle": None, "proc_utime": None}
+
+
+def _read_proc_stat_cpu():
+    try:
+        with open('/proc/stat') as f:
+            line = f.readline()
+        parts = [float(x) for x in line.split()[1:]]
+        idle = parts[3] + (parts[4] if len(parts) > 4 else 0)
+        total = sum(parts)
+        return total, idle
+    except Exception:
+        return None, None
+
+
+def _read_proc_self_stat():
+    try:
+        with open('/proc/self/stat') as f:
+            p = f.read().split()
+        utime = float(p[13])
+        stime = float(p[14])
+        rss = int(p[23])
+        threads = int(p[19])
+        starttime = float(p[21])
+        return utime + stime, rss, threads, starttime
+    except Exception:
+        return None, None, None, None
+
+
+def _read_loadavg():
+    try:
+        with open('/proc/loadavg') as f:
+            parts = f.read().split()
+        return [float(parts[0]), float(parts[1]), float(parts[2])]
+    except Exception:
+        return None
+
+
+def _read_meminfo():
+    info = {}
+    try:
+        with open('/proc/meminfo') as f:
+            for line in f:
+                k, v = line.split(':', 1)
+                info[k.strip()] = int(v.split()[0]) * 1024
+    except Exception:
+        pass
+    return info
+
+
+def _read_uptime():
+    try:
+        with open('/proc/uptime') as f:
+            return float(f.read().split()[0])
+    except Exception:
+        return None
+
+
+def _get_resource_stats():
+    import time
+    now = time.time()
+    clk_tck = os.sysconf('SC_CLK_TCK') if hasattr(os, 'sysconf') else 100
+    page_size = os.sysconf('SC_PAGE_SIZE') if hasattr(os, 'sysconf') else 4096
+    stats = {
+        "system": {"cpu_percent": None, "cpu_count": None, "load_avg": None,
+                    "mem_total_bytes": None, "mem_used_bytes": None, "mem_available_bytes": None,
+                    "uptime_seconds": None},
+        "process": {"rss_bytes": None, "cpu_percent": None, "threads": None,
+                     "uptime_seconds": None},
+        "disk": {"music_dir": str(MUSIC_DIR), "total_bytes": None, "free_bytes": None, "used_bytes": None},
+    }
+
+    try:
+        import psutil
+        svm = psutil.virtual_memory()
+        stats["system"]["mem_total_bytes"] = svm.total
+        stats["system"]["mem_available_bytes"] = svm.available
+        stats["system"]["mem_used_bytes"] = svm.used
+        stats["system"]["cpu_count"] = psutil.cpu_count()
+        stats["system"]["cpu_percent"] = psutil.cpu_percent(interval=0.0)
+        try:
+            stats["system"]["load_avg"] = list(psutil.getloadavg())
+        except Exception:
+            pass
+        p = psutil.Process()
+        stats["process"]["rss_bytes"] = p.memory_info().rss
+        stats["process"]["cpu_percent"] = p.cpu_percent(interval=0.0)
+        stats["process"]["threads"] = p.num_threads()
+        stats["process"]["uptime_seconds"] = now - p.create_time()
+        stats["system"]["uptime_seconds"] = now - psutil.boot_time()
+    except ImportError:
+        stats["system"]["cpu_count"] = os.cpu_count()
+        stats["system"]["load_avg"] = _read_loadavg()
+        stats["system"]["uptime_seconds"] = _read_uptime()
+        mem = _read_meminfo()
+        if mem:
+            stats["system"]["mem_total_bytes"] = mem.get('MemTotal')
+            stats["system"]["mem_available_bytes"] = mem.get('MemAvailable')
+            if mem.get('MemAvailable') is not None and mem.get('MemTotal') is not None:
+                stats["system"]["mem_used_bytes"] = mem['MemTotal'] - mem['MemAvailable']
+            elif mem.get('MemFree') is not None:
+                stats["system"]["mem_used_bytes"] = mem['MemTotal'] - mem['MemFree']
+        st_total, st_idle = _read_proc_stat_cpu()
+        proc_total, rss, threads, proc_start = _read_proc_self_stat()
+        if rss is not None:
+            stats["process"]["rss_bytes"] = rss * page_size
+        if threads is not None:
+            stats["process"]["threads"] = threads
+        if proc_start is not None and stats["system"]["uptime_seconds"] is not None:
+            stats["process"]["uptime_seconds"] = stats["system"]["uptime_seconds"] - proc_start / clk_tck
+        cache = _RES_CACHE
+        if (cache["ts"] and st_total is not None and proc_total is not None
+                and cache["sys_total"] is not None and (now - cache["ts"]) > 0):
+            dsys = st_total - cache["sys_total"]
+            didle = st_idle - cache["sys_idle"]
+            dproc = proc_total - cache["proc_utime"]
+            dt = now - cache["ts"]
+            if dsys > 0:
+                stats["system"]["cpu_percent"] = round(
+                    max(0.0, min(100.0, (dsys - didle) / dsys * 100.0)), 1)
+            stats["process"]["cpu_percent"] = round(
+                max(0.0, min(100.0, (dproc / clk_tck) / dt * 100.0)), 1)
+        cache["ts"] = now
+        cache["sys_total"] = st_total
+        cache["sys_idle"] = st_idle
+        cache["proc_utime"] = proc_total
+
+    try:
+        import shutil
+        du = shutil.disk_usage(str(MUSIC_DIR))
+        stats["disk"]["total_bytes"] = du.total
+        stats["disk"]["free_bytes"] = du.free
+        stats["disk"]["used_bytes"] = du.used
+    except Exception:
+        pass
+    return stats
+
+
+@router.get("/api/admin/resources")
+def admin_resources(token: Optional[str] = Header(None)):
+    _require_admin(token)
+    return _get_resource_stats()
+
+
 @router.get("/api/admin/stats")
 def admin_stats(token: Optional[str] = Header(None)):
     _require_admin(token)

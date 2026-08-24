@@ -34,6 +34,44 @@ if (isLight) { document.documentElement.style.setProperty('--bg', '#f5f5f5'); do
     <div class="tab active" id="tab-dashboard">
       <h2>Overview</h2>
       <div class="stats" id="stats"></div>
+      <div class="chart-card" style="margin-bottom:32px;">
+        <h3 style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+          Resource Monitor
+          <span id="res-live-dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;box-shadow:0 0 6px var(--accent);animation:resPulse 1.6s infinite;"></span>
+          <span id="res-updated" style="font-size:11px;color:var(--text3);font-weight:400;"></span>
+        </h3>
+        <div style="font-size:13px;color:var(--text2);">
+          <div style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+            <span style="width:90px;flex:none;color:var(--text2);font-size:12px;">System CPU</span>
+            <div style="flex:1;height:8px;background:var(--bg-hover);border-radius:4px;overflow:hidden;min-width:80px;">
+              <div id="res-sys-cpu-bar" style="height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .4s ease;"></div>
+            </div>
+            <span id="res-sys-cpu-val" style="width:90px;flex:none;text-align:right;color:var(--text);font-size:12px;font-variant-numeric:tabular-nums;">—</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+            <span style="width:90px;flex:none;color:var(--text2);font-size:12px;">System RAM</span>
+            <div style="flex:1;height:8px;background:var(--bg-hover);border-radius:4px;overflow:hidden;min-width:80px;">
+              <div id="res-sys-ram-bar" style="height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .4s ease;"></div>
+            </div>
+            <span id="res-sys-ram-val" style="width:90px;flex:none;text-align:right;color:var(--text);font-size:12px;font-variant-numeric:tabular-nums;">—</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+            <span style="width:90px;flex:none;color:var(--text2);font-size:12px;">Moidify CPU</span>
+            <div style="flex:1;height:8px;background:var(--bg-hover);border-radius:4px;overflow:hidden;min-width:80px;">
+              <div id="res-proc-cpu-bar" style="height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .4s ease;"></div>
+            </div>
+            <span id="res-proc-cpu-val" style="width:90px;flex:none;text-align:right;color:var(--text);font-size:12px;font-variant-numeric:tabular-nums;">—</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin:8px 0;">
+            <span style="width:90px;flex:none;color:var(--text2);font-size:12px;">Moidify RAM</span>
+            <div style="flex:1;height:8px;background:var(--bg-hover);border-radius:4px;overflow:hidden;min-width:80px;">
+              <div id="res-proc-ram-bar" style="height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .4s ease;"></div>
+            </div>
+            <span id="res-proc-ram-val" style="width:90px;flex:none;text-align:right;color:var(--text);font-size:12px;font-variant-numeric:tabular-nums;">—</span>
+          </div>
+          <div id="res-meta" style="margin-top:10px;font-size:12px;color:var(--text3);font-variant-numeric:tabular-nums;"></div>
+        </div>
+      </div>
       <div class="chart-grid" id="chart-grid"></div>
       <div id="scanner-card" class="chart-card" style="margin-bottom:32px;display:none">
         <h3 style="margin-bottom:6px">Scanner Status</h3>
