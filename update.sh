@@ -5,13 +5,22 @@ APP_DIR="/opt/moidify"
 SERVICE_USER="moidify"
 REPO_URL="https://github.com/Moid-M/moidify"
 GIT_REPO_URL="${REPO_URL}.git"
+BRANCH="main"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --branch) BRANCH="$2"; shift 2 ;;
+    --branch=*) BRANCH="${1#*=}"; shift ;;
+    *) shift ;;
+  esac
+done
 
 if [[ $EUID -ne 0 ]]; then
   echo "This must be run as root (sudo)."
   exit 1
 fi
 
-echo "Updating Moidify..."
+echo "Updating Moidify (branch: $BRANCH)..."
 
 # Use local sources if running from a dev copy (not the installed dir)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -22,11 +31,11 @@ if [[ -f "$SCRIPT_DIR/server.py" && "$SCRIPT_DIR" != "$APP_DIR" ]]; then
 elif [[ -d "$APP_DIR/.git" ]]; then
   cd "$APP_DIR"
   git stash --include-untracked 2>/dev/null || true
-  git pull origin main 2>/dev/null || git pull "$GIT_REPO_URL" main
+  git pull origin "$BRANCH" 2>/dev/null || git pull "$GIT_REPO_URL" "$BRANCH"
 else
   # Download latest archive
   TMPDIR=$(mktemp -d)
-  curl -sL "${REPO_URL}/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
+  curl -sL "${REPO_URL}/archive/refs/heads/${BRANCH}.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
   rsync -a --delete "$TMPDIR/" "$APP_DIR/"
   rm -rf "$TMPDIR"
 fi
