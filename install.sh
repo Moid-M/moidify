@@ -25,20 +25,51 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ─── Helpers ─────────────────────────────────────────────────────────────────
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
-info()  { echo -e "${CYAN}::${NC} $1"; }
-ok()    { echo -e "${GREEN}ok${NC}  $1"; }
-warn()  { echo -e "${YELLOW}!!${NC} $1"; }
-err()   { echo -e "${RED}!!${NC} $1"; }
+# ─── Visual helpers ───────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'
+GREY='\033[90m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 
-if $VERBOSE; then
-  LOG=""
-  REDIR=""
-else
-  LOG="--quiet"
-  REDIR=">/dev/null 2>&1"
-fi
+TOTAL_STEPS=14
+CUR_STEP=0
+
+step() {
+  CUR_STEP=$((CUR_STEP + 1))
+  echo ""
+  echo -e "  ${BOLD}${CYAN}▶ [${CUR_STEP}/${TOTAL_STEPS}]${NC} ${BOLD}$1${NC}"
+}
+
+info()  { echo -e "     ${CYAN}ℹ${NC} $1"; }
+ok()    { echo -e "     ${GREEN}✓${NC} $1"; }
+warn()  { echo -e "     ${YELLOW}⚠${NC} $1"; }
+err()   { echo -e "     ${RED}✗${NC} $1"; }
+
+_spinner() {
+  local pid=$1 frames="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏" i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    printf "\r\033[K     ${GREY}%s${NC}" "${frames:i++%10:1}"
+    sleep 0.1
+  done
+  printf "\r\033[K"
+}
+
+# run_cmd "label" cmd... — shows a spinner (non-verbose) or live output (verbose)
+run_cmd() {
+  local label="$1"; shift
+  if $VERBOSE; then
+    echo -e "     ${CYAN}↻${NC} $label"
+    "$@"
+    return $?
+  fi
+  printf "     ${GREY}…${NC} %s" "$label"
+  "$@" >/dev/null 2>&1 &
+  local pid=$!
+  _spinner "$pid"
+  wait "$pid"
+  local rc=$?
+  if [ "$rc" -eq 0 ]; then echo -e "${GREEN} ✓${NC} $label"
+  else echo -e "${RED} ✗${NC} $label"; fi
+  return $rc
+}
 
 cleanup() {
   if [[ -n "${TMPDIR:-}" && "${TMPDIR:-}" != "$SCRIPT_DIR" ]]; then
@@ -47,7 +78,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ─── Root check ──────────────────────────────────────────────────────────────
+# ─── Banner ────────────────────────────────────────────────────────────────────
+echo ""
+echo -e "${CYAN}  ╔════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}  ║${NC}             ${BOLD}🎵  MOIDIFY INSTALLER${NC}             ${CYAN}║${NC}"
+echo -e "${CYAN}  ╚════════════════════════════════════════════════╝${NC}"
+echo -e "     ${DIM}Your music. Anywhere. No strings attached.${NC}"
+
+# ─── Step 1: preconditions ─────────────────────────────────────────────────────
+step "Checking preconditions"
+
 if [[ $EUID -ne 0 ]]; then
   err "This installer must be run as root (sudo)."
   exit 1
@@ -55,14 +95,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# ─── Header ──────────────────────────────────────────────────────────────────
-echo ""
-echo -e "${CYAN}  ╔═══════════════════════════╗${NC}"
-echo -e "${CYAN}  ║     Moidify Installer     ║${NC}"
-echo -e "${CYAN}  ╚═══════════════════════════╝${NC}"
-echo ""
-
-# ─── Detect distro ───────────────────────────────────────────────────────────
+# ─── Detect distro ─────────────────────────────────────────────────────────────
 PKG_MANAGER=""
 INSTALL_CMD=""
 if command -v apt &>/dev/null; then
@@ -76,8 +109,10 @@ elif command -v zypper &>/dev/null; then
 elif command -v apk &>/dev/null; then
   PKG_MANAGER="apk"; INSTALL_CMD="apk add"
 fi
+ok "Running as root; package manager: ${PKG_MANAGER:-none detected}"
 
-# ─── System deps ─────────────────────────────────────────────────────────────
+# ─── Step 2: system dependencies ───────────────────────────────────────────────
+step "Installing system dependencies"
 case "$PKG_MANAGER" in
   apt) PKG_LIST="python3 python3-pip python3-venv sqlite3 rsync git curl" ;;
   dnf) PKG_LIST="python3 python3-pip python3-virtualenv sqlite rsync git curl" ;;
@@ -87,19 +122,21 @@ case "$PKG_MANAGER" in
 esac
 
 if [[ -n "$PKG_MANAGER" ]]; then
-  info "Installing system dependencies..."
-  case "$PKG_MANAGER" in
-    apt) apt update -qq $LOG ;;
-  esac
-  if $VERBOSE; then
-    $INSTALL_CMD $PKG_LIST
-  else
-    $INSTALL_CMD $PKG_LIST >/dev/null 2>&1
+  if [[ "$PKG_MANAGER" == "apt" ]]; then
+    run_cmd "Updating package lists" apt update -qq
   fi
-  ok "System dependencies ready."
+  if run_cmd "Installing base packages" bash -c "$INSTALL_CMD $PKG_LIST"; then
+    ok "System dependencies ready."
+  else
+    err "Failed to install system dependencies."
+    exit 1
+  fi
+else
+  warn "No supported package manager found; assuming dependencies are already present."
 fi
 
-# ─── Service user ────────────────────────────────────────────────────────────
+# ─── Step 3: service user ──────────────────────────────────────────────────────
+step "Creating service user"
 if id "$SERVICE_USER" &>/dev/null; then
   info "User $SERVICE_USER already exists."
 else
@@ -107,11 +144,12 @@ else
   ok "Created system user: $SERVICE_USER"
 fi
 
-# ─── Directories ─────────────────────────────────────────────────────────────
+# ─── Step 4: directories ───────────────────────────────────────────────────────
+step "Preparing directories"
 install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$APP_DIR" "$DATA_DIR" "$DATA_DIR/music" "$DATA_DIR/covers"
 install -d -o root -g root "$CONFIG_DIR"
+ok "Directories ready."
 
-# ─── Music dir ───────────────────────────────────────────────────────────────
 MUSIC_DIR_INPUT="${CLI_MUSIC_DIR:-${DATA_DIR}/music}"
 if [[ ! -d "$MUSIC_DIR_INPUT" ]]; then
   install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$MUSIC_DIR_INPUT"
@@ -119,27 +157,27 @@ else
   chown "$SERVICE_USER":"$SERVICE_USER" "$MUSIC_DIR_INPUT"
 fi
 
-# ─── Source files ─────────────────────────────────────────────────────────────
+# ─── Step 5: application files ──────────────────────────────────────────────────
+step "Fetching application files"
 if [[ -f "$SCRIPT_DIR/server.py" ]]; then
   info "Using local source files from $SCRIPT_DIR"
   VERSION=$(cat "$SCRIPT_DIR/version.txt" 2>/dev/null || echo "?")
   if command -v rsync &>/dev/null; then
-    rsync -a --delete --exclude='install.sh' \
-      --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' \
+    run_cmd "Copying files (rsync)" rsync -a --delete \
+      --exclude='install.sh' --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' \
       --exclude='venv' --exclude='music' --exclude='data' --exclude='covers' \
       "$SCRIPT_DIR/" "$APP_DIR/"
   else
-    cp -r "$SCRIPT_DIR"/* "$APP_DIR/"
+    run_cmd "Copying files (cp)" cp -r "$SCRIPT_DIR"/* "$APP_DIR/"
   fi
   chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
   ok "Application files copied to $APP_DIR"
 else
-  info "Downloading application files..."
+  info "Downloading application files…"
   TMPDIR=$(mktemp -d)
 
   if command -v git &>/dev/null; then
-    git clone --depth 1 "$GIT_REPO_URL" "$TMPDIR/repo" 2>&1 | tail -1 || true
-    if [[ -d "$TMPDIR/repo" ]]; then
+    if run_cmd "Cloning repository" git clone --depth 1 "$GIT_REPO_URL" "$TMPDIR/repo"; then
       rm -rf "$TMPDIR/repo/.git" 2>/dev/null || true
       cp -r "$TMPDIR/repo"/* "$TMPDIR/" 2>/dev/null || true
       rm -rf "$TMPDIR/repo" 2>/dev/null || true
@@ -148,9 +186,11 @@ else
 
   if [[ ! -f "$TMPDIR/server.py" ]]; then
     if command -v curl &>/dev/null; then
-      curl -sL "${REPO_URL}/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
+      run_cmd "Downloading release tarball" bash -c \
+        "curl -sL '${REPO_URL}/archive/refs/heads/main.tar.gz' | tar -xz -C '$TMPDIR' --strip-components=1"
     elif command -v wget &>/dev/null; then
-      wget -qO- "${REPO_URL}/archive/refs/heads/main.tar.gz" | tar -xz -C "$TMPDIR" --strip-components=1
+      run_cmd "Downloading release tarball" bash -c \
+        "wget -qO- '${REPO_URL}/archive/refs/heads/main.tar.gz' | tar -xz -C '$TMPDIR' --strip-components=1"
     fi
   fi
 
@@ -161,65 +201,70 @@ else
 
   VERSION=$(cat "$TMPDIR/version.txt" 2>/dev/null || echo "?")
 
-  rm -rf "$TMPDIR/install.sh" \
-         "$TMPDIR/__pycache__" "$TMPDIR/music" "$TMPDIR/data" "$TMPDIR/covers" \
-         "$TMPDIR/.git" 2>/dev/null || true
+  rm -rf "$TMPDIR/install.sh" "$TMPDIR/__pycache__" "$TMPDIR/music" \
+         "$TMPDIR/data" "$TMPDIR/covers" "$TMPDIR/.git" 2>/dev/null || true
   find "$TMPDIR" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
   find "$TMPDIR" -name '*.pyc' -delete 2>/dev/null || true
 
   if command -v rsync &>/dev/null; then
-    rsync -a --delete "$TMPDIR/" "$APP_DIR/"
+    run_cmd "Copying files (rsync)" rsync -a --delete "$TMPDIR/" "$APP_DIR/"
   else
-    cp -r "$TMPDIR"/* "$APP_DIR/"
+    run_cmd "Copying files (cp)" cp -r "$TMPDIR"/* "$APP_DIR/"
   fi
   chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
   ok "Application files copied to $APP_DIR"
 fi
 
-# ─── CLI ──────────────────────────────────────────────────────────────────────
-if install -m 755 "$APP_DIR/moidify" /usr/local/bin/moidify 2>/dev/null; then
-  ok "CLI installed: /usr/local/bin/moidify"
-else
+# ─── Step 6: CLI ───────────────────────────────────────────────────────────────
+step "Installing command-line interface"
+if ! run_cmd "Installing CLI" install -m 755 "$APP_DIR/moidify" /usr/local/bin/moidify; then
   warn "Could not install CLI to /usr/local/bin/moidify"
   warn "Run manually: sudo install -m 755 $APP_DIR/moidify /usr/local/bin/moidify"
 fi
 
-# ─── Virtual env + deps ──────────────────────────────────────────────────────
-info "Setting up Python virtual environment..."
-$PYTHON -m venv "$APP_DIR/venv"
+# ─── Step 7: virtual environment ───────────────────────────────────────────────
+step "Creating Python virtual environment"
+if ! run_cmd "Creating virtual environment" "$PYTHON" -m venv "$APP_DIR/venv"; then
+  err "Failed to create virtual environment. Ensure python3-venv is installed."
+  exit 1
+fi
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/venv"
 
-info "Installing Python dependencies..."
-if $VERBOSE; then
-  "$APP_DIR/venv/bin/pip" install --no-cache-dir -r "$APP_DIR/requirements.txt"
+# ─── Step 8: Python dependencies ───────────────────────────────────────────────
+step "Installing Python dependencies"
+if run_cmd "Installing Python dependencies" "$APP_DIR/venv/bin/pip" install --no-cache-dir -r "$APP_DIR/requirements.txt"; then
+  ok "Python dependencies installed."
 else
-  "$APP_DIR/venv/bin/pip" install --quiet --no-cache-dir -r "$APP_DIR/requirements.txt"
+  err "Dependency install failed — this is usually a network issue."
+  err "Re-run the installer; it is safe to run again."
+  exit 1
 fi
-ok "Python dependencies installed."
 
-# ─── yt-dlp (for URL imports) ────────────────────────────────────────────────
-info "Installing yt-dlp..."
+# ─── Step 9: yt-dlp ────────────────────────────────────────────────────────────
+step "Installing yt-dlp (URL imports)"
 mkdir -p "$APP_DIR/extra-pkgs"
-if $VERBOSE; then
-  "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp && ok "yt-dlp installed." || warn "yt-dlp install failed"
-else
-  "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp >/dev/null 2>&1 && ok "yt-dlp installed." || warn "yt-dlp install failed"
+if ! run_cmd "Installing yt-dlp" "$PYTHON" -m pip install --target="$APP_DIR/extra-pkgs" --upgrade --no-cache-dir yt-dlp; then
+  warn "yt-dlp install failed — URL imports will be unavailable."
+  warn "Install later with: pip install yt-dlp"
 fi
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/extra-pkgs" 2>/dev/null || true
 
-# ─── ffmpeg (for audio transcoding) ──────────────────────────────────────────
+# ─── Step 10: ffmpeg ───────────────────────────────────────────────────────────
+step "Installing ffmpeg (transcoding)"
 if ! command -v ffmpeg &>/dev/null && [[ -n "$PKG_MANAGER" ]]; then
-  info "Installing ffmpeg..."
   case "$PKG_MANAGER" in
-    apt) DEBIAN_FRONTEND=noninteractive apt install -y ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped (install manually: sudo apt install ffmpeg)" ;;
-    dnf) dnf install -y ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped" ;;
-    pacman) pacman -S --noconfirm ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped" ;;
-    zypper) zypper install -y ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped" ;;
-    apk) apk add ffmpeg >/dev/null 2>&1 && ok "ffmpeg installed." || warn "ffmpeg install skipped" ;;
+    apt)    run_cmd "Installing ffmpeg" bash -c "DEBIAN_FRONTEND=noninteractive apt install -y ffmpeg" || warn "ffmpeg install skipped (install manually: sudo apt install ffmpeg)" ;;
+    dnf)    run_cmd "Installing ffmpeg" bash -c "dnf install -y ffmpeg" || warn "ffmpeg install skipped" ;;
+    pacman) run_cmd "Installing ffmpeg" bash -c "pacman -S --noconfirm ffmpeg" || warn "ffmpeg install skipped" ;;
+    zypper) run_cmd "Installing ffmpeg" bash -c "zypper install -y ffmpeg" || warn "ffmpeg install skipped" ;;
+    apk)    run_cmd "Installing ffmpeg" bash -c "apk add ffmpeg" || warn "ffmpeg install skipped" ;;
   esac
+else
+  info "ffmpeg already present or no package manager — skipping."
 fi
 
-# ─── Config ──────────────────────────────────────────────────────────────────
+# ─── Step 11: configuration ────────────────────────────────────────────────────
+step "Writing configuration"
 MAX_UPLOAD_SIZE_BYTES=$(python3 -c "print(int(float('$MAX_UPLOAD_SIZE_GB') * 1024 * 1024 * 1024))")
 cat > "$CONFIG_DIR/config.json" <<CONF
 {
@@ -230,22 +275,28 @@ cat > "$CONFIG_DIR/config.json" <<CONF
   "max_upload_size": $MAX_UPLOAD_SIZE_BYTES
 }
 CONF
+ok "Configuration written to $CONFIG_DIR/config.json"
 
-# ─── Init DB ─────────────────────────────────────────────────────────────────
-info "Initializing database..."
-"$APP_DIR/venv/bin/python" -c "
+# ─── Step 12: database ─────────────────────────────────────────────────────────
+step "Initializing database"
+if "$APP_DIR/venv/bin/python" -c "
 import sys; sys.path.insert(0, '$APP_DIR')
 from database import init_db; init_db()
-" 2>&1 || warn "Database init had issues (may be fine on first start)"
+" 2>&1; then
+  ok "Database initialized."
+else
+  warn "Database init had issues (may be fine on first start)"
+fi
 chown "$SERVICE_USER":"$SERVICE_USER" "$DATA_DIR/music.db" 2>/dev/null || true
 
-# ─── Systemd ─────────────────────────────────────────────────────────────────
+# ─── Step 13: systemd ──────────────────────────────────────────────────────────
+step "Installing systemd service"
 sed "s/--port 8000/--port $PORT/" "$APP_DIR/moidify.service" > "$SERVICE_FILE"
 systemctl daemon-reload
 ok "Systemd service installed on port $PORT."
 
-# ─── Start ───────────────────────────────────────────────────────────────────
-info "Starting ${APP_NAME}..."
+# ─── Step 14: start ────────────────────────────────────────────────────────────
+step "Starting Moidify"
 systemctl enable moidify.service
 systemctl restart moidify.service
 sleep 2
@@ -256,29 +307,23 @@ else
   warn "${APP_NAME} failed to start. Check: journalctl -u moidify.service -n 30 --no-pager"
 fi
 
-# ─── Summary ─────────────────────────────────────────────────────────────────
+# ─── Summary ───────────────────────────────────────────────────────────────────
 IP=$(ip route get 1 2>/dev/null | awk '{print $7}' || hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
 echo ""
-echo -e "${CYAN}  ╔═══════════════════════════╗${NC}"
-echo -e "${CYAN}  ║   Installation Complete   ║${NC}"
-echo -e "${CYAN}  ╚═══════════════════════════╝${NC}"
+echo -e "${GREEN}  ╔════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}  ║${NC}            ${BOLD}✓  Installation complete${NC}            ${GREEN}║${NC}"
+echo -e "${GREEN}  ╚════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "  ${GREEN}${APP_NAME} v${VERSION}${NC} running at:"
-echo -e "  ${CYAN}http://${IP}:${PORT}${NC}"
+echo -e "     ${BOLD}Moidify v${VERSION}${NC} is running at:"
+echo -e "        ${CYAN}http://${IP}:${PORT}${NC}"
 echo ""
-echo -e "  ${YELLOW}Music folder:${NC}  $MUSIC_DIR_INPUT"
-echo -e "  ${YELLOW}Config:${NC}       $CONFIG_DIR/config.json"
-echo -e "  ${YELLOW}Data:${NC}         $DATA_DIR"
-echo -e "  ${YELLOW}Logs:${NC}         journalctl -u moidify.service -f"
+echo -e "     ${DIM}Music folder:${NC}   $MUSIC_DIR_INPUT"
+echo -e "     ${DIM}Config:${NC}         $CONFIG_DIR/config.json"
+echo -e "     ${DIM}Data:${NC}           $DATA_DIR"
+echo -e "     ${DIM}Logs:${NC}           journalctl -u moidify.service -f"
 echo ""
-echo -e "  ${YELLOW}Commands:${NC}  run ${CYAN}moidify help${NC} to list all available commands"
-echo -e "    e.g.  moidify start | stop | restart | status | logs | config | rescan | download"
+echo -e "     ${BOLD}Next:${NC} open the setup wizard to create your admin account:"
+echo -e "        ${CYAN}http://${IP}:${PORT}/setup${NC}"
 echo ""
-echo -e "  ${YELLOW}Next:${NC} Open the setup wizard to create your admin account:"
-echo -e "  ${CYAN}http://${IP}:${PORT}/setup${NC}"
-echo ""
-
-if ! $VERBOSE; then
-  echo -e "  ${YELLOW}Tip:${NC} Run with ${CYAN}-v${NC} for verbose output."
-fi
+echo -e "     ${DIM}Commands:${NC} run ${CYAN}moidify help${NC} to list all available commands"
 echo ""
