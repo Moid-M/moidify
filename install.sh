@@ -71,6 +71,12 @@ run_cmd() {
   return $rc
 }
 
+# quick GitHub reachability check (silent, non-fatal by caller)
+_check_connectivity() {
+  curl -fsS --max-time 8 -o /dev/null https://github.com 2>/dev/null \
+    || curl -fsS --max-time 8 -o /dev/null https://api.github.com 2>/dev/null
+}
+
 cleanup() {
   if [[ -n "${TMPDIR:-}" && "${TMPDIR:-}" != "$SCRIPT_DIR" ]]; then
     rm -rf "$TMPDIR"
@@ -84,6 +90,14 @@ echo -e "${CYAN}  ╔═══════════════════�
 echo -e "${CYAN}  ║${NC}             ${BOLD}🎵  MOIDIFY INSTALLER${NC}             ${CYAN}║${NC}"
 echo -e "${CYAN}  ╚════════════════════════════════════════════════╝${NC}"
 echo -e "     ${DIM}Your music. Anywhere. No strings attached.${NC}"
+
+# ─── Trust preamble ────────────────────────────────────────────────────────────
+echo -e "  ${BOLD}This installer will:${NC}"
+echo -e "    ${DIM}•${NC} install system dependencies (python, ffmpeg, …)"
+echo -e "    ${DIM}•${NC} download Moidify into ${BOLD}${APP_DIR}${NC}"
+echo -e "    ${DIM}•${NC} create a '${SERVICE_USER}' service user + systemd service"
+echo -e "  ${DIM}Open source — review the code at ${REPO_URL}${NC}"
+echo ""
 
 # ─── Step 1: preconditions ─────────────────────────────────────────────────────
 step "Checking preconditions"
@@ -173,33 +187,57 @@ if [[ -f "$SCRIPT_DIR/server.py" ]]; then
   chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
   ok "Application files copied to $APP_DIR"
 else
-  info "Downloading application files…"
   TMPDIR=$(mktemp -d)
 
+  if ! _check_connectivity; then
+    err "Cannot reach GitHub — check your internet connection and try again."
+    exit 1
+  fi
+  info "Source: ${BOLD}${REPO_URL}${NC}  (branch: ${BOLD}main${NC})"
+
+  ARCHIVE="$TMPDIR/moidify.tar.gz"
+  FETCHED=false
+
+  # Preferred: shallow git clone (shows progress)
   if command -v git &>/dev/null; then
-    if run_cmd "Cloning repository" git clone --depth 1 "$GIT_REPO_URL" "$TMPDIR/repo"; then
-      rm -rf "$TMPDIR/repo/.git" 2>/dev/null || true
-      cp -r "$TMPDIR/repo"/* "$TMPDIR/" 2>/dev/null || true
-      rm -rf "$TMPDIR/repo" 2>/dev/null || true
+    printf "     ${GREY}↓${NC} Cloning repository (shallow)…\n"
+    if git clone --depth 1 --progress "$GIT_REPO_URL" "$TMPDIR/repo" 2>&1 | cat; then
+      if [[ -f "$TMPDIR/repo/server.py" ]]; then
+        VERSION=$(cat "$TMPDIR/repo/version.txt" 2>/dev/null || echo "?")
+        rm -rf "$TMPDIR/repo/.git"
+        cp -r "$TMPDIR/repo"/* "$TMPDIR/" 2>/dev/null || true
+        rm -rf "$TMPDIR/repo"
+        FETCHED=true
+        ok "Repository cloned (v$VERSION)"
+      fi
+    else
+      warn "Git clone failed — falling back to release archive."
     fi
   fi
 
-  if [[ ! -f "$TMPDIR/server.py" ]]; then
-    if command -v curl &>/dev/null; then
-      run_cmd "Downloading release tarball" bash -c \
-        "curl -sL '${REPO_URL}/archive/refs/heads/main.tar.gz' | tar -xz -C '$TMPDIR' --strip-components=1"
+  # Fallback: download release tarball with a real progress bar
+  if [[ "$FETCHED" != "true" ]]; then
+    printf "     ${GREY}↓${NC} Downloading release archive…\n"
+    if curl -fL# -o "$ARCHIVE" "${REPO_URL}/archive/refs/heads/main.tar.gz" 2>&1; then
+      SIZE=$(du -h "$ARCHIVE" 2>/dev/null | cut -f1)
+      printf "     ${GREEN}✓${NC} Downloaded archive (%s)\n" "${SIZE:-?}"
+      if tar -xzf "$ARCHIVE" -C "$TMPDIR" --strip-components=1 2>/dev/null; then
+        VERSION=$(cat "$TMPDIR/version.txt" 2>/dev/null || echo "?")
+        FETCHED=true
+      fi
     elif command -v wget &>/dev/null; then
-      run_cmd "Downloading release tarball" bash -c \
-        "wget -qO- '${REPO_URL}/archive/refs/heads/main.tar.gz' | tar -xz -C '$TMPDIR' --strip-components=1"
+      wget -q --show-progress -O "$ARCHIVE" "${REPO_URL}/archive/refs/heads/main.tar.gz" 2>&1
+      if tar -xzf "$ARCHIVE" -C "$TMPDIR" --strip-components=1 2>/dev/null; then
+        VERSION=$(cat "$TMPDIR/version.txt" 2>/dev/null || echo "?")
+        FETCHED=true
+      fi
     fi
   fi
 
-  if [[ ! -f "$TMPDIR/server.py" ]]; then
+  if [[ "$FETCHED" != "true" || ! -f "$TMPDIR/server.py" ]]; then
     err "Failed to download Moidify source."
     exit 1
   fi
-
-  VERSION=$(cat "$TMPDIR/version.txt" 2>/dev/null || echo "?")
 
   rm -rf "$TMPDIR/install.sh" "$TMPDIR/__pycache__" "$TMPDIR/music" \
          "$TMPDIR/data" "$TMPDIR/covers" "$TMPDIR/.git" 2>/dev/null || true
@@ -212,7 +250,7 @@ else
     run_cmd "Copying files (cp)" cp -r "$TMPDIR"/* "$APP_DIR/"
   fi
   chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR"
-  ok "Application files copied to $APP_DIR"
+  ok "Application files copied to $APP_DIR (v$VERSION)"
 fi
 
 # ─── Step 6: CLI ───────────────────────────────────────────────────────────────
