@@ -115,13 +115,14 @@ curl -sSL https://raw.githubusercontent.com/Moid-M/moidify/main/install.sh | sud
 | 3 | Copies the app to `/opt/moidify` |
 | 4 | Sets up a Python virtual environment |
 | 5 | Installs Python dependencies (FastAPI, uvicorn, mutagen, watchdog) |
-| 6 | **Asks for max upload size** (default **2.5 GB**) |
-| 7 | **Asks for port number** (default **8000**) |
-| 8 | **Asks for your music folder location** |
-| 9 | **Asks to create an admin account** (optional — skip to use the browser setup wizard later) |
-| 10 | Writes config to `/etc/moidify/config.json` |
-| 11 | Installs a systemd service |
-| 12 | Starts the server immediately |
+| 6 | Sets the **max upload size** (default **2.5 GB**) — editable later in `/etc/moidify/config.json` |
+| 7 | Sets the **port** (default **8000**) — editable in `/etc/moidify/config.json` |
+| 8 | Uses a **music folder** (default `/var/lib/moidify/music`) — change it with `install.sh --music-dir /path` or in config.json |
+| 9 | Writes config to `/etc/moidify/config.json` |
+| 10 | The **admin account** is created afterwards in the browser **setup wizard** at `/setup` (the installer does not ask) |
+| 11 | Optionally opens the port in your firewall (`ufw`/`firewalld`), after a `[Y/n]` prompt |
+| 12 | Installs a systemd service |
+| 13 | Starts the server immediately |
 
 </details>
 

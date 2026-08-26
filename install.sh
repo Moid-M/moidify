@@ -29,7 +29,7 @@ done
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'
 GREY='\033[90m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 
-TOTAL_STEPS=14
+TOTAL_STEPS=15
 CUR_STEP=0
 
 step() {
@@ -77,12 +77,28 @@ _check_connectivity() {
     || curl -fsS --max-time 8 -o /dev/null https://api.github.com 2>/dev/null
 }
 
+# Read a [Y/n] answer from /dev/tty; falls back to the default when non-interactive.
+_confirm() {
+  local q="$1" default="${2:-Y}" input=""
+  if [[ -t 0 ]] || [[ -c /dev/tty ]]; then
+    { read -r -p "  $q [$default]: " input; } </dev/tty 2>/dev/null || input="$default"
+  fi
+  input="${input:-$default}"; input="${input,,}"
+  [[ "$input" == "y" || "$input" == "yes" ]]
+}
+
 cleanup() {
   if [[ -n "${TMPDIR:-}" && "${TMPDIR:-}" != "$SCRIPT_DIR" ]]; then
     rm -rf "$TMPDIR"
   fi
 }
 trap cleanup EXIT
+
+# ─── Install log ───────────────────────────────────────────────────────────────
+LOGFILE="/var/log/moidify-install.log"
+if [[ -w "$(dirname "$LOGFILE")" ]]; then
+  exec > >(tee -a "$LOGFILE") 2>&1
+fi
 
 # ─── Banner ────────────────────────────────────────────────────────────────────
 echo ""
@@ -98,6 +114,8 @@ echo -e "    ${DIM}•${NC} download Moidify into ${BOLD}${APP_DIR}${NC}"
 echo -e "    ${DIM}•${NC} create a '${SERVICE_USER}' service user + systemd service"
 echo -e "  ${DIM}Open source — review the code at ${REPO_URL}${NC}"
 echo ""
+echo -e "  ${DIM}Install log: ${LOGFILE}${NC}"
+echo ""
 
 # ─── Step 1: preconditions ─────────────────────────────────────────────────────
 step "Checking preconditions"
@@ -107,7 +125,25 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+# Idempotency guard — don't silently clobber an existing install
+if [[ -d "$APP_DIR" && -f "$APP_DIR/server.py" ]]; then
+  echo -e "  ${YELLOW}⚠${NC} An existing Moidify installation was found at ${BOLD}$APP_DIR${NC}."
+  if _confirm "Reinstall over the existing installation? [R]einstall / [C]ancel" "R"; then
+    info "Reinstalling over the existing installation."
+  else
+    info "Aborting as requested."
+    exit 0
+  fi
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if ! _check_connectivity; then
+  err "No internet connection detected."
+  err "An internet connection is required to download dependencies and Moidify."
+  exit 1
+fi
+ok "Internet connection: ok"
 
 # ─── Detect distro ─────────────────────────────────────────────────────────────
 PKG_MANAGER=""
@@ -262,18 +298,38 @@ fi
 
 # ─── Step 7: virtual environment ───────────────────────────────────────────────
 step "Creating Python virtual environment"
+if ! command -v "$PYTHON" &>/dev/null; then
+  err "python3 not found after installing system dependencies."
+  exit 1
+fi
+if ! "$PYTHON" -c "import sys; sys.exit(0 if sys.version_info>=(3,9) else 1)"; then
+  err "Python 3.9 or newer is required to run Moidify."
+  exit 1
+fi
+ok "Python $(python3 -c 'import sys;print("%d.%d"%sys.version_info[:2])') detected."
 if ! run_cmd "Creating virtual environment" "$PYTHON" -m venv "$APP_DIR/venv"; then
   err "Failed to create virtual environment. Ensure python3-venv is installed."
   exit 1
 fi
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_DIR/venv"
 
-# ─── Step 8: Python dependencies ───────────────────────────────────────────────
+# ─── Step 8: Python dependencies (resilient) ───────────────────────────────────
 step "Installing Python dependencies"
-if run_cmd "Installing Python dependencies" "$APP_DIR/venv/bin/pip" install --no-cache-dir -r "$APP_DIR/requirements.txt"; then
+install_ok=false
+for attempt in 1 2 3; do
+  if run_cmd "Installing Python dependencies (attempt $attempt/3)" \
+        "$APP_DIR/venv/bin/pip" install --no-cache-dir --default-timeout=120 --retries=10 -r "$APP_DIR/requirements.txt"; then
+    install_ok=true
+    break
+  fi
+  warn "Dependency install failed (attempt $attempt/3) — retrying in 3s…"
+  sleep 3
+done
+if $install_ok; then
   ok "Python dependencies installed."
 else
-  err "Dependency install failed — this is usually a network issue."
+  err "Dependency install failed — this is usually a network or DNS issue."
+  err "A full log was written to ${LOGFILE}."
   err "Re-run the installer; it is safe to run again."
   exit 1
 fi
@@ -333,7 +389,30 @@ sed "s/--port 8000/--port $PORT/" "$APP_DIR/moidify.service" > "$SERVICE_FILE"
 systemctl daemon-reload
 ok "Systemd service installed on port $PORT."
 
-# ─── Step 14: start ────────────────────────────────────────────────────────────
+# ─── Step 14: firewall ─────────────────────────────────────────────────────────
+step "Configuring firewall"
+FW_TOOL=""
+if command -v ufw &>/dev/null; then FW_TOOL="ufw";
+elif command -v firewall-cmd &>/dev/null; then FW_TOOL="firewalld"; fi
+
+if [[ -z "$FW_TOOL" ]]; then
+  info "No supported firewall tool (ufw/firewalld) found — skipping."
+  info "If this host is behind another firewall, open port $PORT manually."
+elif _confirm "Open port $PORT in the firewall ($FW_TOOL)? [Y/n]"; then
+  if [[ "$FW_TOOL" == "ufw" ]]; then
+    if ! run_cmd "Opening port $PORT (ufw)" ufw allow "$PORT"/tcp; then
+      warn "Could not open firewall port — open $PORT manually if needed."
+    fi
+  else
+    if ! run_cmd "Opening port $PORT (firewalld)" bash -c "firewall-cmd --add-port=$PORT/tcp --permanent && firewall-cmd --reload"; then
+      warn "Could not open firewall port — open $PORT manually if needed."
+    fi
+  fi
+else
+  info "Skipping firewall changes — open port $PORT manually if needed."
+fi
+
+# ─── Step 15: start ────────────────────────────────────────────────────────────
 step "Starting Moidify"
 systemctl enable moidify.service
 systemctl restart moidify.service
@@ -358,6 +437,7 @@ echo ""
 echo -e "     ${DIM}Music folder:${NC}   $MUSIC_DIR_INPUT"
 echo -e "     ${DIM}Config:${NC}         $CONFIG_DIR/config.json"
 echo -e "     ${DIM}Data:${NC}           $DATA_DIR"
+echo -e "     ${DIM}Install log:${NC}    $LOGFILE"
 echo -e "     ${DIM}Logs:${NC}           journalctl -u moidify.service -f"
 echo ""
 echo -e "     ${BOLD}Next:${NC} open the setup wizard to create your admin account:"
