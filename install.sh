@@ -93,7 +93,7 @@ _ask_choice() {
   local q="$1" allowed="$2" input=""
   while true; do
     if [[ -t 0 ]] || [[ -c /dev/tty ]]; then
-      { read -r -p "  $q: " input; } </dev/tty 2>/dev/null || input=""
+      { read -r -p "  ${BOLD}${YELLOW}➤${NC} $q ${DIM}(type one, then press Enter)${NC}: " input; } </dev/tty 2>/dev/null || input=""
     else
       input=""
     fi
