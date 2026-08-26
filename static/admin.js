@@ -1345,3 +1345,122 @@ checkAdmin().then(function(ok) {
     resTimer = setInterval(loadResources, 2000);
   }
 });
+
+/* ===== Metadata Editor tab ===== */
+var metaCurrent = null;
+
+function escMeta(s) {
+  s = (s == null) ? '' : String(s);
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function metaSearch() {
+  var q = document.getElementById('meta-search').value.trim();
+  api('/api/tracks?search=' + encodeURIComponent(q) + '&limit=100')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var tracks = Array.isArray(d) ? d : (d.tracks || []);
+      var html = '';
+      if (!tracks.length) {
+        html = '<p style="color:var(--text3);">No tracks found.</p>';
+      }
+      tracks.forEach(function (t) {
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid var(--bg-hover);">'
+          + '<img src="/api/cover/' + t.id + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;background:var(--bg-hover);" onerror="this.style.visibility=\'hidden\'">'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escMeta(t.title || 'Unknown') + '</div>'
+          + '<div style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escMeta(t.artist || '') + ' — ' + escMeta(t.album || '') + '</div>'
+          + '</div>'
+          + '<button class="admin-btn" onclick="openMetaEditor(' + t.id + ')">Edit</button>'
+          + '</div>';
+      });
+      document.getElementById('meta-results').innerHTML = html;
+    })
+    .catch(function (e) {
+      document.getElementById('meta-results').innerHTML = '<p style="color:var(--danger)">Error: ' + e.message + '</p>';
+    });
+}
+
+function openMetaEditor(trackId) {
+  api('/api/tracks/' + trackId).then(function (r) { return r.json(); }).then(function (t) {
+    metaCurrent = t;
+    document.getElementById('m-title').value = t.title || '';
+    document.getElementById('m-artist').value = t.artist || '';
+    document.getElementById('m-album-artist').value = t.album_artist || '';
+    document.getElementById('m-album').value = t.album || '';
+    document.getElementById('m-genre').value = t.genre || '';
+    document.getElementById('m-year').value = t.year || '';
+    document.getElementById('m-track').value = t.track_number || '';
+    document.getElementById('m-disc').value = t.disc_number || '';
+    document.getElementById('m-lyrics').value = t.lyrics || '';
+    document.getElementById('m-cover').src = '/api/cover/' + t.id;
+    document.getElementById('m-cover-file').value = '';
+    document.getElementById('m-artist-file').value = '';
+    document.getElementById('m-cover-album').checked = false;
+    document.getElementById('meta-edit-msg').textContent = '';
+    document.getElementById('meta-edit-modal').style.display = 'flex';
+  });
+}
+
+function closeMetaModal() {
+  document.getElementById('meta-edit-modal').style.display = 'none';
+}
+
+function metaVal(id) { return document.getElementById(id).value.trim(); }
+
+async function saveMetaEditor() {
+  if (!metaCurrent) return;
+  var body = {};
+  var title = metaVal('m-title'); if (title !== (metaCurrent.title || '')) body.title = title;
+  var artist = metaVal('m-artist'); if (artist !== (metaCurrent.artist || '')) body.artist = artist;
+  var aa = metaVal('m-album-artist'); if (aa !== (metaCurrent.album_artist || '')) body.album_artist = aa;
+  var album = metaVal('m-album'); if (album !== (metaCurrent.album || '')) body.album = album;
+  var genre = metaVal('m-genre'); if (genre !== (metaCurrent.genre || '')) body.genre = genre;
+  var year = metaVal('m-year'); body.year = year === '' ? null : parseInt(year, 10);
+  var track = metaVal('m-track'); body.track_number = track === '' ? null : parseInt(track, 10);
+  var disc = metaVal('m-disc'); body.disc_number = disc === '' ? null : parseInt(disc, 10);
+  var lyrics = document.getElementById('m-lyrics').value;
+  if (lyrics !== (metaCurrent.lyrics || '')) body.lyrics = lyrics;
+
+  var msg = document.getElementById('meta-edit-msg');
+  msg.style.color = 'var(--accent)';
+  msg.textContent = 'Saving…';
+  try {
+    var r = await api('/api/admin/tracks/' + metaCurrent.id + '/metadata', { method: 'PATCH', body: body });
+    if (!r.ok) {
+      var e = await r.json().catch(function () {});
+      msg.style.color = 'var(--danger)';
+      msg.textContent = 'Error: ' + (e && e.detail ? e.detail : r.statusText);
+      return;
+    }
+    var coverFile = document.getElementById('m-cover-file').files[0];
+    if (coverFile) {
+      var fd = new FormData();
+      fd.append('file', coverFile);
+      var coverUrl = document.getElementById('m-cover-album').checked
+        ? '/api/admin/albums/' + encodeURIComponent(metaCurrent.album || '') + '/cover?artist=' + encodeURIComponent(metaCurrent.album_artist || metaCurrent.artist || '')
+        : '/api/admin/tracks/' + metaCurrent.id + '/cover';
+      await api(coverUrl, { method: 'POST', body: fd });
+    }
+    var artFile = document.getElementById('m-artist-file').files[0];
+    if (artFile) {
+      var fd2 = new FormData();
+      fd2.append('file', artFile);
+      await api('/api/admin/artists/' + encodeURIComponent(metaCurrent.artist || '') + '/image', { method: 'POST', body: fd2 });
+    }
+    msg.style.color = 'var(--accent)';
+    msg.textContent = 'Saved.';
+    setTimeout(closeMetaModal, 600);
+    metaSearch();
+  } catch (e) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Error: ' + e.message;
+  }
+}
+
+var _metaNav = document.querySelector('.nav li[data-tab="metadata"]');
+if (_metaNav) {
+  _metaNav.addEventListener('click', function () { setTimeout(metaSearch, 0); });
+  var _metaSearchInput = document.getElementById('meta-search');
+  if (_metaSearchInput) _metaSearchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') metaSearch(); });
+}

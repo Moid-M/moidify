@@ -11,7 +11,9 @@ from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
 from mutagen.oggvorbis import OggVorbis
 from mutagen.oggopus import OggOpus
-from mutagen.mp4 import MP4
+from mutagen.mp4 import MP4, MP4Cover
+from mutagen.id3 import ID3, TIT2, TPE1, TPE2, TALB, TCON, TDRC, TRCK, TPOS, USLT, APIC
+from mutagen.flac import Picture as FlacPicture
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -208,6 +210,124 @@ def _save_cover(cover_data):
         with open(cover_path, 'wb') as f:
             f.write(cover_data)
     return cover_hash
+
+
+def _img_mime(data):
+    if data[:4] == b'\x89PNG':
+        return 'image/png'
+    if data[:2] == b'\xff\xd8':
+        return 'image/jpeg'
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return 'image/webp'
+    return 'image/jpeg'
+
+
+def _img_ext(data):
+    m = _img_mime(data)
+    return '.png' if m == 'image/png' else ('.webp' if m == 'image/webp' else '.jpg')
+
+
+def write_metadata_to_file(file_path, fields):
+    """Write a subset of metadata fields into an audio file's tags.
+
+    fields keys: title, artist, album_artist, album, genre, year,
+                 track_number, disc_number, lyrics, cover_data (bytes).
+    Returns True if tags were written, False if the format has no tag support
+    (e.g. WAV). Raises on unexpected tag-write errors (caller should catch).
+    """
+    audio = File(file_path)
+    if audio is None:
+        return False
+
+    def _num(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
+    if isinstance(audio, MP3):
+        try:
+            tags = audio.tags or ID3()
+        except Exception:
+            tags = ID3()
+        if 'lyrics' in fields:
+            tags.delall('USLT')
+            if fields['lyrics']:
+                tags.add(USLT(encoding=3, lang='eng', desc='', text=fields['lyrics']))
+        if 'title' in fields: tags['TIT2'] = TIT2(encoding=3, text=fields['title'] or '')
+        if 'artist' in fields: tags['TPE1'] = TPE1(encoding=3, text=fields['artist'] or '')
+        if 'album_artist' in fields: tags['TPE2'] = TPE2(encoding=3, text=fields['album_artist'] or '')
+        if 'album' in fields: tags['TALB'] = TALB(encoding=3, text=fields['album'] or '')
+        if 'genre' in fields: tags['TCON'] = TCON(encoding=3, text=fields['genre'] or '')
+        if 'year' in fields: tags['TDRC'] = TDRC(encoding=3, text=str(fields['year'] or ''))
+        if 'track_number' in fields:
+            tn = _num(fields['track_number'])
+            tags['TRCK'] = TRCK(encoding=3, text=str(tn) if tn is not None else '')
+        if 'disc_number' in fields:
+            dn = _num(fields['disc_number'])
+            tags['TPOS'] = TPOS(encoding=3, text=str(dn) if dn is not None else '')
+        if 'cover_data' in fields and fields['cover_data']:
+            tags['APIC'] = APIC(encoding=3, mime=_img_mime(fields['cover_data']),
+                                type=3, desc='Cover', data=fields['cover_data'])
+        audio.tags = tags
+        audio.save()
+        return True
+
+    if isinstance(audio, (FLAC, OggVorbis, OggOpus)):
+        if 'lyrics' in fields:
+            if fields['lyrics']:
+                audio['lyrics'] = [fields['lyrics']]
+            else:
+                audio.pop('lyrics', None)
+        if 'title' in fields: audio['title'] = [fields['title'] or '']
+        if 'artist' in fields: audio['artist'] = [fields['artist'] or '']
+        if 'album_artist' in fields: audio['albumartist'] = [fields['album_artist'] or '']
+        if 'album' in fields: audio['album'] = [fields['album'] or '']
+        if 'genre' in fields: audio['genre'] = [fields['genre'] or '']
+        if 'year' in fields: audio['date'] = [str(fields['year'] or '')]
+        if 'track_number' in fields:
+            tn = _num(fields['track_number'])
+            audio['tracknumber'] = [str(tn)] if tn is not None else ['']
+        if 'disc_number' in fields:
+            dn = _num(fields['disc_number'])
+            audio['discnumber'] = [str(dn)] if dn is not None else ['']
+        if 'cover_data' in fields and fields['cover_data']:
+            try:
+                pic = FlacPicture()
+                pic.data = fields['cover_data']
+                pic.type = 3
+                pic.mime = _img_mime(fields['cover_data'])
+                pic.desc = 'Cover'
+                audio.clear_pictures()
+                audio.add_picture(pic)
+            except Exception:
+                pass
+        audio.save()
+        return True
+
+    if isinstance(audio, MP4):
+        tags = audio.tags or {}
+        if 'lyrics' in fields: tags['\xa9lyr'] = fields['lyrics'] or ''
+        if 'title' in fields: tags['\xa9nam'] = fields['title'] or ''
+        if 'artist' in fields: tags['\xa9ART'] = fields['artist'] or ''
+        if 'album_artist' in fields: tags['aART'] = fields['album_artist'] or ''
+        if 'album' in fields: tags['\xa9alb'] = fields['album'] or ''
+        if 'genre' in fields: tags['\xa9gen'] = fields['genre'] or ''
+        if 'year' in fields: tags['\xa9day'] = str(fields['year'] or '')
+        if 'track_number' in fields:
+            tn = _num(fields['track_number'])
+            tags['trkn'] = [(tn, 0)] if tn is not None else [(0, 0)]
+        if 'disc_number' in fields:
+            dn = _num(fields['disc_number'])
+            tags['disk'] = [(dn, 0)] if dn is not None else [(0, 0)]
+        if 'cover_data' in fields and fields['cover_data']:
+            flag = MP4Cover.FORMAT_PNG if _img_mime(fields['cover_data']) == 'image/png' else MP4Cover.FORMAT_JPEG
+            tags['covr'] = [MP4Cover(fields['cover_data'], flag)]
+        audio.tags = tags
+        audio.save()
+        return True
+
+    return False
 
 
 def process_file(file_path, conn=None, force=False):

@@ -9,6 +9,8 @@ from fastapi.responses import FileResponse
 from database import get_connection
 from config import COVERS_DIR
 from routes.deps import _normalize, _get_user_from_token, _fetch_lyrics_from_lrclib, UpdateLyricsBody
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["tracks"])
 
@@ -142,18 +144,32 @@ def get_track_gain(track_id: int):
 @router.get("/api/tracks/{track_id}/lyrics")
 def get_track_lyrics(track_id: int):
     conn = get_connection()
-    row = conn.execute("SELECT lyrics, artist, title, album FROM tracks WHERE id = ?", (track_id,)).fetchone()
+    row = conn.execute(
+        "SELECT file_path, lyrics, artist, title, album FROM tracks WHERE id = ?", (track_id,)
+    ).fetchone()
     if row is None:
         conn.close()
         raise HTTPException(404, "Track not found")
-    lyrics = row["lyrics"]
-    if not lyrics:
-        lyrics = _fetch_lyrics_from_lrclib(row["artist"] or "", row["title"] or "", row["album"] or "")
-        if lyrics:
-            conn.execute("UPDATE tracks SET lyrics = ? WHERE id = ?", (lyrics, track_id))
-            conn.commit()
+    # 1) embedded tag is the source of truth
+    try:
+        from scanner import extract_metadata
+        md = extract_metadata(row["file_path"])
+        if md and md.get("lyrics"):
+            conn.close()
+            return {"lyrics": md["lyrics"], "source": "file"}
+    except Exception:
+        pass
+    # 2) live LRCLIB fallback (no DB caching on open)
+    lyrics = _fetch_lyrics_from_lrclib(row["artist"] or "", row["title"] or "", row["album"] or "")
+    if lyrics:
+        conn.close()
+        return {"lyrics": lyrics, "source": "lrclib"}
+    # 3) last-resort: scan-time DB cache
+    if row["lyrics"]:
+        conn.close()
+        return {"lyrics": row["lyrics"], "source": "cache"}
     conn.close()
-    return {"lyrics": lyrics}
+    return {"lyrics": None}
 
 @router.put("/api/tracks/{track_id}/lyrics")
 def update_track_lyrics(track_id: int, body: UpdateLyricsBody):
@@ -161,7 +177,15 @@ def update_track_lyrics(track_id: int, body: UpdateLyricsBody):
     conn = get_connection()
     conn.execute("UPDATE tracks SET lyrics = ? WHERE id = ?", (lyrics, track_id))
     conn.commit()
+    row = conn.execute("SELECT file_path FROM tracks WHERE id = ?", (track_id,)).fetchone()
     conn.close()
+    # write-through to the audio file so edits survive rescans
+    if row and row["file_path"]:
+        try:
+            from scanner import write_metadata_to_file
+            write_metadata_to_file(row["file_path"], {"lyrics": lyrics})
+        except Exception as e:
+            logger.warning("Could not write lyrics to file %s: %s", row["file_path"], e)
     return {"ok": True}
 
 

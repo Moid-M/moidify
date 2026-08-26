@@ -740,6 +740,23 @@ class MetadataBody(BaseModel):
     year: Optional[int] = None
     track_number: Optional[int] = None
     disc_number: Optional[int] = None
+    lyrics: Optional[str] = None
+
+
+def _is_image(data):
+    return (data[:4] == b'\x89PNG' or data[:2] == b'\xff\xd8'
+            or (data[:4] == b'RIFF' and data[8:12] == b'WEBP'))
+
+
+def _img_ext(data):
+    if data[:4] == b'\x89PNG':
+        return '.png'
+    if data[:2] == b'\xff\xd8':
+        return '.jpg'
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return '.webp'
+    return '.jpg'
+
 
 @router.patch("/api/admin/tracks/{track_id}/metadata")
 def admin_update_track_metadata(track_id: int, body: MetadataBody, token: Optional[str] = Header(None)):
@@ -750,7 +767,7 @@ def admin_update_track_metadata(track_id: int, body: MetadataBody, token: Option
         raise HTTPException(404, "Track not found")
     fields = []
     vals = []
-    for field in ("title", "artist", "album_artist", "album", "genre", "year", "track_number", "disc_number"):
+    for field in ("title", "artist", "album_artist", "album", "genre", "year", "track_number", "disc_number", "lyrics"):
         val = getattr(body, field, None)
         if val is not None:
             fields.append(f"{field} = ?")
@@ -762,7 +779,80 @@ def admin_update_track_metadata(track_id: int, body: MetadataBody, token: Option
     conn.execute(sql, vals)
     conn.commit()
     conn.close()
+    # write-through to the audio file so edits survive rescans
+    file_fields = {}
+    for field in ("title", "artist", "album_artist", "album", "genre", "year", "track_number", "disc_number", "lyrics"):
+        val = getattr(body, field, None)
+        if val is not None:
+            file_fields[field] = val
+    if file_fields and row["file_path"]:
+        try:
+            from scanner import write_metadata_to_file
+            wrote = write_metadata_to_file(row["file_path"], file_fields)
+            if not wrote:
+                logger.warning("File format does not support tags; updated DB only for track %s", track_id)
+        except Exception as e:
+            logger.warning("Could not write metadata to file %s: %s", row["file_path"], e)
     return {"ok": True, "updated": fields}
+
+
+@router.post("/api/admin/tracks/{track_id}/cover")
+async def admin_upload_track_cover(track_id: int, file: UploadFile = File(...), token: Optional[str] = Header(None)):
+    _require_admin(token)
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Empty file")
+    if not _is_image(data):
+        raise HTTPException(415, "Not a valid image (png/jpg/webp)")
+    conn = get_connection()
+    row = conn.execute("SELECT id, file_path FROM tracks WHERE id = ?", (track_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Track not found")
+    cover_hash = _save_cover(data)
+    conn.execute("UPDATE tracks SET has_cover = 1, cover_hash = ? WHERE id = ?", (cover_hash, track_id))
+    conn.commit()
+    conn.close()
+    try:
+        from scanner import write_metadata_to_file
+        write_metadata_to_file(row["file_path"], {"cover_data": data})
+    except Exception as e:
+        logger.warning("Could not embed cover into file %s: %s", row["file_path"], e)
+    return {"ok": True, "cover_hash": cover_hash}
+
+
+@router.post("/api/admin/albums/{album_name}/cover")
+async def admin_upload_album_cover(album_name: str, file: UploadFile = File(...),
+                                   artist: Optional[str] = Query(None), token: Optional[str] = Header(None)):
+    _require_admin(token)
+    data = await file.read()
+    if not _is_image(data):
+        raise HTTPException(415, "Not a valid image (png/jpg/webp)")
+    cover_hash = _save_cover(data)
+    conn = get_connection()
+    if artist:
+        conn.execute(
+            "UPDATE tracks SET has_cover = 1, cover_hash = ? WHERE album = ? "
+            "AND COALESCE(NULLIF(album_artist,''), artist) = ?",
+            (cover_hash, album_name, artist),
+        )
+    else:
+        conn.execute("UPDATE tracks SET has_cover = 1, cover_hash = ? WHERE album = ?", (cover_hash, album_name))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "cover_hash": cover_hash, "album": album_name}
+
+
+@router.post("/api/admin/artists/{artist_name}/image")
+async def admin_upload_artist_image(artist_name: str, file: UploadFile = File(...), token: Optional[str] = Header(None)):
+    _require_admin(token)
+    data = await file.read()
+    if not _is_image(data):
+        raise HTTPException(415, "Not a valid image (png/jpg/webp)")
+    key = hashlib.md5(artist_name.strip().lower().encode()).hexdigest()[:16]
+    dest = COVERS_DIR / f"artist_{key}{_img_ext(data)}"
+    dest.write_bytes(data)
+    return {"ok": True, "artist": artist_name}
 
 
 @router.post("/api/admin/tracks/{track_id}/lyrics-upload")

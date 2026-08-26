@@ -23,6 +23,7 @@ if (isLight) { document.documentElement.style.setProperty('--bg', '#f5f5f5'); do
       <li data-tab="statistics">Statistics</li>
       <li data-tab="songs">Songs</li>
       <li data-tab="library">Library</li>
+      <li data-tab="metadata">Metadata</li>
       <li data-tab="download">Download</li>
       <li data-tab="users">Users</li>
       <li data-tab="security">Security</li>
@@ -217,6 +218,18 @@ if (isLight) { document.documentElement.style.setProperty('--bg', '#f5f5f5'); do
       <div id="lib-content" style="font-size:13px;color:var(--text2);"></div>
     </div>
 
+    <div class="tab" id="tab-metadata">
+      <h2>Metadata Editor</h2>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">
+        Search your library, then edit tags, lyrics, and artwork. Changes are saved to both the audio file and the database.
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <input type="text" id="meta-search" placeholder="Search title, artist, or album…" style="flex:1;min-width:220px;padding:10px 12px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg-el);color:var(--text);outline:none;">
+        <button class="admin-btn" onclick="metaSearch()">Search</button>
+      </div>
+      <div id="meta-results"></div>
+    </div>
+
     <div class="tab" id="tab-download">
       <div class="chart-card" style="margin-bottom:24px;">
         <h3 style="margin-bottom:12px">Import from URL</h3>
@@ -363,6 +376,45 @@ if (isLight) { document.documentElement.style.setProperty('--bg', '#f5f5f5'); do
   <div class="context-menu-item" data-action="change-pw">Change Password</div>
   <div class="context-menu-divider"></div>
   <div class="context-menu-item danger" data-action="delete-user">Delete User</div>
+</div>
+
+<!-- Metadata editor modal -->
+<div id="meta-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-el);border-radius:var(--radius);padding:24px;width:min(560px,92vw);max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+    <h3 style="margin:0 0 12px;">Edit Metadata</h3>
+    <div id="meta-edit-msg" style="font-size:12px;margin-bottom:8px;"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <label>Title<br><input id="m-title" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
+      <label>Artist<br><input id="m-artist" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
+      <label>Album Artist<br><input id="m-album-artist" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
+      <label>Album<br><input id="m-album" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
+      <label>Genre<br><input id="m-genre" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
+      <label>Year<br><input id="m-year" type="number" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
+      <label>Track #<br><input id="m-track" type="number" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
+      <label>Disc #<br><input id="m-disc" type="number" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
+    </div>
+    <label style="display:block;margin-top:10px;">Lyrics<br>
+      <textarea id="m-lyrics" rows="8" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);font-family:monospace;"></textarea>
+    </label>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <img id="m-cover" src="/static/logo.png" alt="cover" style="width:64px;height:64px;border-radius:8px;object-fit:cover;background:var(--bg-hover);">
+      <div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Cover</div>
+        <input type="file" id="m-cover-file" accept="image/png,image/jpeg,image/webp">
+        <div style="margin-top:6px;"><label style="font-size:12px;color:var(--text2);"><input type="checkbox" id="m-cover-album"> apply to whole album</label></div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Artist image</div>
+        <input type="file" id="m-artist-file" accept="image/png,image/jpeg,image/webp">
+      </div>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="admin-btn" onclick="closeMetaModal()">Cancel</button>
+      <button class="admin-btn" style="background:var(--accent);color:#fff;border:none;" onclick="saveMetaEditor()">Save</button>
+    </div>
+  </div>
 </div>
 
 <script src="/static/admin.js"></script>
