@@ -87,6 +87,23 @@ _confirm() {
   [[ "$input" == "y" || "$input" == "yes" ]]
 }
 
+# Ask for an explicit single-letter choice; loops until valid. Returns 1 if no
+# terminal is available, so the caller can apply a safe non-interactive default.
+_ask_choice() {
+  local q="$1" allowed="$2" input=""
+  while true; do
+    if [[ -t 0 ]] || [[ -c /dev/tty ]]; then
+      { read -r -p "  $q: " input; } </dev/tty 2>/dev/null || input=""
+    else
+      input=""
+    fi
+    input="${input,,}"
+    if [[ -z "$input" ]]; then return 1; fi
+    if [[ "$allowed" == *"$input"* ]]; then CHOICE="$input"; return 0; fi
+    warn "Please answer with one of: ${allowed}."
+  done
+}
+
 cleanup() {
   if [[ -n "${TMPDIR:-}" && "${TMPDIR:-}" != "$SCRIPT_DIR" ]]; then
     rm -rf "$TMPDIR"
@@ -126,12 +143,17 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Idempotency guard — don't silently clobber an existing install
+REINSTALL=false
+KEEP_CONFIG=false
 if [[ -d "$APP_DIR" && -f "$APP_DIR/server.py" ]]; then
   echo -e "  ${YELLOW}⚠${NC} An existing Moidify installation was found at ${BOLD}$APP_DIR${NC}."
-  if _confirm "Reinstall over the existing installation? [R]einstall / [C]ancel" "R"; then
-    info "Reinstalling over the existing installation."
+  if _ask_choice "Reinstall over it or cancel? [R]einstall / [C]ancel" "rc"; then
+    case "$CHOICE" in
+      r) info "Reinstalling over the existing installation."; REINSTALL=true ;;
+      c) info "Aborting as requested."; exit 0 ;;
+    esac
   else
-    info "Aborting as requested."
+    info "Non-interactive run — defaulting to Cancel (no changes made)."
     exit 0
   fi
 fi
@@ -359,8 +381,31 @@ fi
 
 # ─── Step 11: configuration ────────────────────────────────────────────────────
 step "Writing configuration"
-MAX_UPLOAD_SIZE_BYTES=$(python3 -c "print(int(float('$MAX_UPLOAD_SIZE_GB') * 1024 * 1024 * 1024))")
-cat > "$CONFIG_DIR/config.json" <<CONF
+
+# On reinstall, ask whether to keep the existing config (port / music folder)
+if $REINSTALL && [[ -f "$CONFIG_DIR/config.json" ]]; then
+  if _ask_choice "Keep existing config (port/music folder) or overwrite with defaults? [K]eep / [O]verwrite" "ko"; then
+    case "$CHOICE" in
+      k) KEEP_CONFIG=true ;;
+      o) KEEP_CONFIG=false ;;
+    esac
+  else
+    KEEP_CONFIG=true   # non-interactive reinstall: keep by default
+  fi
+fi
+
+if $KEEP_CONFIG && [[ -f "$CONFIG_DIR/config.json" ]]; then
+  info "Keeping existing config at $CONFIG_DIR/config.json"
+  CFG_PORT=$(python3 -c "import json; print(json.load(open('$CONFIG_DIR/config.json')).get('port', $PORT))" 2>/dev/null || echo "$PORT")
+  PORT="$CFG_PORT"
+  CFG_MUSIC=$(python3 -c "import json; print(json.load(open('$CONFIG_DIR/config.json')).get('music_dir', ''))" 2>/dev/null || true)
+  if [[ -n "$CFG_MUSIC" ]]; then
+    MUSIC_DIR_INPUT="$CFG_MUSIC"
+    install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$MUSIC_DIR_INPUT" 2>/dev/null || true
+  fi
+else
+  MAX_UPLOAD_SIZE_BYTES=$(python3 -c "print(int(float('$MAX_UPLOAD_SIZE_GB') * 1024 * 1024 * 1024))")
+  cat > "$CONFIG_DIR/config.json" <<CONF
 {
   "music_dir": "$MUSIC_DIR_INPUT",
   "covers_dir": "$DATA_DIR/covers",
@@ -369,7 +414,8 @@ cat > "$CONFIG_DIR/config.json" <<CONF
   "max_upload_size": $MAX_UPLOAD_SIZE_BYTES
 }
 CONF
-ok "Configuration written to $CONFIG_DIR/config.json"
+  ok "Configuration written to $CONFIG_DIR/config.json"
+fi
 
 # ─── Step 12: database ─────────────────────────────────────────────────────────
 step "Initializing database"
