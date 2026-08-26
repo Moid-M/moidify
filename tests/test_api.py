@@ -254,3 +254,93 @@ def test_admin_schedule_rescan(client, auth_token):
     assert r.status_code == 200
     data = r.json()
     assert "interval_hours" in data
+
+
+def _add_track(file_path="/nonexistent/test.mp3", title="Song", artist="Artist",
+               album="Album", lyrics=None):
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO tracks (file_path, title, artist, album, lyrics) VALUES (?,?,?,?,?)",
+        (file_path, title, artist, album, lyrics),
+    )
+    tid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.commit()
+    conn.close()
+    return tid
+
+
+def test_metadata_patch_updates_track_and_handles_missing_audio_file(client, auth_token):
+    tid = _add_track(lyrics="old")
+    r = client.patch(
+        f"/api/admin/tracks/{tid}/metadata",
+        headers={"token": auth_token},
+        json={"title": "New Title", "artist": "New Artist", "lyrics": "brand new"},
+    )
+    assert r.status_code == 200
+    assert r.json().get("ok") is True
+    conn = get_connection()
+    row = conn.execute("SELECT title, artist, lyrics FROM tracks WHERE id = ?", (tid,)).fetchone()
+    conn.close()
+    assert row["title"] == "New Title"
+    assert row["artist"] == "New Artist"
+    assert row["lyrics"] == "brand new"
+
+
+def test_metadata_patch_rejects_unauthenticated(client):
+    tid = _add_track()
+    r = client.patch(f"/api/admin/tracks/{tid}/metadata", json={"title": "X"})
+    assert r.status_code == 401
+
+
+def test_lyrics_endpoint_prefers_embedded(monkeypatch, client):
+    import scanner
+    import routes.tracks as tracks
+    tid = _add_track(lyrics="cached")
+    monkeypatch.setattr(scanner, "extract_metadata", lambda fp: {"lyrics": "embedded line"})
+    monkeypatch.setattr(tracks, "_fetch_lyrics_from_lrclib", lambda *a, **k: "live")
+    r = client.get(f"/api/tracks/{tid}/lyrics")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["lyrics"] == "embedded line"
+    assert d["source"] == "file"
+
+
+def test_lyrics_endpoint_falls_back_to_cache(monkeypatch, client):
+    import scanner
+    import routes.tracks as tracks
+    tid = _add_track(lyrics="cached line")
+    monkeypatch.setattr(scanner, "extract_metadata", lambda fp: None)
+    monkeypatch.setattr(tracks, "_fetch_lyrics_from_lrclib", lambda *a, **k: None)
+    r = client.get(f"/api/tracks/{tid}/lyrics")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["lyrics"] == "cached line"
+    assert d["source"] == "cache"
+
+
+def test_track_cover_upload(client, auth_token):
+    tid = _add_track()
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+    r = client.post(
+        f"/api/admin/tracks/{tid}/cover",
+        headers={"token": auth_token},
+        files={"file": ("cover.png", png, "image/png")},
+    )
+    assert r.status_code == 200
+    conn = get_connection()
+    row = conn.execute("SELECT has_cover, cover_hash FROM tracks WHERE id = ?", (tid,)).fetchone()
+    conn.close()
+    assert row["has_cover"] == 1
+    assert row["cover_hash"]
+
+
+def test_artist_image_upload(client, auth_token):
+    artist = "Some Artist"
+    _add_track(artist=artist)
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+    r = client.post(
+        f"/api/admin/artists/{artist}/image",
+        headers={"token": auth_token},
+        files={"file": ("artist.png", png, "image/png")},
+    )
+    assert r.status_code == 200

@@ -1365,7 +1365,7 @@ function metaSearch() {
         html = '<p style="color:var(--text3);">No tracks found.</p>';
       }
       tracks.forEach(function (t) {
-        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid var(--bg-hover);">'
+        html += '<div class="meta-result" style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid var(--bg-hover);" onclick="openMetaEditor(' + t.id + ')">'
           + '<img src="/api/cover/' + t.id + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;background:var(--bg-hover);" onerror="this.style.visibility=\'hidden\'">'
           + '<div style="flex:1;min-width:0;">'
           + '<div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escMeta(t.title || 'Unknown') + '</div>'
@@ -1394,16 +1394,47 @@ function openMetaEditor(trackId) {
     document.getElementById('m-disc').value = t.disc_number || '';
     document.getElementById('m-lyrics').value = t.lyrics || '';
     document.getElementById('m-cover').src = '/api/cover/' + t.id;
+    document.getElementById('m-album').dataset.orig = t.album || '';
+    document.getElementById('m-album-artist').dataset.orig = t.album_artist || '';
+    document.getElementById('m-artist').dataset.orig = t.artist || '';
     document.getElementById('m-cover-file').value = '';
     document.getElementById('m-artist-file').value = '';
     document.getElementById('m-cover-album').checked = false;
     document.getElementById('meta-edit-msg').textContent = '';
-    document.getElementById('meta-edit-modal').style.display = 'flex';
+    var saveBtn = document.getElementById('meta-save-btn');
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save changes';
+    document.getElementById('meta-edit-ctx').textContent =
+      [t.album, t.artist].filter(Boolean).join(' · ') || ('Track #' + t.id);
+    openModal('meta-edit-modal');
   });
 }
 
 function closeMetaModal() {
-  document.getElementById('meta-edit-modal').style.display = 'none';
+  closeModal('meta-edit-modal');
+}
+
+function fetchLyricsIntoEditor() {
+  if (!metaCurrent) return;
+  var msg = document.getElementById('meta-edit-msg');
+  msg.style.color = 'var(--accent)';
+  msg.textContent = 'Fetching lyrics…';
+  api('/api/admin/tracks/' + metaCurrent.id + '/lyrics/fetch', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.ok && d.lyrics) {
+        document.getElementById('m-lyrics').value = d.lyrics;
+        msg.style.color = 'var(--accent)';
+        msg.textContent = 'Lyrics loaded.';
+      } else {
+        msg.style.color = 'var(--danger)';
+        msg.textContent = 'No lyrics found on LRCLIB.';
+      }
+    })
+    .catch(function (e) {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = 'Fetch error: ' + e.message;
+    });
 }
 
 function metaVal(id) { return document.getElementById(id).value.trim(); }
@@ -1423,6 +1454,9 @@ async function saveMetaEditor() {
   if (lyrics !== (metaCurrent.lyrics || '')) body.lyrics = lyrics;
 
   var msg = document.getElementById('meta-edit-msg');
+  var saveBtn = document.getElementById('meta-save-btn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
   msg.style.color = 'var(--accent)';
   msg.textContent = 'Saving…';
   try {
@@ -1431,6 +1465,8 @@ async function saveMetaEditor() {
       var e = await r.json().catch(function () {});
       msg.style.color = 'var(--danger)';
       msg.textContent = 'Error: ' + (e && e.detail ? e.detail : r.statusText);
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save changes';
       return;
     }
     var coverFile = document.getElementById('m-cover-file').files[0];
@@ -1450,11 +1486,12 @@ async function saveMetaEditor() {
     }
     msg.style.color = 'var(--accent)';
     msg.textContent = 'Saved.';
-    setTimeout(closeMetaModal, 600);
-    metaSearch();
+    setTimeout(function () { closeMetaModal(); metaSearch(); }, 600);
   } catch (e) {
     msg.style.color = 'var(--danger)';
     msg.textContent = 'Error: ' + e.message;
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save changes';
   }
 }
 
@@ -1464,3 +1501,10 @@ if (_metaNav) {
   var _metaSearchInput = document.getElementById('meta-search');
   if (_metaSearchInput) _metaSearchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') metaSearch(); });
 }
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    var m = document.getElementById('meta-edit-modal');
+    if (m && m.classList.contains('visible')) closeMetaModal();
+  }
+});

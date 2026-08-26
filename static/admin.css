@@ -91,6 +91,8 @@ h3{font-size:14px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;
 .modal-confirm:hover{opacity:.85}
 .modal .checkbox-row{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--text2);cursor:pointer}
 .modal .checkbox-row input{width:auto}
+.meta-result{cursor:pointer;transition:background .12s;border-radius:8px}
+.meta-result:hover{background:var(--bg-hover)}
 
 /* Context menu */
 .context-menu{display:none;position:fixed;background:var(--card);border:1px solid var(--bg-hover);border-radius:var(--radius);padding:4px 0;min-width:170px;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,.4)}

@@ -379,40 +379,51 @@ if (isLight) { document.documentElement.style.setProperty('--bg', '#f5f5f5'); do
 </div>
 
 <!-- Metadata editor modal -->
-<div id="meta-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
-  <div style="background:var(--bg-el);border-radius:var(--radius);padding:24px;width:min(560px,92vw);max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
-    <h3 style="margin:0 0 12px;">Edit Metadata</h3>
-    <div id="meta-edit-msg" style="font-size:12px;margin-bottom:8px;"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <label>Title<br><input id="m-title" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
-      <label>Artist<br><input id="m-artist" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
-      <label>Album Artist<br><input id="m-album-artist" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
-      <label>Album<br><input id="m-album" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
-      <label>Genre<br><input id="m-genre" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
-      <label>Year<br><input id="m-year" type="number" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
-      <label>Track #<br><input id="m-track" type="number" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
-      <label>Disc #<br><input id="m-disc" type="number" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);"></label>
+<div class="modal-overlay" id="meta-edit-modal" onclick="if(event.target===this)closeMetaModal()">
+  <div class="modal" style="width:min(640px,94vw);max-height:90vh;overflow:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+      <h3 style="margin:0;">Edit Metadata</h3>
+      <button class="modal-cancel" style="padding:2px 10px;" onclick="closeMetaModal()" title="Close">✕</button>
     </div>
-    <label style="display:block;margin-top:10px;">Lyrics<br>
-      <textarea id="m-lyrics" rows="8" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);font-family:monospace;"></textarea>
-    </label>
-    <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <img id="m-cover" src="/static/logo.png" alt="cover" style="width:64px;height:64px;border-radius:8px;object-fit:cover;background:var(--bg-hover);">
+    <div id="meta-edit-ctx" style="font-size:12px;color:var(--text2);margin-bottom:14px;"></div>
+
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:20px;align-items:start;">
       <div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Cover</div>
-        <input type="file" id="m-cover-file" accept="image/png,image/jpeg,image/webp">
-        <div style="margin-top:6px;"><label style="font-size:12px;color:var(--text2);"><input type="checkbox" id="m-cover-album"> apply to whole album</label></div>
+        <img id="m-cover" src="/static/logo.png" alt="cover" style="width:120px;height:120px;border-radius:10px;object-fit:cover;background:var(--bg-hover);display:block;margin-bottom:10px;">
+        <label class="admin-btn" for="m-cover-file" style="display:block;text-align:center;">Change cover</label>
+        <input type="file" id="m-cover-file" accept="image/png,image/jpeg,image/webp" hidden>
+        <label class="checkbox-row" style="margin-top:10px;"><input type="checkbox" id="m-cover-album"> Apply to whole album</label>
+        <div style="margin-top:18px;">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Artist image</div>
+          <label class="admin-btn" for="m-artist-file" style="display:block;text-align:center;">Upload artist</label>
+          <input type="file" id="m-artist-file" accept="image/png,image/jpeg,image/webp" hidden>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <label style="margin-top:0;">Title<input id="m-title" type="text"></label>
+        <label style="margin-top:0;">Artist<input id="m-artist" type="text"></label>
+        <label style="margin-top:0;">Album Artist<input id="m-album-artist" type="text"></label>
+        <label style="margin-top:0;">Album<input id="m-album" type="text"></label>
+        <label style="margin-top:0;">Genre<input id="m-genre" type="text"></label>
+        <label style="margin-top:0;">Year<input id="m-year" type="text" inputmode="numeric"></label>
+        <label style="margin-top:0;">Track #<input id="m-track" type="text" inputmode="numeric"></label>
+        <label style="margin-top:0;">Disc #<input id="m-disc" type="text" inputmode="numeric"></label>
       </div>
     </div>
-    <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Artist image</div>
-        <input type="file" id="m-artist-file" accept="image/png,image/jpeg,image/webp">
+
+    <div style="margin-top:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:13px;color:var(--text2);">Lyrics</span>
+        <button class="admin-btn" type="button" onclick="fetchLyricsIntoEditor()">Fetch from LRCLIB</button>
       </div>
+      <textarea id="m-lyrics" rows="8" style="width:100%;padding:8px;border-radius:var(--radius);border:1px solid var(--text3);background:var(--bg);color:var(--text);font-family:monospace;box-sizing:border-box;"></textarea>
     </div>
-    <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end;">
-      <button class="admin-btn" onclick="closeMetaModal()">Cancel</button>
-      <button class="admin-btn" style="background:var(--accent);color:#fff;border:none;" onclick="saveMetaEditor()">Save</button>
+
+    <div id="meta-edit-msg" style="font-size:12px;margin-top:10px;min-height:16px;"></div>
+
+    <div class="modal-row">
+      <button class="modal-cancel" onclick="closeMetaModal()">Cancel</button>
+      <button class="modal-confirm" id="meta-save-btn" onclick="saveMetaEditor()">Save changes</button>
     </div>
   </div>
 </div>
