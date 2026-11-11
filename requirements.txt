@@ -3,6 +3,7 @@ uvicorn[standard]>=0.32.0
 mutagen>=1.47.0
 watchdog>=4.0.0
 python-multipart>=0.0.9
+cryptography>=42.0.0
 
 # Dev/test
 pytest>=8.0.0

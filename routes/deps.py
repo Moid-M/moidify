@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import secrets
 import shutil
 import time
@@ -32,6 +33,7 @@ except Exception:
 
 # Rate limiter (in-memory, single-process)
 _rate_limit_store = defaultdict(list)
+_RATE_LIMIT_MAX_KEYS = 10000
 
 def check_rate_limit(key: str, max_attempts: int = 10, window_seconds: int = 900):
     """Returns True if allowed, False if rate limited."""
@@ -40,6 +42,15 @@ def check_rate_limit(key: str, max_attempts: int = 10, window_seconds: int = 900
     if len(_rate_limit_store[key]) >= max_attempts:
         return False
     _rate_limit_store[key].append(now)
+    # Prevent unbounded growth from unique keys (e.g. per-username IPs)
+    if len(_rate_limit_store) > _RATE_LIMIT_MAX_KEYS:
+        empty = [k for k, v in _rate_limit_store.items() if not v]
+        for k in empty[: len(empty) // 2]:
+            del _rate_limit_store[k]
+        if len(_rate_limit_store) > _RATE_LIMIT_MAX_KEYS:
+            # Still too many active keys — drop oldest entries wholesale
+            for k in list(_rate_limit_store.keys())[: _RATE_LIMIT_MAX_KEYS // 2]:
+                del _rate_limit_store[k]
     return True
 
 def _normalize(s):
@@ -56,6 +67,79 @@ def _hash_password(password: str, salt: Optional[str] = None):
         "sha256", password.encode(), salt.encode(), PBKDF2_ITERATIONS
     ).hex()
     return pwd_hash, salt
+
+
+def _verify_password(password: str, salt: str, expected_hash: str) -> bool:
+    """Timing-safe PBKDF2 password verification."""
+    if not salt or not expected_hash:
+        return False
+    candidate = hashlib.pbkdf2_hmac(
+        "sha256", password.encode(), salt.encode(), PBKDF2_ITERATIONS
+    ).hex()
+    return hmac.compare_digest(candidate, expected_hash)
+
+
+# --- Reversible password copy for Subsonic token auth -----------------------
+# Subsonic clients send t = md5(password + salt). Verifying that requires the
+# plaintext password, which a one-way hash cannot provide. Like Navidrome and
+# Ampache, we keep a Fernet-encrypted copy of the password solely for this.
+# Web login continues to use PBKDF2; this copy is never sent to clients.
+
+_fernet = None
+
+def _get_fernet():
+    """Lazily create/load the password-encryption key (file next to the DB)."""
+    global _fernet
+    if _fernet is not None:
+        return _fernet
+    from cryptography.fernet import Fernet
+    import config
+    key_path = config.DB_PATH.parent / ".moidify_secret_key"
+    try:
+        if key_path.exists():
+            key = key_path.read_bytes().strip()
+        else:
+            key = Fernet.generate_key()
+            config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+            key_path.write_bytes(key)
+            try:
+                key_path.chmod(0o600)
+            except OSError:
+                pass
+        _fernet = Fernet(key)
+    except Exception:
+        _fernet = None
+    return _fernet
+
+def encrypt_password_for_subsonic(password: str) -> Optional[str]:
+    f = _get_fernet()
+    if f is None:
+        return None
+    try:
+        return f.encrypt(password.encode()).decode()
+    except Exception:
+        return None
+
+def decrypt_password_for_subsonic(token: Optional[str]) -> Optional[str]:
+    if not token:
+        return None
+    f = _get_fernet()
+    if f is None:
+        return None
+    try:
+        return f.decrypt(token.encode()).decode()
+    except Exception:
+        return None
+
+def _store_subsonic_password(conn, user_id: int, password: str):
+    """Persist/replaces the encrypted password copy used by Subsonic auth."""
+    enc = encrypt_password_for_subsonic(password)
+    if enc is None:
+        return
+    conn.execute(
+        "UPDATE users SET password_encrypted = ? WHERE id = ?",
+        (enc, user_id),
+    )
 
 
 def _token_hash(token: str) -> str:
@@ -165,7 +249,14 @@ def _reset_failed_attempts(username: str):
 
 
 def _is_registration_open() -> bool:
+    # Registration is never open before the setup wizard has created an admin.
     conn = get_connection()
+    admin_count = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE is_admin = 1"
+    ).fetchone()[0]
+    if admin_count == 0:
+        conn.close()
+        return False
     row = conn.execute(
         "SELECT value FROM settings WHERE key = 'registration_open'"
     ).fetchone()

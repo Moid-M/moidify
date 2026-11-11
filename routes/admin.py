@@ -17,7 +17,7 @@ from database import get_connection
 from scanner import scan_existing, get_scan_status, process_file
 from routes.deps import (
     _require_admin, _hash_password, _create_session, _validate_password,
-    _fetch_lyrics_from_lrclib,
+    _fetch_lyrics_from_lrclib, _store_subsonic_password, check_rate_limit,
     ScheduleBody, ToggleAdminBody, CreateUserBody, ChangePasswordBody,
 )
 from pydantic import BaseModel
@@ -30,6 +30,7 @@ _MAX_DOWNLOAD_JOBS = 100
 def _cleanup_old_jobs():
     with DOWNLOAD_LOCK:
         done_jobs = [jid for jid, j in DOWNLOAD_JOBS.items() if j.get("status") in ("done", "error")]
+        # Keep the 50 most recently finished jobs; drop the rest
         for jid in done_jobs[:-50]:
             del DOWNLOAD_JOBS[jid]
 
@@ -1276,10 +1277,11 @@ def admin_create_user(body: CreateUserBody, token: Optional[str] = Header(None))
         conn.close()
         raise HTTPException(400, "Username already taken")
     pwd_hash, salt = _hash_password(body.password)
-    conn.execute(
+    cursor = conn.execute(
         "INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, ?)",
         (body.username, pwd_hash, salt, 1 if body.is_admin else 0),
     )
+    _store_subsonic_password(conn, cursor.lastrowid, body.password)
     conn.commit()
     conn.close()
     return {"ok": True, "username": body.username, "is_admin": body.is_admin}
@@ -1296,6 +1298,7 @@ def admin_change_password(user_id: int, body: ChangePasswordBody, token: Optiona
         raise HTTPException(404, "User not found")
     pwd_hash, salt = _hash_password(body.password)
     conn.execute("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?", (pwd_hash, salt, user_id))
+    _store_subsonic_password(conn, user_id, body.password)
     conn.commit()
     conn.close()
     return {"ok": True, "username": target["username"]}
@@ -1419,7 +1422,8 @@ def admin_toggle_registration(token: Optional[str] = Header(None)):
     current = conn.execute(
         "SELECT value FROM settings WHERE key = 'registration_open'"
     ).fetchone()
-    new_val = "0" if (current and current["value"] == "0") else "1"
+    # Toggle: currently closed ("0") → open ("1"); open/unset → closed ("0")
+    new_val = "1" if (current and current["value"] == "0") else "0"
     conn.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('registration_open', ?)",
         (new_val,),

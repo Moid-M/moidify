@@ -27,9 +27,17 @@ def test_db():
     new_path = Path(tmp.name)
     config.DB_PATH = new_path
     database.DB_PATH = new_path
+    # Reset cached Fernet so each test uses a key next to its temp DB
+    import routes.deps as deps
+    deps._fernet = None
     init_db()
     yield
+    # Clean up key file alongside the DB
+    key = new_path.parent / ".moidify_secret_key"
+    if key.exists():
+        key.unlink()
     os.unlink(tmp.name)
+    deps._fernet = None
 
 
 @pytest.fixture
@@ -254,3 +262,155 @@ def test_admin_schedule_rescan(client, auth_token):
     assert r.status_code == 200
     data = r.json()
     assert "interval_hours" in data
+
+
+# ── Security regression tests ──────────────────────────────────────────────
+
+
+def test_no_admin_autopromote_on_init(client):
+    """A non-admin user named 'admin' must NOT be promoted by init_db()."""
+    # Create a regular user literally named "admin" via direct DB insert
+    # (setup hasn't run, so registration is closed — use the DB directly)
+    from routes.deps import _hash_password
+    pwd, salt = _hash_password("TestPass123!")
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO users (username, password_hash, salt, is_admin) VALUES (?, ?, ?, 0)",
+        ("admin", pwd, salt),
+    )
+    conn.commit()
+    conn.close()
+    # Re-run init_db — the old bug would flip is_admin to 1 here
+    init_db()
+    conn = get_connection()
+    row = conn.execute("SELECT is_admin FROM users WHERE username = 'admin'").fetchone()
+    conn.close()
+    assert row is not None
+    assert row["is_admin"] == 0, "init_db must not auto-promote user 'admin'"
+
+
+def test_registration_blocked_before_setup(client):
+    """Registration must be closed until the setup wizard creates an admin."""
+    r = client.post("/api/auth/register", json={
+        "username": "sneaky",
+        "password": "TestPass123!",
+    })
+    assert r.status_code == 403
+
+
+def test_registration_open_after_setup(client, auth_token):
+    """After setup, registration respects the (default-open) setting."""
+    r = client.post("/api/auth/register", json={
+        "username": "alice",
+        "password": "TestPass123!",
+    })
+    assert r.status_code == 200
+
+
+def test_registration_closed_when_disabled(client, auth_token):
+    # Toggle registration off (default after setup is open → first toggle closes)
+    r = client.post("/api/admin/registration-toggle", headers={"token": auth_token})
+    assert r.status_code == 200
+    assert r.json()["registration_open"] is False
+    r = client.post("/api/auth/register", json={
+        "username": "bob",
+        "password": "TestPass123!",
+    })
+    assert r.status_code == 403
+
+
+def test_lyrics_put_requires_auth(client, auth_token):
+    r = client.put("/api/tracks/1/lyrics", json={"lyrics": "hacked"})
+    assert r.status_code == 401
+
+
+def test_subsonic_token_auth(client, auth_token):
+    """Modern Subsonic t=md5(password+salt) auth must succeed."""
+    import hashlib
+    password = "TestPass123!"
+    salt = "c19b2d"
+    token = hashlib.md5((password + salt).encode()).hexdigest()
+    r = client.get("/rest/ping", params={
+        "u": "admin", "t": token, "s": salt,
+        "v": "1.16.1", "c": "test", "f": "json",
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["subsonic-response"]["status"] == "ok"
+
+
+def test_subsonic_token_auth_wrong_password(client, auth_token):
+    import hashlib
+    salt = "c19b2d"
+    token = hashlib.md5(("WrongPass999!" + salt).encode()).hexdigest()
+    # getMusicFolders requires auth (ping does not)
+    r = client.get("/rest/getMusicFolders", params={
+        "u": "admin", "t": token, "s": salt,
+        "v": "1.16.1", "c": "test", "f": "json",
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["subsonic-response"]["status"] == "failed"
+    assert data["subsonic-response"]["error"]["code"] == "40"
+
+
+def test_subsonic_plaintext_auth(client, auth_token):
+    r = client.get("/rest/ping", params={
+        "u": "admin", "p": "TestPass123!",
+        "v": "1.16.1", "c": "test", "f": "json",
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["subsonic-response"]["status"] == "ok"
+
+
+def test_subsonic_hex_password_auth(client, auth_token):
+    """Legacy enc:<hex> password auth must work."""
+    hex_pw = "TestPass123!".encode().hex()
+    r = client.get("/rest/ping", params={
+        "u": "admin", "p": f"enc:{hex_pw}",
+        "v": "1.16.1", "c": "test", "f": "json",
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["subsonic-response"]["status"] == "ok"
+
+
+def test_password_hash_not_plaintext_in_db(client, auth_token):
+    conn = get_connection()
+    row = conn.execute("SELECT password_hash, password_encrypted FROM users WHERE username = 'admin'").fetchone()
+    conn.close()
+    assert row is not None
+    # PBKDF2 hash must not contain the password
+    assert "TestPass123!" not in row["password_hash"]
+    # Encrypted copy exists for Subsonic (and is not plaintext either)
+    assert row["password_encrypted"] is not None
+    assert "TestPass123!" not in row["password_encrypted"]
+
+
+def test_stream_requires_no_auth_but_download_does(client, auth_token):
+    """Anonymous browsing streams, but ZIP downloads require login."""
+    r = client.get("/api/download/album", params={"album": "Nope"})
+    assert r.status_code == 401
+
+
+def test_admin_create_user_stores_subsonic_copy(client, auth_token):
+    r = client.post("/api/admin/users", json={
+        "username": "carol",
+        "password": "TestPass123!",
+        "is_admin": False,
+    }, headers={"token": auth_token})
+    assert r.status_code == 200
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT password_encrypted FROM users WHERE username = 'carol'"
+    ).fetchone()
+    conn.close()
+    assert row is not None
+    assert row["password_encrypted"] is not None
+
+
+def test_album_share_status_requires_auth(client, auth_token):
+    """Share tokens must not leak to unauthenticated callers."""
+    r = client.get("/api/albums/share-status", params={"album": "SomeAlbum"})
+    assert r.status_code == 401

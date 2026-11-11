@@ -27,6 +27,7 @@ def init_db():
             email TEXT,
             password_hash TEXT NOT NULL,
             salt TEXT NOT NULL,
+            password_encrypted TEXT DEFAULT NULL,
             is_admin INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -183,7 +184,8 @@ def init_db():
         "ALTER TABLE sessions ADD COLUMN token_hash TEXT DEFAULT NULL",
         "ALTER TABLE tracks ADD COLUMN cover_hash TEXT DEFAULT NULL",
         "ALTER TABLE tracks ADD COLUMN artist_img_hash TEXT DEFAULT NULL",
-    ]:  
+        "ALTER TABLE users ADD COLUMN password_encrypted TEXT DEFAULT NULL",
+    ]:
         table = stmt.split()[2]
         col = stmt.split()[3].split(" ")[0].split("(")[0]
         if not _has_col(table, col):
@@ -205,15 +207,5 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
-    # ensure the "admin" user has is_admin=1
-    for attempt in range(3):
-        try:
-            conn.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
-            break
-        except sqlite3.OperationalError as e:
-            if "locked" in str(e).lower() and attempt < 2:
-                time.sleep(1)
-            else:
-                raise
     conn.commit()
     conn.close()

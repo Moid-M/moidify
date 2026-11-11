@@ -5,7 +5,8 @@ from database import get_connection
 from routes.deps import (
     _hash_password, _create_session, _get_user_from_token, _validate_password,
     _check_account_locked, _increment_failed_attempts, _reset_failed_attempts,
-    _is_registration_open, check_rate_limit, _token_hash,
+    _is_registration_open, check_rate_limit, _token_hash, _verify_password,
+    _store_subsonic_password,
     RegisterBody, LoginBody, SetupInitBody, ChangeOwnPasswordBody,
 )
 
@@ -39,10 +40,11 @@ def register(body: RegisterBody):
         conn.close()
         raise HTTPException(400, "Username already taken")
     pwd_hash, salt = _hash_password(body.password)
-    conn.execute(
+    cursor = conn.execute(
         "INSERT INTO users (username, email, password_hash, salt) VALUES (?, ?, ?, ?)",
         (body.username, body.email, pwd_hash, salt),
     )
+    _store_subsonic_password(conn, cursor.lastrowid, body.password)
     conn.commit()
     conn.close()
     return {"ok": True}
@@ -57,14 +59,19 @@ def login(body: LoginBody):
     row = conn.execute(
         "SELECT * FROM users WHERE username = ?", (body.username,)
     ).fetchone()
-    conn.close()
     if row is None or not row["salt"]:
+        conn.close()
         raise HTTPException(401, "Invalid credentials")
-    pwd_hash, _ = _hash_password(body.password, row["salt"])
-    if pwd_hash != row["password_hash"]:
+    if not _verify_password(body.password, row["salt"], row["password_hash"]):
+        conn.close()
         _increment_failed_attempts(body.username)
         raise HTTPException(401, "Invalid credentials")
     _reset_failed_attempts(body.username)
+    # Backfill encrypted copy for Subsonic token auth if missing/outdated
+    if not row["password_encrypted"]:
+        _store_subsonic_password(conn, row["id"], body.password)
+    conn.commit()
+    conn.close()
     token = _create_session(row["id"])
     return {
         "token": token,
@@ -92,8 +99,7 @@ def change_own_password(body: ChangeOwnPasswordBody, token: Optional[str] = Head
     if not row:
         conn.close()
         raise HTTPException(404, "User not found")
-    current_hash, _ = _hash_password(body.current_password, row["salt"])
-    if current_hash != row["password_hash"]:
+    if not _verify_password(body.current_password, row["salt"], row["password_hash"]):
         conn.close()
         raise HTTPException(400, "Current password is incorrect")
     _validate_password(body.new_password)
@@ -102,6 +108,7 @@ def change_own_password(body: ChangeOwnPasswordBody, token: Optional[str] = Head
         "UPDATE users SET password_hash = ?, salt = ? WHERE id = ?",
         (new_hash, new_salt, user["id"]),
     )
+    _store_subsonic_password(conn, user["id"], body.new_password)
     # Revoke all other sessions
     conn.execute(
         "DELETE FROM sessions WHERE user_id = ? AND token_hash != ?",
@@ -172,6 +179,7 @@ def setup_init(body: SetupInitBody):
             (body.username, pwd_hash, salt),
         )
         user_id = cursor.lastrowid
+        _store_subsonic_password(conn, user_id, body.password)
         conn.commit()
     except HTTPException:
         conn.rollback()

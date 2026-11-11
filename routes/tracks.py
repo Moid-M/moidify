@@ -156,7 +156,10 @@ def get_track_lyrics(track_id: int):
     return {"lyrics": lyrics}
 
 @router.put("/api/tracks/{track_id}/lyrics")
-def update_track_lyrics(track_id: int, body: UpdateLyricsBody):
+def update_track_lyrics(track_id: int, body: UpdateLyricsBody, token: Optional[str] = Header(None)):
+    user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
     lyrics = body.lyrics
     conn = get_connection()
     conn.execute("UPDATE tracks SET lyrics = ? WHERE id = ?", (lyrics, track_id))

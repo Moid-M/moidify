@@ -346,6 +346,8 @@ def unshare_album(body: UnshareAlbumBody, token: Optional[str] = Header(None)):
 @router.get("/api/albums/share-status")
 def get_album_share_status(album: str = Query(...), artist: Optional[str] = Query(None), token: Optional[str] = Header(None)):
     user = _get_user_from_token(token)
+    if user is None:
+        raise HTTPException(401, "Login required")
     conn = get_connection()
     row = conn.execute(
         "SELECT token FROM shared_albums WHERE album = ? AND (artist IS ? OR artist = ?)",

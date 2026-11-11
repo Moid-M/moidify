@@ -54,7 +54,23 @@ p = os.environ['NEW_PASS']
 s = os.environ['NEW_SALT']
 print(hashlib.pbkdf2_hmac('sha256', p.encode(), s.encode(), 600000).hex())
 ")
-  DB_PATH="$DB_PATH" NEW_HASH="$NEW_HASH" NEW_SALT="$NEW_SALT" python3 -c "
+  # Encrypted copy for Subsonic token auth (same key file the server uses)
+  NEW_ENC=$(DB_PATH="$DB_PATH" NEW_PASS="$ADMIN_PASS" python3 -c "
+import os
+from pathlib import Path
+try:
+    from cryptography.fernet import Fernet
+    db = Path(os.environ['DB_PATH'])
+    key_path = db.parent / '.moidify_secret_key'
+    if key_path.exists():
+        f = Fernet(key_path.read_bytes().strip())
+        print(f.encrypt(os.environ['NEW_PASS'].encode()).decode())
+    else:
+        print('')
+except Exception:
+    print('')
+")
+  DB_PATH="$DB_PATH" NEW_HASH="$NEW_HASH" NEW_SALT="$NEW_SALT" NEW_ENC="$NEW_ENC" python3 -c "
 import sqlite3, sys, os
 
 conn = sqlite3.connect(os.environ['DB_PATH'])
@@ -65,6 +81,9 @@ if not admin:
 
 conn.execute('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?',
     (os.environ['NEW_HASH'], os.environ['NEW_SALT'], admin[0]))
+enc = os.environ.get('NEW_ENC') or ''
+if enc:
+    conn.execute('UPDATE users SET password_encrypted = ? WHERE id = ?', (enc, admin[0]))
 conn.commit()
 conn.close()
 print(f'Updated password for admin user \"{admin[1]}\" (id={admin[0]})')

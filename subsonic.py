@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -47,15 +48,7 @@ def _xml_to_json(xml_bytes):
                     tags[key].append(el_to_dict(child))
                 else:
                     tags[key] = el_to_dict(child)
-            # check if children are just text tags
-            all_text = all(
-                not list(child) and child.text and child.text.strip()
-                for child in children
-            )
-            if all_text:
-                d.update(tags)
-            else:
-                d.update(tags)
+            d.update(tags)
         elif el.text and el.text.strip():
             d["value"] = el.text.strip()
         return d
@@ -104,36 +97,61 @@ def _authenticate(request: Request):
     if not u:
         return None
 
-    conn = get_connection()
-    row = conn.execute("SELECT * FROM users WHERE username = ?", (u,)).fetchone()
-    conn.close()
-    if not row:
+    # Rate-limit failed Subsonic auth attempts per username
+    from routes.deps import check_rate_limit
+    if not check_rate_limit(f"subsonic:{u}", max_attempts=30, window_seconds=900):
         return None
 
-    pwd_hash = row["password_hash"]
-    salt_db = row["salt"]
+    # Legacy hex-encoded password: enc:<hex(password)>
+    if p.startswith("enc:"):
+        try:
+            p = bytes.fromhex(p[4:]).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return None
 
-    # token auth (modern): t = hex(sha256(password + salt)), s = salt (provided by client)
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM users WHERE username = ?", (u,)).fetchone()
+    if row is None:
+        conn.close()
+        return None
+
+    # Token auth (Subsonic >= 1.13): t = md5(password + salt).
+    # Requires the plaintext password — verified against the encrypted copy
+    # kept specifically for Subsonic compatibility (see routes/deps.py).
     if t and s:
-        expected = hashlib.md5((pwd_hash + s).encode()).hexdigest()
-        if t.lower() == expected:
-            return dict(row)
+        from routes.deps import decrypt_password_for_subsonic
+        plaintext = decrypt_password_for_subsonic(row["password_encrypted"])
+        if plaintext is not None:
+            expected = hashlib.md5((plaintext + s).encode()).hexdigest()
+            if hmac.compare_digest(t.lower(), expected):
+                conn.close()
+                return dict(row)
+        conn.close()
+        return None
 
-    # token auth via token param (alternative)
     if token and s:
-        expected = hashlib.md5((pwd_hash + s).encode()).hexdigest()
-        if token.lower() == expected:
+        from routes.deps import decrypt_password_for_subsonic
+        plaintext = decrypt_password_for_subsonic(row["password_encrypted"])
+        if plaintext is not None:
+            expected = hashlib.md5((plaintext + s).encode()).hexdigest()
+            if hmac.compare_digest(token.lower(), expected):
+                conn.close()
+                return dict(row)
+        conn.close()
+        return None
+
+    # Plaintext / hex password auth (legacy) — also backfills the encrypted
+    # copy so subsequent token auth works for this user.
+    if p:
+        from routes.deps import _verify_password, _store_subsonic_password
+        if _verify_password(p, row["salt"], row["password_hash"]):
+            if not row["password_encrypted"]:
+                _store_subsonic_password(conn, row["id"], p)
+                conn.commit()
+            conn.close()
             return dict(row)
 
-    # password auth: plaintext only (enc: token is not supported — use t+s token auth instead)
-    if p and not p.startswith("enc:"):
-        import secrets
-        pwd_hash_check = hashlib.pbkdf2_hmac(
-            "sha256", p.encode(), salt_db.encode(), PBKDF2_ITERATIONS
-        ).hex()
-        if pwd_hash_check == row["password_hash"]:
-            return dict(row)
-
+    conn.close()
     return None
 
 

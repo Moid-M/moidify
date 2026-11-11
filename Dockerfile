@@ -7,7 +7,8 @@ RUN pip install --no-cache-dir --no-compile \
     uvicorn[standard]>=0.32.0 \
     mutagen>=1.47.0 \
     watchdog>=4.0.0 \
-    python-multipart>=0.0.9
+    python-multipart>=0.0.9 \
+    cryptography>=42.0.0
 
 COPY . .
 

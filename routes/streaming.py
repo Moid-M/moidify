@@ -1,10 +1,12 @@
 import asyncio
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Header, Query
 from fastapi.responses import FileResponse, StreamingResponse
+from starlette.background import BackgroundTask
 
 from config import MUSIC_DIR, COVERS_DIR, STATIC_DIR
 from database import get_connection
@@ -15,6 +17,45 @@ router = APIRouter(tags=["streaming"])
 MUSIC_DIR_RESOLVED = Path(MUSIC_DIR).resolve(strict=False)
 
 _transcode_semaphore = asyncio.Semaphore(10)
+
+# Spill zip archives to disk past this size to avoid buffering large
+# albums/playlists entirely in RAM.
+_ZIP_SPOOL_MAX = 8 * 1024 * 1024  # 8 MB
+
+
+def _zip_filename(name: str) -> str:
+    safe = "".join(c if c.isalnum() or c in " _-" else "_" for c in name).strip()
+    return (safe or "download") + ".zip"
+
+
+def _stream_zip(rows, filename: str, arcname_for) -> StreamingResponse:
+    """Build a zip of the given DB rows on a spooled temp file and stream it.
+
+    `arcname_for(row, path)` returns the archive entry name for a track.
+    The temp file is closed after the response finishes.
+    """
+    tmp = tempfile.SpooledTemporaryFile(max_size=_ZIP_SPOOL_MAX)
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+        for row in rows:
+            path = Path(row["file_path"])
+            if path.exists():
+                zf.write(str(path), arcname_for(row, path))
+    tmp.seek(0)
+    return StreamingResponse(
+        tmp,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        background=BackgroundTask(tmp.close),
+    )
+
+
+def _track_arcname(row, path: Path) -> str:
+    if row["disc_number"] and row["disc_number"] > 1:
+        prefix = f"{row['disc_number'] or 1}-{row['track_number'] or 0:02d}"
+    else:
+        prefix = f"{row['track_number'] or 0:02d}"
+    track_name = f"{prefix} - {row['title'] or path.stem}{path.suffix}"
+    return "".join(c if c.isalnum() or c in " ._-" else "_" for c in track_name)
 
 
 def _within_music_dir(path: Path) -> bool:
@@ -148,7 +189,6 @@ def get_cover(track_id: int):
 def download_album(album: str = Query(...), artist: Optional[str] = Query(None), token: Optional[str] = Header(None)):
     if not _get_user_from_token(token):
         raise HTTPException(401, "Authentication required")
-    import io
 
     conn = get_connection()
     try:
@@ -168,31 +208,14 @@ def download_album(album: str = Query(...), artist: Optional[str] = Query(None),
         raise HTTPException(404, "No tracks found for this album")
 
     suffix = f"_{artist}" if artist else ""
-    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in album + suffix).strip()
-    zip_name = safe_name + ".zip"
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for row in rows:
-            path = Path(row["file_path"])
-            if path.exists():
-                prefix = f"{row['disc_number'] or 1}-{row['track_number'] or 0:02d}" if row['disc_number'] and row['disc_number'] > 1 else f"{row['track_number'] or 0:02d}"
-                track_name = f"{prefix} - {row['title'] or path.stem}{path.suffix}"
-                safe_name = "".join(c if c.isalnum() or c in " ._-" else "_" for c in track_name)
-                zf.write(str(path), safe_name)
-    buf.seek(0)
-    return StreamingResponse(
-        buf,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.zip"'},
-    )
+    zip_name = _zip_filename(album + suffix)
+    return _stream_zip(rows, zip_name, _track_arcname)
 
 
 @router.get("/api/download/tracks-zip")
 def download_tracks_zip(ids: str = Query(...), token: Optional[str] = Header(None)):
     if not _get_user_from_token(token):
         raise HTTPException(401, "Authentication required")
-    import io
 
     track_ids = [int(x) for x in ids.split(",") if x.strip().isdigit()]
     if not track_ids:
@@ -201,29 +224,15 @@ def download_tracks_zip(ids: str = Query(...), token: Optional[str] = Header(Non
     conn = get_connection()
     rows = conn.execute(f"SELECT * FROM tracks WHERE id IN ({placeholders})", track_ids).fetchall()
     conn.close()
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for row in rows:
-            path = Path(row["file_path"])
-            if path.exists():
-                prefix = f"{row['track_number'] or 0:02d}"
-                track_name = f"{prefix} - {row['title'] or path.stem}{path.suffix}"
-                safe_name = "".join(c if c.isalnum() or c in " ._-" else "_" for c in track_name)
-                zf.write(str(path), safe_name)
-    buf.seek(0)
-    return StreamingResponse(
-        buf,
-        media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="tracks.zip"'},
-    )
+    if not rows:
+        raise HTTPException(404, "No tracks found")
+    return _stream_zip(rows, "tracks.zip", _track_arcname)
 
 
 @router.get("/api/download/track-zip/{track_id}")
 def download_track_zip(track_id: int, token: Optional[str] = Header(None)):
     if not _get_user_from_token(token):
         raise HTTPException(401, "Authentication required")
-    import io
 
     conn = get_connection()
     row = conn.execute("SELECT * FROM tracks WHERE id = ?", (track_id,)).fetchone()
@@ -234,25 +243,18 @@ def download_track_zip(track_id: int, token: Optional[str] = Header(None)):
     if not path.exists():
         raise HTTPException(404, "File not found on disk")
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        arcname = f"{row['title'] or path.stem}{path.suffix}"
-        safe_arcname = "".join(c if c.isalnum() or c in " ._-" else "_" for c in arcname)
-        zf.write(str(path), safe_arcname)
-    buf.seek(0)
-    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in (row["title"] or "track")).strip()
-    return StreamingResponse(
-        buf,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.zip"'},
-    )
+    def _single_arcname(r, p):
+        arcname = f"{r['title'] or p.stem}{p.suffix}"
+        return "".join(c if c.isalnum() or c in " ._-" else "_" for c in arcname)
+
+    zip_name = _zip_filename(row["title"] or "track")
+    return _stream_zip([row], zip_name, _single_arcname)
 
 
 @router.get("/api/download/playlist/{playlist_id}")
 def download_playlist(playlist_id: int, token: Optional[str] = Header(None)):
     if not _get_user_from_token(token):
         raise HTTPException(401, "Authentication required")
-    import io
 
     conn = get_connection()
     rows = conn.execute(
@@ -264,20 +266,5 @@ def download_playlist(playlist_id: int, token: Optional[str] = Header(None)):
     if not rows:
         raise HTTPException(404, "No tracks in playlist")
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for row in rows:
-            path = Path(row["file_path"])
-            if path.exists():
-                prefix = f"{row['disc_number'] or 1}-{row['track_number'] or 0:02d}" if row['disc_number'] and row['disc_number'] > 1 else f"{row['track_number'] or 0:02d}"
-                track_name = f"{prefix} - {row['title'] or path.stem}{path.suffix}"
-                safe_name = "".join(c if c.isalnum() or c in " ._-" else "_" for c in track_name)
-                zf.write(str(path), safe_name)
-    buf.seek(0)
     name = pl_name["name"] if pl_name else "playlist"
-    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in name).strip()
-    return StreamingResponse(
-        buf,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}.zip"'},
-    )
+    return _stream_zip(rows, _zip_filename(name), _track_arcname)

@@ -76,13 +76,13 @@
 
 **🏠 Personalized Home Feed** — recently played, top listened, and randomly recommended tracks on login
 
-**🔌 Subsonic API Compatible** — works with clients like Sonixd, Sublime Music, and DSub (`/rest/getArtists`, `/rest/getAlbum`, `/rest/stream`, scrobbling, star/unstar, and more)
+**🔌 Subsonic API Compatible** — works with clients like Sonixd, Sublime Music, and DSub (`/rest/getArtists`, `/rest/getAlbum`, `/rest/stream`, scrobbling, star/unstar, and more). Supports token (`t`/`s`), plaintext (`p`), and hex (`p=enc:`) auth. *Upgrading from ≤2.0: log into the web UI once (or send a plaintext Subsonic password once) so token auth can be enabled for your account.*
 
 **🎮 Discord Rich Presence** — companion script shows your currently playing track on Discord
 
 **📱 Responsive** — works on desktop and mobile browsers
 
-**🔒 No Telemetry** — zero tracking, zero external calls (except optional LRCLIB for lyrics), everything stays on your server
+**🔒 No Telemetry** — zero tracking, zero analytics; external network calls are limited to optional features you enable (LRCLIB for lyrics, Deezer for artist images) — everything else stays on your server
 
 **👤 Dedicated System User** — runs as `moidify` user, not root; isolated and sandboxed by design
 
