@@ -1,0 +1,67 @@
+[package]
+name = "moidify"
+version = "3.0.0"
+edition = "2021"
+description = "Self-hosted music server — Rust rewrite"
+license = "MIT"
+repository = "https://github.com/Moid-M/moidify"
+
+[[bin]]
+name = "moidify-server"
+path = "src/main.rs"
+
+[dependencies]
+# HTTP
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "compression-gzip", "compression-br", "fs", "trace", "set-header"] }
+
+# Runtime
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+
+# Async SQLite
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Errors
+thiserror = "2"
+anyhow = "1"
+
+# Crypto (auth — Phase 1, declared now so schema/tests can reference)
+sha2 = "0.10"
+hmac = "0.12"
+pbkdf2 = "0.12"
+hex = "0.4"
+rand = "0.8"
+# Pure-Rust Fernet (AES-128-CBC + HMAC-SHA256) — see src/auth/fernet.rs.
+# The `fernet` crate pulls openssl-sys; we avoid system OpenSSL entirely.
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+
+# HTTP client (LRCLIB / Deezer / Last.fm — Phase 8)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Misc
+base64 = "0.22"
+
+[dev-dependencies]
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

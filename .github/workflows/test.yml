@@ -1,23 +1,53 @@
-name: Test
+name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, rust-port, dev]
   pull_request:
-    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
-
+        os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test
+
+  # Python suite stays green on main until the cutover (Phase 9).
+  python:
+    name: Python (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -28,4 +58,4 @@ jobs:
           pip install pytest httpx
 
       - name: Run tests
-        run: python -m pytest tests/ -v
+        run: pytest tests/ -q

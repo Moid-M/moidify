@@ -18,3 +18,7 @@ start.sh
 dist/
 AGENTS.md
 .github-creds
+
+# Rust
+/target/
+
