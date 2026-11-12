@@ -1,3 +1,4 @@
+use moidify::auth::load_or_create_fernet;
 use moidify::config::Config;
 use moidify::{build_router, db, state};
 use std::sync::Arc;
@@ -26,7 +27,10 @@ async fn main() -> anyhow::Result<()> {
     db::init(&pool).await?;
     tracing::info!("database ready");
 
-    let state = state::AppState::new(pool, config.clone());
+    let fernet = Arc::new(load_or_create_fernet(&config.db_path)?);
+    tracing::info!("fernet key ready");
+
+    let state = state::AppState::new(pool, config.clone(), fernet);
     let app = build_router(state);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port)).await?;

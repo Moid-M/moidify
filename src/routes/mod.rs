@@ -14,11 +14,16 @@ pub mod streaming;
 pub mod subsonic;
 pub mod tracks;
 
-/// Phase 0: health check only. Other routers attach as phases land.
+/// Phase 0: health only. Auth attaches in Phase 1; more routers per phase.
 pub fn health_router() -> Router<AppState> {
     Router::new().route("/health", get(health))
 }
 
 async fn health() -> Json<serde_json::Value> {
     Json(json!({ "status": "ok" }))
+}
+
+/// Full API router assembled from phase modules.
+pub fn api_router() -> Router<AppState> {
+    Router::new().merge(health_router()).merge(auth::router())
 }

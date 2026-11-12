@@ -15,7 +15,7 @@ use tower_http::trace::TraceLayer;
 /// Build the full application router (same stack the binary serves).
 pub fn build_router(state: state::AppState) -> Router {
     Router::new()
-        .merge(routes::health_router())
+        .merge(routes::api_router())
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

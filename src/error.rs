@@ -52,7 +52,14 @@ impl AppError {
 
     pub fn detail(&self) -> String {
         match self {
-            AppError::Internal(_) => "Internal server error".to_string(),
+            // Include source in debug builds so tests can see the cause.
+            AppError::Internal(e) => {
+                if cfg!(debug_assertions) {
+                    format!("Internal server error: {e:#}")
+                } else {
+                    "Internal server error".to_string()
+                }
+            }
             other => other.to_string(),
         }
     }

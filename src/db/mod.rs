@@ -19,7 +19,9 @@ pub async fn connect(db_path: &std::path::Path) -> anyhow::Result<SqlitePool> {
         .foreign_keys(true);
 
     let pool = SqlitePoolOptions::new()
-        .max_connections(8)
+        // Small default pool: SQLite serializes writes anyway, and large
+        // pools exhaust file descriptors when many tests run in parallel.
+        .max_connections(4)
         .connect_with(options)
         .await?;
 
