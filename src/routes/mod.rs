@@ -30,6 +30,7 @@ pub fn api_router() -> Router<AppState> {
         .merge(health_router())
         .merge(auth::router())
         .merge(tracks::router())
+        .merge(streaming::router())
 }
 
 /// JSON 404 for unknown paths (matches FastAPI's `{"detail":"Not Found"}`).

@@ -11,6 +11,8 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub rate: Arc<RateLimiter>,
     pub fernet: Arc<Fernet>,
+    /// Caps concurrent ffmpeg transcodes (Python: asyncio.Semaphore(10)).
+    pub transcode_sem: Arc<tokio::sync::Semaphore>,
 }
 
 impl AppState {
@@ -20,6 +22,7 @@ impl AppState {
             config,
             rate: Arc::new(RateLimiter::new()),
             fernet,
+            transcode_sem: Arc::new(tokio::sync::Semaphore::new(10)),
         }
     }
 }

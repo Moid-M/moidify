@@ -1,15 +1,27 @@
+// Each test binary compiles this module independently and uses a different
+// subset of the helpers — silence per-binary dead_code warnings.
+#![allow(dead_code)]
+
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use moidify::auth::load_or_create_fernet;
 use moidify::config::Config;
 use moidify::{build_router, db, state};
+use sqlx::SqlitePool;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tower::ServiceExt;
 
 /// Test app + the TempDir that must outlive it (dropping TempDir deletes the DB).
 pub struct TestApp {
     pub router: axum::Router,
+    /// Direct DB access for fixture inserts.
+    pub pool: SqlitePool,
+    /// Temp music dir (path-safety fixtures live here).
+    pub music_dir: PathBuf,
+    /// Temp covers dir (cover fixtures live here).
+    pub covers_dir: PathBuf,
     /// Kept alive so the temp DB file isn't deleted mid-test.
     _dir: tempfile::TempDir,
 }
@@ -27,6 +39,8 @@ pub async fn test_app() -> TestApp {
 
     let config = Config {
         db_path: db_path.clone(),
+        music_dir: dir.path().join("music"),
+        covers_dir: dir.path().join("covers"),
         ..Default::default()
     };
     config.ensure_dirs().expect("dirs");
@@ -35,9 +49,12 @@ pub async fn test_app() -> TestApp {
     db::init(&pool).await.expect("init");
 
     let fernet = Arc::new(load_or_create_fernet(&db_path).expect("fernet"));
-    let state = state::AppState::new(pool, Arc::new(config), fernet);
+    let state = state::AppState::new(pool.clone(), Arc::new(config.clone()), fernet);
     TestApp {
         router: build_router(state),
+        pool,
+        music_dir: config.music_dir.clone(),
+        covers_dir: config.covers_dir.clone(),
         _dir: dir,
     }
 }
@@ -80,7 +97,6 @@ pub async fn get(app: &axum::Router, uri: &str) -> (StatusCode, serde_json::Valu
 }
 
 /// GET with token header.
-#[allow(dead_code)] // used by tests/auth.rs only; each test binary compiles this module
 pub async fn get_auth(
     app: &axum::Router,
     uri: &str,
