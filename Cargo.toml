@@ -54,6 +54,9 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Misc
 base64 = "0.22"
+unicode-normalization = "0.1"
+regex = "1"
+md-5 = "0.10"
 
 [dev-dependencies]
 http-body-util = "0.1"

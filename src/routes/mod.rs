@@ -1,3 +1,4 @@
+use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
 use serde_json::json;
@@ -25,5 +26,16 @@ async fn health() -> Json<serde_json::Value> {
 
 /// Full API router assembled from phase modules.
 pub fn api_router() -> Router<AppState> {
-    Router::new().merge(health_router()).merge(auth::router())
+    Router::new()
+        .merge(health_router())
+        .merge(auth::router())
+        .merge(tracks::router())
+}
+
+/// JSON 404 for unknown paths (matches FastAPI's `{"detail":"Not Found"}`).
+pub async fn not_found() -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({ "detail": "Not Found" })),
+    )
 }

@@ -80,6 +80,7 @@ pub async fn get(app: &axum::Router, uri: &str) -> (StatusCode, serde_json::Valu
 }
 
 /// GET with token header.
+#[allow(dead_code)] // used by tests/auth.rs only; each test binary compiles this module
 pub async fn get_auth(
     app: &axum::Router,
     uri: &str,
