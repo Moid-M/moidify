@@ -782,29 +782,30 @@ fn md5_hex(s: &str) -> String {
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
+/// Shared track-row → JSON shape (also used by playlists/favorites joins).
+pub(crate) fn row_to_track(r: &sqlx::sqlite::SqliteRow) -> Value {
+    json!({
+        "id": r.get::<i64, _>("id"),
+        "file_path": r.get::<String, _>("file_path"),
+        "file_hash": r.get::<Option<String>, _>("file_hash"),
+        "title": r.get::<Option<String>, _>("title"),
+        "artist": r.get::<Option<String>, _>("artist"),
+        "album_artist": r.get::<Option<String>, _>("album_artist"),
+        "album": r.get::<Option<String>, _>("album"),
+        "track_number": r.get::<Option<i64>, _>("track_number"),
+        "disc_number": r.get::<Option<i64>, _>("disc_number"),
+        "genre": r.get::<Option<String>, _>("genre"),
+        "year": r.get::<Option<i64>, _>("year"),
+        "duration": r.get::<Option<f64>, _>("duration"),
+        "has_cover": r.get::<Option<i64>, _>("has_cover"),
+        "play_count": r.get::<Option<i64>, _>("play_count"),
+        "lyrics": r.get::<Option<String>, _>("lyrics"),
+        "cover_hash": r.get::<Option<String>, _>("cover_hash"),
+        "artist_img_hash": r.get::<Option<String>, _>("artist_img_hash"),
+        "created_at": r.get::<Option<String>, _>("created_at"),
+    })
+}
+
 fn rows_to_tracks(rows: &[sqlx::sqlite::SqliteRow]) -> Vec<Value> {
-    rows.iter()
-        .map(|r| {
-            json!({
-                "id": r.get::<i64, _>("id"),
-                "file_path": r.get::<String, _>("file_path"),
-                "file_hash": r.get::<Option<String>, _>("file_hash"),
-                "title": r.get::<Option<String>, _>("title"),
-                "artist": r.get::<Option<String>, _>("artist"),
-                "album_artist": r.get::<Option<String>, _>("album_artist"),
-                "album": r.get::<Option<String>, _>("album"),
-                "track_number": r.get::<Option<i64>, _>("track_number"),
-                "disc_number": r.get::<Option<i64>, _>("disc_number"),
-                "genre": r.get::<Option<String>, _>("genre"),
-                "year": r.get::<Option<i64>, _>("year"),
-                "duration": r.get::<Option<f64>, _>("duration"),
-                "has_cover": r.get::<Option<i64>, _>("has_cover"),
-                "play_count": r.get::<Option<i64>, _>("play_count"),
-                "lyrics": r.get::<Option<String>, _>("lyrics"),
-                "cover_hash": r.get::<Option<String>, _>("cover_hash"),
-                "artist_img_hash": r.get::<Option<String>, _>("artist_img_hash"),
-                "created_at": r.get::<Option<String>, _>("created_at"),
-            })
-        })
-        .collect()
+    rows.iter().map(row_to_track).collect()
 }

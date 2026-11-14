@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 # HTTP
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors", "compression-gzip", "compression-br", "fs", "trace", "set-header"] }
 
