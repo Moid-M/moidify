@@ -1,6 +1,7 @@
 use crate::auth::fernet::Fernet;
 use crate::auth::ratelimit::RateLimiter;
 use crate::config::Config;
+use crate::scanner::Scanner;
 use sqlx::SqlitePool;
 use std::sync::Arc;
 
@@ -13,6 +14,8 @@ pub struct AppState {
     pub fernet: Arc<Fernet>,
     /// Caps concurrent ffmpeg transcodes (Python: asyncio.Semaphore(10)).
     pub transcode_sem: Arc<tokio::sync::Semaphore>,
+    /// Scan status/lock + filesystem watcher handle (Python: scanner globals).
+    pub scanner: Arc<Scanner>,
 }
 
 impl AppState {
@@ -23,6 +26,7 @@ impl AppState {
             rate: Arc::new(RateLimiter::new()),
             fernet,
             transcode_sem: Arc::new(tokio::sync::Semaphore::new(10)),
+            scanner: Arc::new(Scanner::new()),
         }
     }
 }

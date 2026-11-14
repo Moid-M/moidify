@@ -22,6 +22,8 @@ pub struct TestApp {
     pub music_dir: PathBuf,
     /// Temp covers dir (cover fixtures live here).
     pub covers_dir: PathBuf,
+    /// Full app state (scanner/watcher tests drive it directly).
+    pub state: moidify::state::AppState,
     /// Kept alive so the temp DB file isn't deleted mid-test.
     _dir: tempfile::TempDir,
 }
@@ -51,7 +53,8 @@ pub async fn test_app() -> TestApp {
     let fernet = Arc::new(load_or_create_fernet(&db_path).expect("fernet"));
     let state = state::AppState::new(pool.clone(), Arc::new(config.clone()), fernet);
     TestApp {
-        router: build_router(state),
+        router: build_router(state.clone()),
+        state,
         pool,
         music_dir: config.music_dir.clone(),
         covers_dir: config.covers_dir.clone(),

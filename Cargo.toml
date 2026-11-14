@@ -58,6 +58,10 @@ unicode-normalization = "0.1"
 regex = "1"
 md-5 = "0.10"
 
+# Scanner (Phase 5): metadata + filesystem watcher
+lofty = "0.25"
+notify = "8"
+
 [dev-dependencies]
 http-body-util = "0.1"
 tower = { version = "0.5", features = ["util"] }

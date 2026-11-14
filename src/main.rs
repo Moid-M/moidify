@@ -31,6 +31,8 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("fernet key ready");
 
     let state = state::AppState::new(pool, config.clone(), fernet);
+    // Python lifespan: background scan + file watcher + rescan scheduler.
+    moidify::scanner::spawn_startup(state.clone());
     let app = build_router(state);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port)).await?;
