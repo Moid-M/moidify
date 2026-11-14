@@ -1,6 +1,11 @@
-//! Admin endpoints — scanner + rescan schedule (Phase 5).
-//! Phase 6 adds users/upload/stats/db-tools/etc.
-//! Byte-compatible with Python `routes/admin.py` scanner section.
+//! Admin endpoints — router assembly + scanner/rescan (Phase 5).
+//! Byte-compatible with Python `routes/admin.py`:
+//!   - `users.rs`   — user CRUD, sessions, unlock, registration toggle
+//!   - `library.rs` — upload, metadata edit, delete, lyrics ops, covers
+//!   - `system.rs`  — stats, dashboard, db tools, resources, server-info
+//!   - this file    — scanner status, rescan, rescan schedule
+//!
+//! Import endpoints (import-url/import-album/search-album) come in Phase 8.
 
 use axum::extract::State;
 use axum::routing::{get, post};
@@ -13,8 +18,15 @@ use crate::error::AppResult;
 use crate::scanner;
 use crate::state::AppState;
 
+mod library;
+mod system;
+mod users;
+
 pub fn router() -> Router<AppState> {
     Router::new()
+        .merge(users::router())
+        .merge(library::router())
+        .merge(system::router())
         .route("/api/admin/scanner", get(scanner_status))
         .route("/api/admin/rescan", post(rescan))
         .route(

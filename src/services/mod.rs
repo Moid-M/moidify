@@ -2,3 +2,4 @@
 
 pub mod artist_image;
 pub mod lyrics;
+pub mod resources;

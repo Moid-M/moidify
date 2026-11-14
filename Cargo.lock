@@ -1238,6 +1238,7 @@ dependencies = [
  "hex",
  "hmac",
  "http-body-util",
+ "libc",
  "lofty",
  "md-5",
  "notify",

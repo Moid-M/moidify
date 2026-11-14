@@ -248,7 +248,7 @@ pub fn get_file_hash(path: &Path) -> std::io::Result<String> {
 }
 
 /// Python `_save_cover()` — sniff the container, dedupe by content hash.
-fn save_cover(covers_dir: &Path, data: &[u8]) -> std::io::Result<String> {
+pub fn save_cover(covers_dir: &Path, data: &[u8]) -> std::io::Result<String> {
     let ext = if data.starts_with(b"\x89PNG") {
         ".png"
     } else if data.starts_with(b"\xff\xd8") {

@@ -62,6 +62,9 @@ md-5 = "0.10"
 lofty = "0.25"
 notify = "8"
 
+# System stats (Phase 6): statvfs for disk usage, no psutil equivalent
+libc = "0.2"
+
 [dev-dependencies]
 http-body-util = "0.1"
 tower = { version = "0.5", features = ["util"] }
