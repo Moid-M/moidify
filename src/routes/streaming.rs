@@ -79,7 +79,7 @@ fn media_type_for(path: &FsPath, quality: &str) -> &'static str {
 }
 
 /// Python `_within_music_dir`: canonical path must live under MUSIC_DIR.
-fn within_music_dir(path: &FsPath, music_dir: &FsPath) -> bool {
+pub(crate) fn within_music_dir(path: &FsPath, music_dir: &FsPath) -> bool {
     let (Ok(canon), Ok(music)) = (path.canonicalize(), music_dir.canonicalize()) else {
         return false;
     };
@@ -279,7 +279,7 @@ async fn get_cover(State(app): State<AppState>, Path(track_id): Path<i64>) -> Re
     file_response(&placeholder, "image/svg+xml", "public, max-age=3600").await
 }
 
-fn cover_mime(ext: &str) -> &'static str {
+pub(crate) fn cover_mime(ext: &str) -> &'static str {
     match ext {
         "png" => "image/png",
         "webp" => "image/webp",
@@ -287,7 +287,11 @@ fn cover_mime(ext: &str) -> &'static str {
     }
 }
 
-async fn file_response(path: &FsPath, mime: &'static str, cache: &'static str) -> Response {
+pub(crate) async fn file_response(
+    path: &FsPath,
+    mime: &'static str,
+    cache: &'static str,
+) -> Response {
     match tokio::fs::read(path).await {
         Ok(bytes) => {
             let mut resp = (StatusCode::OK, bytes).into_response();

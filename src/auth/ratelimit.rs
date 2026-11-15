@@ -19,46 +19,85 @@ impl RateLimiter {
     }
 
     /// Returns `true` if allowed (and records the attempt), `false` if limited.
+    ///
+    /// Same semantics as Python `check_rate_limit`: every allowed call is
+    /// recorded, so even successful requests count toward the window.
     pub fn check(&self, key: &str, max_attempts: usize, window: Duration) -> bool {
         let now = Instant::now();
-        let mut map = match self.store.lock() {
+        let mut map = self.lock();
+        if Self::prune_limited(&mut map, key, max_attempts, window, now) {
+            return false;
+        }
+        Self::push(&mut map, key, window, now);
+        Self::evict(&mut map);
+        true
+    }
+
+    /// Is `key` currently rate limited? Prunes the window but records nothing.
+    pub fn is_limited(&self, key: &str, max_attempts: usize, window: Duration) -> bool {
+        let now = Instant::now();
+        let mut map = self.lock();
+        Self::prune_limited(&mut map, key, max_attempts, window, now)
+    }
+
+    /// Record an attempt for `key` (used for failure-only limiter keys such as
+    /// `subsonic:{user}`, where successes must not consume the budget).
+    pub fn record(&self, key: &str, window: Duration) {
+        let now = Instant::now();
+        let mut map = self.lock();
+        Self::push(&mut map, key, window, now);
+        Self::evict(&mut map);
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, Vec<Instant>>> {
+        match self.store.lock() {
             Ok(m) => m,
             Err(poisoned) => poisoned.into_inner(),
-        };
-
-        // Drop timestamps outside the window.
-        if let Some(times) = map.get_mut(key) {
-            times.retain(|&t| now.duration_since(t) < window);
-            if times.len() >= max_attempts {
-                return false;
-            }
-            times.push(now);
-        } else {
-            map.insert(key.to_string(), vec![now]);
         }
+    }
 
-        // Evict if too many distinct keys.
+    /// Drop timestamps outside the window, then report whether the key is
+    /// already at its attempt cap.
+    fn prune_limited(
+        map: &mut HashMap<String, Vec<Instant>>,
+        key: &str,
+        max_attempts: usize,
+        window: Duration,
+        now: Instant,
+    ) -> bool {
+        let times = map.entry(key.to_string()).or_default();
+        times.retain(|&t| now.duration_since(t) < window);
+        times.len() >= max_attempts
+    }
+
+    fn push(map: &mut HashMap<String, Vec<Instant>>, key: &str, window: Duration, now: Instant) {
+        let times = map.entry(key.to_string()).or_default();
+        times.retain(|&t| now.duration_since(t) < window);
+        times.push(now);
+    }
+
+    /// Evict if too many distinct keys (Python's `_RATE_LIMIT_MAX_KEYS` cap).
+    fn evict(map: &mut HashMap<String, Vec<Instant>>) {
+        if map.len() <= MAX_KEYS {
+            return;
+        }
+        // First drop keys whose windows have fully elapsed.
+        let empty: Vec<String> = map
+            .iter()
+            .filter(|(_, v)| v.is_empty())
+            .map(|(k, _)| k.clone())
+            .collect();
+        for k in empty.iter().take(empty.len() / 2) {
+            map.remove(k);
+        }
+        // Still too many → drop oldest-inserted half wholesale.
         if map.len() > MAX_KEYS {
-            // First drop keys whose windows have fully elapsed.
-            let empty: Vec<String> = map
-                .iter()
-                .filter(|(_, v)| v.is_empty())
-                .map(|(k, _)| k.clone())
-                .collect();
-            for k in empty.iter().take(empty.len() / 2) {
-                map.remove(k);
-            }
-            // Still too many → drop oldest-inserted half wholesale.
-            if map.len() > MAX_KEYS {
-                let mut keys: Vec<String> = map.keys().cloned().collect();
-                keys.truncate(MAX_KEYS / 2);
-                for k in keys {
-                    map.remove(&k);
-                }
+            let mut keys: Vec<String> = map.keys().cloned().collect();
+            keys.truncate(MAX_KEYS / 2);
+            for k in keys {
+                map.remove(&k);
             }
         }
-
-        true
     }
 }
 
@@ -109,5 +148,29 @@ mod tests {
         }
         let len = rl.store.lock().unwrap().len();
         assert!(len <= MAX_KEYS, "expected <= {MAX_KEYS}, got {len}");
+    }
+
+    #[test]
+    fn is_limited_checks_without_recording() {
+        let rl = RateLimiter::new();
+        // 50 cheap "checks" must not consume any budget.
+        for _ in 0..50 {
+            assert!(!rl.is_limited("subsonic:u", 5, Duration::from_secs(900)));
+        }
+        // Explicit records do consume it.
+        for _ in 0..5 {
+            rl.record("subsonic:u", Duration::from_secs(900));
+        }
+        assert!(rl.is_limited("subsonic:u", 5, Duration::from_secs(900)));
+    }
+
+    #[test]
+    fn recorded_failures_expire_with_window() {
+        let rl = RateLimiter::new();
+        rl.record("k", Duration::from_millis(10));
+        rl.record("k", Duration::from_millis(10));
+        assert!(rl.is_limited("k", 2, Duration::from_millis(10)));
+        std::thread::sleep(Duration::from_millis(20));
+        assert!(!rl.is_limited("k", 2, Duration::from_millis(10)));
     }
 }

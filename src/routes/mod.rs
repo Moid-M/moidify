@@ -34,6 +34,7 @@ pub fn api_router() -> Router<AppState> {
         .merge(playlists::router())
         .merge(player::router())
         .merge(admin::router())
+        .merge(subsonic::router())
 }
 
 /// JSON 404 for unknown paths (matches FastAPI's `{"detail":"Not Found"}`).
