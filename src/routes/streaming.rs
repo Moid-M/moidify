@@ -130,11 +130,10 @@ async fn stream_track(
     // Original (or no ffmpeg): ServeFile gives native Range/206 + Accept-Ranges,
     // same as Starlette FileResponse.
     let media = media_type_for(&path, "original");
-    let mut resp = ServeFile::new(&path)
-        .oneshot(req)
-        .await
-        .expect("ServeFile is infallible")
-        .map(Body::new);
+    let mut resp = match ServeFile::new(&path).oneshot(req).await {
+        Ok(r) => r.map(Body::new),
+        Err(_) => return Err(AppError::NotFound("File not found on disk".into())),
+    };
     if let Ok(ct) = HeaderValue::from_str(media) {
         resp.headers_mut().insert(header::CONTENT_TYPE, ct);
     }
