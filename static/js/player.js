@@ -17,6 +17,12 @@ function playFromQueue(queue, index) {
   if (!track) return;
 
   audio.src = '/api/stream/' + track.id + '?quality=' + (state.streamQuality || 'high');
+  // Reset progress UI so a previous track's position never leaks into the new one.
+  document.getElementById('seek').value = 0;
+  document.getElementById('queue-seek').value = 0;
+  document.getElementById('current-time').textContent = '0:00';
+  document.getElementById('queue-current-time').textContent = '0:00';
+  document.documentElement.style.setProperty('--seek-pct', '0%');
   audio.play().catch(function() {});
   fetch('/api/play/' + track.id, {method:'POST'});
 
@@ -73,9 +79,12 @@ function updatePlayerUI(track) {
   document.getElementById('player-cover').src = '/api/cover/'+track.id;
   qs('#play-btn').innerHTML = iconPause();
 
-  qsa('.track-row.playing').forEach(function(el){el.classList.remove('playing');});
-  var rows = qsa('.track-row');
-  if (rows[state.currentIndex]) rows[state.currentIndex].classList.add('playing');
+  // Highlight by track id, not by queue index — queue order and DOM order
+  // frequently diverge (shuffle, sorting, appended similar tracks).
+  qsa('.track-row').forEach(function(el) {
+    if (el.dataset.trackId === String(track.id)) el.classList.add('playing');
+    else el.classList.remove('playing');
+  });
 
   checkFavoriteStatus(track.id);
   renderQueuePanel();
@@ -374,6 +383,11 @@ function toggleNowPlaying() {
 function updateNowPlaying() {
   var track = state.queue[state.currentIndex];
   if (!track) return;
+  var coverUrl = '/api/cover/' + (track.id || track.track_id);
+  var cover = document.getElementById('np-cover');
+  if (cover) cover.src = coverUrl;
+  var backdrop = document.getElementById('np-backdrop');
+  if (backdrop) backdrop.style.backgroundImage = 'url(' + coverUrl + ')';
   document.getElementById('np-title').textContent = track.title || '';
   document.getElementById('np-artist').textContent = (track.artist || 'Unknown') + (track.album ? ' \u2022 ' + track.album : '');
   document.getElementById('np-total-time').textContent = formatTime(audio.duration || track.duration || 0);
@@ -399,7 +413,14 @@ function renderNowPlayingLyrics() {
   if (!track) { container.innerHTML = ''; return; }
   if (window.currentLyrics && window.currentLyrics.length) {
     container.innerHTML = window.currentLyrics.map(function(l) {
-      return '<div class="lyrics-line' + (l.active ? ' active' : '') + '">' + esc(l.text || l) + '</div>';
+      var cls = 'lyrics-line' + (l.active ? ' active' : '');
+      if (l.words && l.words.length) {
+        var wordsHtml = l.words.map(function(w) {
+          return '<span class="lyrics-word" data-time="' + w.time + '">' + esc(w.text) + '</span>';
+        }).join('');
+        return '<div class="' + cls + '" data-time="' + (l.time || 0) + '">' + wordsHtml + '</div>';
+      }
+      return '<div class="' + cls + '" data-time="' + (l.time || 0) + '">' + esc(l.text || l) + '</div>';
     }).join('');
   } else if (window.currentLyricsText) {
     container.innerHTML = '<div class="lyrics-line">' + esc(window.currentLyricsText).replace(/\n/g, '<br>') + '</div>';
@@ -419,6 +440,18 @@ function updateNowPlayingLyricsSync() {
     if (lines[i]) {
       var isActive = window.currentLyrics[i].active;
       lines[i].className = 'lyrics-line' + (isActive ? ' active' : '');
+      if (isActive && window.currentLyrics[i].words) {
+        var wSpans = lines[i].querySelectorAll('.lyrics-word');
+        var activeWord = -1;
+        var ct = audio.currentTime || 0;
+        for (var w = 0; w < window.currentLyrics[i].words.length; w++) {
+          if (window.currentLyrics[i].words[w].time <= ct) activeWord = w;
+        }
+        wSpans.forEach(function(span, w) {
+          span.classList.toggle('active', w === activeWord);
+          span.classList.toggle('sung', w < activeWord);
+        });
+      }
       if (isActive) {
         lines[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
       }

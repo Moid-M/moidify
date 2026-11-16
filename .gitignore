@@ -22,3 +22,10 @@ AGENTS.md
 # Rust
 /target/
 
+
+# Archives / logs
+*.7z
+*.zip
+*.tar
+*.tar.gz
+*.log

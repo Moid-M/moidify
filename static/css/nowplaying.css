@@ -9,8 +9,9 @@
 
 #np-backdrop {
   position: absolute; inset: 0;
-  background: var(--accent);
-  filter: brightness(0.25);
+  background-size: cover; background-position: center;
+  filter: blur(70px) saturate(1.7) brightness(0.45);
+  transform: scale(1.25);
   opacity: 0;
   transition: opacity 0.8s ease;
   pointer-events: none;
@@ -45,23 +46,49 @@
 #np-body {
   flex: 1;
   display: flex; align-items: center; justify-content: center;
+  gap: 48px;
   overflow: hidden;
-  padding: 0 40px;
+  padding: 0 48px;
+}
+
+#np-cover-wrap {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  max-width: 320px;
+}
+#np-cover {
+  width: 280px; height: 280px;
+  border-radius: 14px; object-fit: cover;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+}
+.np-track-meta {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  text-align: center;
+}
+.np-track-meta #np-title {
+  font-size: 20px; font-weight: 700;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+.np-track-meta #np-artist {
+  font-size: 14px; color: rgba(255,255,255,0.65);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 #np-lyrics-content {
-  max-width: 800px;
-  width: 100%;
+  flex: 1 1 auto;
+  max-width: 720px;
   max-height: 70vh;
   overflow-y: auto;
   white-space: pre-wrap;
-  font-size: 22px;
-  line-height: 2.4;
+  font-size: 24px;
+  line-height: 2.2;
   color: #fff;
   text-align: center;
   scroll-behavior: smooth;
   padding: 20px 0;
 }
+
+
 #np-lyrics-content::-webkit-scrollbar { width: 4px; }
 #np-lyrics-content::-webkit-scrollbar-track { background: transparent; }
 #np-lyrics-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
@@ -143,4 +170,19 @@
 }
 .np-play-btn:hover {
   background: rgba(255,255,255,0.2) !important;
+}
+
+/* ---- Word-level sync (SpicyLyrics-style) ---- */
+#np-lyrics-content .lyrics-word {
+  display: inline-block;
+  opacity: 0.32;
+  transition: opacity 0.25s ease, transform 0.25s ease, color 0.25s ease;
+  margin: 0 2px;
+}
+#np-lyrics-content .lyrics-word.sung { opacity: 0.72; }
+#np-lyrics-content .lyrics-word.active {
+  opacity: 1;
+  transform: scale(1.08);
+  color: #fff;
+  text-shadow: 0 0 18px rgba(255,255,255,0.35);
 }

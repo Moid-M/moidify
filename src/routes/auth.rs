@@ -469,7 +469,7 @@ async fn increment_failed_attempts(app: &AppState, username: &str) -> AppResult<
         let attempts = (attempts.unwrap_or(0)) + 1;
         if attempts >= 5 {
             // 30m, 1h, 2h, 4h, … max 24h
-            let lock_duration = std::cmp::min(30 * 60 * 2i64.pow((attempts - 5) as u32), 86_400);
+            let lock_duration = std::cmp::min(30 * 60 * 2i64.pow((attempts - 5).clamp(0, 20) as u32), 86_400);
             let locked_until = chrono::Utc::now().timestamp() + lock_duration;
             sqlx::query("UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?")
                 .bind(attempts)

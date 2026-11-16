@@ -564,3 +564,33 @@ This project is **open source** — you are free to use, modify, share, sell, or
     <a href="https://github.com/Moid-M/moidify/issues">💡 Request a feature</a>
   </p>
 </div>
+
+---
+
+## Rust port (current)
+
+The active implementation lives in `src/` (Rust, axum + SQLx). The legacy
+Python tree is retained for reference but is no longer the served backend.
+
+Build & run:
+
+```bash
+cargo build --release
+MOIDIFY_DB_PATH=/var/lib/moidify/music.db \
+MOIDIFY_MUSIC_DIR=/var/lib/moidify/music \
+MOIDIFY_COVERS_DIR=/var/lib/moidify/covers \
+MOIDIFY_PORT=8000 \
+./target/release/moidify-server
+```
+
+Subsonic API: `/rest/*` (23 endpoints, `f=xml|json|jsonp`), compatible with
+Sonixd, Sublime Music, Symfonium, play:Sub, DSub. Includes word-level synced
+lyrics fetched from LRCLIB (with LRC line-sync and plain fallbacks plus
+embedded tags) and a Cinema View lyrics overlay.
+
+Tests:
+
+```bash
+cargo fmt --all && cargo clippy --all-targets -- -D warnings
+cargo test
+```

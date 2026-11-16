@@ -33,33 +33,37 @@ const ARTIST_SEARCH: &str = "SELECT DISTINCT COALESCE(NULLIF(album_artist,''), a
                               FROM tracks WHERE artist LIKE ? OR album_artist LIKE ? \
                               GROUP BY artist ORDER BY artist LIMIT ?";
 
-const ARTIST_ALBUMS: &str = "SELECT album, COALESCE(NULLIF(album_artist,''), artist) as artist, \
+const ARTIST_ALBUMS: &str =
+    "SELECT album, MIN(COALESCE(NULLIF(album_artist,''), artist)) as artist, \
                               COUNT(*) as track_count, MAX(has_cover) as has_cover, \
                               MIN(id) as cover_track_id FROM tracks \
-                              WHERE COALESCE(NULLIF(album_artist,''), artist) = ? \
-                              GROUP BY album, COALESCE(NULLIF(album_artist,''), artist) \
+                              WHERE album IS NOT NULL \
+                              GROUP BY album \
+                              HAVING MIN(COALESCE(NULLIF(album_artist,''), artist)) = ? \
                               ORDER BY album";
 
-const ALBUM_GROUPS: &str = "SELECT album, COALESCE(NULLIF(album_artist,''), artist) as artist, \
+const ALBUM_GROUPS: &str =
+    "SELECT album, MIN(COALESCE(NULLIF(album_artist,''), artist)) as artist, \
                              COUNT(*) as track_count, MAX(has_cover) as has_cover, \
                              MIN(id) as cover_track_id, MIN(year) as year, MIN(genre) as genre \
                              FROM tracks WHERE album IS NOT NULL \
-                             GROUP BY album, COALESCE(NULLIF(album_artist,''), artist)";
+                             GROUP BY album";
 
 const ALBUM_GROUPS_DIR: &str =
-    "SELECT album, COALESCE(NULLIF(album_artist,''), artist) as artist, \
+    "SELECT album, MIN(COALESCE(NULLIF(album_artist,''), artist)) as artist, \
                                  COUNT(*) as track_count, MAX(has_cover) as has_cover, \
                                  MIN(id) as cover_track_id FROM tracks WHERE album IS NOT NULL \
-                                 GROUP BY album, COALESCE(NULLIF(album_artist,''), artist)";
+                                 GROUP BY album";
 
 const ALBUM_TRACKS: &str = "SELECT {cols} FROM tracks \
-                             WHERE album = ? AND COALESCE(NULLIF(album_artist,''), artist) = ? \
-                             ORDER BY disc_number, track_number";
+                             WHERE album = ? \
+                             ORDER BY COALESCE(disc_number, 1), COALESCE(track_number, 999999), id";
 
-const ALBUM_SEARCH: &str = "SELECT album, COALESCE(NULLIF(album_artist,''), artist) as artist, \
+const ALBUM_SEARCH: &str =
+    "SELECT album, MIN(COALESCE(NULLIF(album_artist,''), artist)) as artist, \
                              COUNT(*) as track_count, MAX(has_cover) as has_cover, \
                              MIN(id) as cover_track_id FROM tracks WHERE album LIKE ? \
-                             GROUP BY album, COALESCE(NULLIF(album_artist,''), artist) \
+                             GROUP BY album \
                              ORDER BY album LIMIT ?";
 
 const SONG_SEARCH: &str = "SELECT {cols} FROM tracks \
@@ -173,9 +177,7 @@ pub async fn get_album(State(app): State<AppState>, Query(q): Query<Params>) -> 
 
     let tracks = fetch_tracks(
         &app.pool,
-        sqlx::query(&ALBUM_TRACKS.replace("{cols}", TRACK_COLS))
-            .bind(target.album.clone())
-            .bind(target.artist.clone()),
+        sqlx::query(&ALBUM_TRACKS.replace("{cols}", TRACK_COLS)).bind(target.album.clone()),
     )
     .await?;
 
@@ -236,9 +238,7 @@ pub async fn get_music_directory(
     if let Some(target) = albums.iter().find(|a| a.id() == id) {
         let tracks = fetch_tracks(
             &app.pool,
-            sqlx::query(&ALBUM_TRACKS.replace("{cols}", TRACK_COLS))
-                .bind(target.album.clone())
-                .bind(target.artist.clone()),
+            sqlx::query(&ALBUM_TRACKS.replace("{cols}", TRACK_COLS)).bind(target.album.clone()),
         )
         .await?;
         let mut directory = Elem::new("directory")
@@ -327,10 +327,10 @@ pub async fn get_album_list2(State(app): State<AppState>, Query(q): Query<Params
         _ => "ORDER BY RANDOM()",
     };
     let sql = format!(
-        "SELECT album, COALESCE(NULLIF(album_artist,''), artist) as artist, \
+        "SELECT album, MIN(COALESCE(NULLIF(album_artist,''), artist)) as artist, \
          COUNT(*) as track_count, MAX(has_cover) as has_cover, MIN(id) as cover_track_id \
          FROM tracks WHERE album IS NOT NULL \
-         GROUP BY album, COALESCE(NULLIF(album_artist,''), artist) \
+         GROUP BY album \
          {order} LIMIT ? OFFSET ?"
     );
     let albums = fetch_albums(&app.pool, sqlx::query(&sql).bind(size).bind(offset)).await?;

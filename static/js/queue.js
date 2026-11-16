@@ -1,6 +1,7 @@
 function addTrackToQueueNext(track) {
-  if (state.queue.length===0 || state.currentIndex<0) { state.queue=[track]; state.currentIndex=0; playFromQueue(state.queue,0); return; }
-  state.queue.splice(state.currentIndex+1,0,track); renderQueuePanel();
+  if (state.queue.length === 0) { state.queue = [track]; state.currentIndex = 0; playFromQueue(state.queue, 0); return; }
+  if (state.currentIndex < 0) { state.queue.unshift(track); state.currentIndex = 0; playFromQueue(state.queue, 0); return; }
+  state.queue.splice(state.currentIndex + 1, 0, track); renderQueuePanel();
 }
 
 function addTrackToQueueEnd(track) {
@@ -26,10 +27,21 @@ function addMultipleToQueue(trackIds) {
 }
 
 function removeFromQueue(index) {
-  if (index<0||index>=state.queue.length) return;
-  if (index===state.currentIndex) { nextTrack(); renderQueuePanel(); return; }
-  state.queue.splice(index,1);
-  if (index<state.currentIndex) state.currentIndex--;
+  if (index < 0 || index >= state.queue.length) return;
+  if (index === state.currentIndex) {
+    state.queue.splice(index, 1);
+    if (state.queue.length === 0) {
+      audio.pause(); audio.src = ''; qs('#play-btn').innerHTML = iconPlay();
+      state.currentIndex = -1;
+    } else {
+      if (state.currentIndex >= state.queue.length) state.currentIndex = state.queue.length - 1;
+      playFromQueue(state.queue, state.currentIndex);
+    }
+    renderQueuePanel();
+    return;
+  }
+  state.queue.splice(index, 1);
+  if (index < state.currentIndex) state.currentIndex--;
   renderQueuePanel();
 }
 
@@ -62,13 +74,6 @@ function clearQueue() {
 }
 
 function autoShowQueue() {
-  var panel = document.getElementById('queue-panel');
-  if (panel.style.display === 'none' || panel.style.display === '') {
-    if (!window._queueAutoShown) {
-      window._queueAutoShown = true;
-      toggleQueuePanel();
-    }
-  }
   updateQueueBadge();
 }
 

@@ -16,7 +16,8 @@ pub async fn connect(db_path: &std::path::Path) -> anyhow::Result<SqlitePool> {
     let options = SqliteConnectOptions::from_str(&url)?
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
         .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
-        .foreign_keys(true);
+        .foreign_keys(true)
+        .busy_timeout(std::time::Duration::from_secs(5));
 
     let pool = SqlitePoolOptions::new()
         // Small default pool: SQLite serializes writes anyway, and large

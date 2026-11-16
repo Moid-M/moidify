@@ -39,6 +39,20 @@ function clearLyricsSync() {
   if (lyricsSyncInterval) { clearInterval(lyricsSyncInterval); lyricsSyncInterval = null; }
 }
 
+function parseLyricWords(text) {
+  var re = /<(\d{2}):(\d{2})[\.:](\d{2,3})>\s*([^<]*)/g;
+  var out = [];
+  var m;
+  while ((m = re.exec(text)) !== null) {
+    var mins = parseInt(m[1]), secs = parseInt(m[2]), ms = parseInt(m[3]);
+    if (m[3].length === 2) ms *= 10;
+    var word = m[4];
+    if (word === '' && out.length === 0) continue;
+    out.push({ time: mins * 60 + secs + ms / 1000, text: word });
+  }
+  return out.length ? out : null;
+}
+
 async function fetchLyrics(track) {
   var gen = ++_lyricsGen;
   _lyricsAttempted = true;
@@ -96,9 +110,11 @@ async function fetchLyrics(track) {
       if (match) {
         var mins = parseInt(match[1]), secs = parseInt(match[2]), ms = parseInt(match[3]);
         if (match[3].length === 2) ms *= 10;
-        return { time: mins * 60 + secs + ms / 1000, text: match[4].trim() };
+        var text = match[4].trim();
+        var words = parseLyricWords(match[4]);
+        return { time: mins * 60 + secs + ms / 1000, text: text, words: words };
       }
-      return { time: -1, text: line.trim() };
+      return { time: -1, text: line.trim(), words: null };
     }).filter(function(l) { return l.text; });
 
     syncedLyrics.forEach(function(l) {
@@ -191,11 +207,11 @@ async function saveLyricsEdit() {
 }
 
 function updateSyncedLyrics() {
-  if (syncedLyrics.length === 0 || !audio.duration || !audio.currentTime) return;
+  if (syncedLyrics.length === 0 || !audio.duration) return;
   var currentTime = audio.currentTime;
   var activeIndex = -1;
   for (var i = 0; i < syncedLyrics.length; i++) {
-    if (syncedLyrics[i].time <= currentTime) {
+    if (syncedLyrics[i].time >= 0 && syncedLyrics[i].time <= currentTime) {
       activeIndex = i;
     }
   }
@@ -208,6 +224,17 @@ function updateSyncedLyrics() {
       line.classList.add('active');
       line.style.opacity = '1';
       line.style.transform = 'scale(1)';
+      if (syncedLyrics[i] && syncedLyrics[i].words) {
+        var wSpans = line.querySelectorAll('.lyrics-word');
+        var activeWord = -1;
+        for (var w = 0; w < syncedLyrics[i].words.length; w++) {
+          if (syncedLyrics[i].words[w].time <= currentTime) activeWord = w;
+        }
+        wSpans.forEach(function(span, w) {
+          span.classList.toggle('active', w === activeWord);
+          span.classList.toggle('sung', w < activeWord);
+        });
+      }
       if (!line.dataset.scrolled) {
         line.dataset.scrolled = '1';
         scrollTarget = line;

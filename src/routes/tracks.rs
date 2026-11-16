@@ -50,7 +50,8 @@ pub struct ListTracksQuery {
 #[derive(Deserialize)]
 struct AlbumTracksQuery {
     album: String,
-    artist: Option<String>,
+    #[serde(default)]
+    _artist: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -279,7 +280,7 @@ async fn get_lyrics(
     State(app): State<AppState>,
     Path(track_id): Path<i64>,
 ) -> AppResult<Json<Value>> {
-    let row = sqlx::query("SELECT lyrics, artist, title, album FROM tracks WHERE id = ?")
+    let row = sqlx::query("SELECT lyrics, artist, title, album, file_path, duration FROM tracks WHERE id = ?")
         .bind(track_id)
         .fetch_optional(&app.pool)
         .await
@@ -292,8 +293,11 @@ async fn get_lyrics(
         let artist = row.get::<Option<String>, _>("artist").unwrap_or_default();
         let title = row.get::<Option<String>, _>("title").unwrap_or_default();
         let album = row.get::<Option<String>, _>("album").unwrap_or_default();
-        // LRCLIB fetch — Phase 8; returns null until then.
-        let fetched = crate::services::lyrics::fetch_from_lrclib(&artist, &title, &album).await;
+        let file_path = row.get::<String, _>("file_path");
+        let duration = row.get::<Option<f64>, _>("duration");
+        // Best available: LRCLIB word-synced -> line-synced -> plain -> embedded tags.
+        let fetched = crate::services::lyrics::fetch_from_lrclib(&artist, &title, &album, duration).await
+            .or_else(|| crate::services::lyrics::extract_embedded_lyrics(&file_path));
         if let Some(text) = fetched {
             sqlx::query("UPDATE tracks SET lyrics = ? WHERE id = ?")
                 .bind(&text)
@@ -329,12 +333,15 @@ async fn list_albums(
     Query(q): Query<GroupedQuery>,
 ) -> AppResult<Json<Value>> {
     let rows = sqlx::query(
-        r#"SELECT album, artist, album_artist, COUNT(*) as track_count,
+        r#"SELECT album,
+                  COALESCE(MIN(NULLIF(album_artist,'')), MIN(artist)) as artist,
+                  MIN(NULLIF(album_artist,'')) as album_artist,
+                  COUNT(*) as track_count,
                   MAX(has_cover) as has_cover, MIN(id) as cover_track_id
            FROM tracks
            WHERE album IS NOT NULL
-           GROUP BY album, COALESCE(NULLIF(album_artist,''), artist)
-           ORDER BY COALESCE(NULLIF(album_artist,''), artist), album"#,
+           GROUP BY album
+           ORDER BY COALESCE(MIN(NULLIF(album_artist,'')), MIN(artist)), album"#,
     )
     .fetch_all(&app.pool)
     .await
@@ -417,24 +424,15 @@ async fn list_album_tracks(
     State(app): State<AppState>,
     Query(q): Query<AlbumTracksQuery>,
 ) -> AppResult<Json<Value>> {
-    let rows = if let Some(artist) = q.artist.filter(|s| !s.is_empty()) {
-        sqlx::query(
-            r#"SELECT * FROM tracks WHERE album = ?
-               AND COALESCE(NULLIF(album_artist,''), artist) = ?
-               ORDER BY disc_number, track_number"#,
-        )
-        .bind(&q.album)
-        .bind(&artist)
-        .fetch_all(&app.pool)
-        .await
-        .map_err(|e| AppError::Internal(e.into()))?
-    } else {
-        sqlx::query("SELECT * FROM tracks WHERE album = ? ORDER BY disc_number, track_number")
+    // An album is identified by its name only — featuring artists on
+    // individual tracks must not split it into separate albums, so every
+    // track sharing the album name is returned regardless of artist.
+    let rows =
+        sqlx::query("SELECT * FROM tracks WHERE album = ? ORDER BY COALESCE(disc_number, 1), COALESCE(track_number, 999999), id")
             .bind(&q.album)
             .fetch_all(&app.pool)
             .await
-            .map_err(|e| AppError::Internal(e.into()))?
-    };
+            .map_err(|e| AppError::Internal(e.into()))?;
     Ok(Json(Value::Array(rows_to_tracks(&rows))))
 }
 

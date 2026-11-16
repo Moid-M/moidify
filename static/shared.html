@@ -95,7 +95,10 @@ function playTrack(i) {
   var rows = qsa('.track-row');
   if (rows[i]) rows[i].classList.add('active');
 
+  if (audio) { try { audio.pause(); } catch(e) {} audio.src = ''; }
   audio = new Audio('/api/stream/'+t.id+'?quality=low');
+  var sp = document.getElementById('p-seek'); if (sp) { sp.value = 0; sp.style.setProperty('--seek-pct', '0%'); }
+  var sc = document.getElementById('p-current'); if (sc) sc.textContent = '0:00';
   audio.play();
   audio.addEventListener('timeupdate', updateProgress);
   audio.addEventListener('ended', function() {

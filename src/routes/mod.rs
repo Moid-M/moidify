@@ -7,7 +7,6 @@ use crate::state::AppState;
 
 pub mod admin;
 pub mod auth;
-pub mod lastfm;
 pub mod pages;
 pub mod player;
 pub mod playlists;

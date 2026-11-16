@@ -57,6 +57,7 @@ base64 = "0.22"
 unicode-normalization = "0.1"
 regex = "1"
 md-5 = "0.10"
+serde_yaml = "0.9"
 
 # Scanner (Phase 5): metadata + filesystem watcher
 lofty = "0.25"

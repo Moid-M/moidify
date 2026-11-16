@@ -440,8 +440,10 @@ async fn fetch_lyrics(
         artist.as_deref().unwrap_or(""),
         title.as_deref().unwrap_or(""),
         album.as_deref().unwrap_or(""),
+        None,
     )
-    .await;
+    .await
+    .or_else(|| crate::services::lyrics::extract_embedded_lyrics(&file_path));
     if let Some(ref l) = lyrics {
         save_lyrics_to_track(&app, track_id, l, &file_path).await?;
     }
@@ -483,8 +485,10 @@ async fn scan_all_lyrics(
             artist.as_deref().unwrap_or(""),
             title.as_deref().unwrap_or(""),
             album.as_deref().unwrap_or(""),
+            None,
         )
-        .await;
+        .await
+        .or_else(|| crate::services::lyrics::extract_embedded_lyrics(&file_path));
         if let Some(l) = lyrics {
             // Python counts `_save_lyrics_to_track` exceptions as errors.
             match save_lyrics_to_track(&app, id, &l, &file_path).await {

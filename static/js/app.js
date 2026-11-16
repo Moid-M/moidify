@@ -323,9 +323,18 @@ function setupEvents() {
   }
 
   audio.addEventListener('loadedmetadata', function() {
-    var d = formatTime(audio.duration);
-    document.getElementById('total-time').textContent = d;
-    document.getElementById('queue-total-time').textContent = d;
+    if (audio.duration && isFinite(audio.duration)) {
+      var d = formatTime(audio.duration);
+      document.getElementById('total-time').textContent = d;
+      document.getElementById('queue-total-time').textContent = d;
+    }
+  });
+  audio.addEventListener('durationchange', function() {
+    if (audio.duration && isFinite(audio.duration)) {
+      var d = formatTime(audio.duration);
+      document.getElementById('total-time').textContent = d;
+      document.getElementById('queue-total-time').textContent = d;
+    }
   });
 
   audio.addEventListener('ended', function() {
