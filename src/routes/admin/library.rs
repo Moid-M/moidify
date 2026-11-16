@@ -57,8 +57,16 @@ type LyricsMetaRow = (
     Option<String>,
     Option<String>,
     String,
+    Option<f64>,
 );
-type LyricsMetaIdRow = (i64, Option<String>, Option<String>, Option<String>, String);
+type LyricsMetaIdRow = (
+    i64,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    String,
+    Option<f64>,
+);
 type AlbumRow = (String, String, i64, Option<f64>, Option<i64>);
 type AlbumTracksRow = (
     i64,
@@ -427,20 +435,21 @@ async fn fetch_lyrics(
     AdminUser(_user): AdminUser,
     Path(track_id): Path<i64>,
 ) -> AppResult<Json<Value>> {
-    let row: Option<LyricsMetaRow> =
-        sqlx::query_as("SELECT artist, title, album, lyrics, file_path FROM tracks WHERE id = ?")
-            .bind(track_id)
-            .fetch_optional(&app.pool)
-            .await
-            .map_err(|e| AppError::Internal(e.into()))?;
-    let Some((artist, title, album, _lyrics, file_path)) = row else {
+    let row: Option<LyricsMetaRow> = sqlx::query_as(
+        "SELECT artist, title, album, lyrics, file_path, duration FROM tracks WHERE id = ?",
+    )
+    .bind(track_id)
+    .fetch_optional(&app.pool)
+    .await
+    .map_err(|e| AppError::Internal(e.into()))?;
+    let Some((artist, title, album, _lyrics, file_path, duration)) = row else {
         return Err(AppError::NotFound("Track not found".into()));
     };
     let lyrics = fetch_from_lrclib(
         artist.as_deref().unwrap_or(""),
         title.as_deref().unwrap_or(""),
         album.as_deref().unwrap_or(""),
-        None,
+        duration,
     )
     .await
     .or_else(|| crate::services::lyrics::extract_embedded_lyrics(&file_path));
@@ -463,13 +472,13 @@ async fn scan_all_lyrics(
 ) -> AppResult<Json<Value>> {
     let rows: Vec<LyricsMetaIdRow> = if q.force {
             sqlx::query_as(
-                "SELECT id, artist, title, album, file_path FROM tracks",
+                "SELECT id, artist, title, album, file_path, duration FROM tracks",
             )
             .fetch_all(&app.pool)
             .await
         } else {
             sqlx::query_as(
-                "SELECT id, artist, title, album, file_path FROM tracks WHERE lyrics IS NULL OR lyrics = ''",
+                "SELECT id, artist, title, album, file_path, duration FROM tracks WHERE lyrics IS NULL OR lyrics = ''",
             )
             .fetch_all(&app.pool)
             .await
@@ -479,13 +488,13 @@ async fn scan_all_lyrics(
     let mut scanned = 0;
     let mut found = 0;
     let mut errors = 0;
-    for (id, artist, title, album, file_path) in rows {
+    for (id, artist, title, album, file_path, duration) in rows {
         scanned += 1;
         let lyrics = fetch_from_lrclib(
             artist.as_deref().unwrap_or(""),
             title.as_deref().unwrap_or(""),
             album.as_deref().unwrap_or(""),
-            None,
+            duration,
         )
         .await
         .or_else(|| crate::services::lyrics::extract_embedded_lyrics(&file_path));
