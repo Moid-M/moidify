@@ -186,3 +186,10 @@
   color: #fff;
   text-shadow: 0 0 18px rgba(255,255,255,0.35);
 }
+
+/* ---- Overlapping / duet lines ---- */
+#np-lyrics-content .lyrics-line.overlap {
+  font-size: 0.85em;
+  opacity: 0.7;
+  margin-left: 2em;
+}

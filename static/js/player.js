@@ -413,7 +413,7 @@ function renderNowPlayingLyrics() {
   if (!track) { container.innerHTML = ''; return; }
   if (window.currentLyrics && window.currentLyrics.length) {
     container.innerHTML = window.currentLyrics.map(function(l) {
-      var cls = 'lyrics-line' + (l.active ? ' active' : '');
+      var cls = 'lyrics-line' + (l.active ? ' active' : '') + (l.overlap ? ' overlap' : '');
       if (l.words && l.words.length) {
         var wordsHtml = l.words.map(function(w) {
           return '<span class="lyrics-word" data-time="' + w.time + '">' + esc(w.text) + '</span>';

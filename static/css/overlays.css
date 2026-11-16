@@ -284,3 +284,26 @@ body.light-mode #eq-overlay { background: rgba(0,0,0,0.3); }
 #eq-preset-strip .eq-preset-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
 #eq-crossfade::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); }
 #eq-crossfade::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: none; }
+
+/* ---- Word-level sync (lyrics overlay) ---- */
+.lyrics-content .lyrics-word {
+  display: inline-block;
+  opacity: 0.35;
+  transition: opacity 0.25s ease, transform 0.25s ease, color 0.25s ease;
+  margin: 0 2px;
+}
+.lyrics-content .lyrics-word.sung { opacity: 0.75; }
+.lyrics-content .lyrics-word.active {
+  opacity: 1;
+  transform: scale(1.06);
+  color: #fff;
+  text-shadow: 0 0 14px rgba(255,255,255,0.35);
+}
+
+/* ---- Overlapping / duet lines ---- */
+.lyrics-content .lyrics-line.overlap,
+#np-lyrics-content .lyrics-line.overlap {
+  font-size: 0.85em;
+  opacity: 0.7;
+  margin-left: 2em;
+}

@@ -105,23 +105,35 @@ async function fetchLyrics(track) {
 
   if (hasSynced) {
     content.innerHTML = '';
+    var _prevTime = null;
     syncedLyrics = lyricsText.split('\n').map(function(line) {
       var match = line.match(syncedPattern);
       if (match) {
         var mins = parseInt(match[1]), secs = parseInt(match[2]), ms = parseInt(match[3]);
         if (match[3].length === 2) ms *= 10;
+        var t = mins * 60 + secs + ms / 1000;
+        var overlap = (_prevTime !== null && Math.abs(_prevTime - t) < 0.001);
+        _prevTime = t;
         var text = match[4].trim();
         var words = parseLyricWords(match[4]);
-        return { time: mins * 60 + secs + ms / 1000, text: text, words: words };
+        return { time: t, text: text, words: words, overlap: overlap };
       }
-      return { time: -1, text: line.trim(), words: null };
+      return { time: -1, text: line.trim(), words: null, overlap: false };
     }).filter(function(l) { return l.text; });
 
     syncedLyrics.forEach(function(l) {
       var div = document.createElement('div');
-      div.className = 'lyrics-line';
+      div.className = 'lyrics-line' + (l.overlap ? ' overlap' : '');
       div.dataset.time = l.time;
-      div.innerHTML = '<span class="lyrics-text">' + esc(l.text) + '</span><span class="lyrics-progress-bar"></span>';
+      var body;
+      if (l.words && l.words.length) {
+        body = l.words.map(function(w) {
+          return '<span class="lyrics-word" data-time="' + w.time + '">' + esc(w.text) + '</span>';
+        }).join('');
+      } else {
+        body = '<span class="lyrics-text">' + esc(l.text) + '</span>';
+      }
+      div.innerHTML = body + '<span class="lyrics-progress-bar"></span>';
       content.appendChild(div);
     });
     _lyricsLinesCache = content.querySelectorAll('.lyrics-line');
