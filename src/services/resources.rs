@@ -27,7 +27,7 @@ const ADMIN_AUDIO_EXTS: [&str; 7] = ["mp3", "flac", "ogg", "m4a", "wav", "aac", 
 /// Python `_walk_music_dir()` — total bytes + per-format bytes for audio
 /// files under `music_dir` (recursive, like `os.walk`), cached for 300 s.
 pub fn walk_music_dir(music_dir: &Path) -> (u64, Vec<(String, u64)>) {
-    let mut cache = DISK_CACHE.lock().unwrap();
+    let mut cache = DISK_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(stamp) = cache.stamp {
         if stamp.elapsed().as_secs() < 300 {
             return (cache.bytes, cache.by_format.clone());
@@ -217,7 +217,7 @@ pub fn get_resource_stats(music_dir: &Path) -> Value {
 
     // CPU percentages via deltas (Python `_RES_CACHE`).
     {
-        let mut cache = RES_CACHE.lock().unwrap();
+        let mut cache = RES_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         let proc_total = proc_stat.map(|(u, _, _, _)| u);
         if let (Some(prev_ts), Some(prev_sys), Some(prev_idle), Some(prev_proc), Some(pt)) = (
             cache.stamp,

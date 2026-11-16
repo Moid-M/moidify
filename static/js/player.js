@@ -93,6 +93,11 @@ function updatePlayerUI(track) {
   applyEQ();
   autoShowQueue();
   applyAnimations();
+  // Reset lyric state so the new track's lyrics are fetched instead of
+  // showing the previous track's lyrics (Cinema View + lyrics panel).
+  window.currentLyrics = null;
+  window.currentLyricsText = null;
+  if (typeof _lyricsAttempted !== 'undefined') _lyricsAttempted = false;
   refreshLyricsForCurrentTrack();
   var npOverlay = document.getElementById('nowplaying-overlay');
   if (npOverlay && npOverlay.classList.contains('visible')) updateNowPlaying();
