@@ -71,15 +71,9 @@ impl FromRequestParts<AppState> for AdminUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let raw = extract_raw_token(&parts.headers);
-        let user = match raw {
-            Some(raw) => crate::auth::session::get_user_from_token(&state.pool, &raw)
-                .await
-                .map_err(|e| AppError::Internal(e.into()))?,
-            None => None,
-        };
-        // Python `_require_admin`: 401 "Not authenticated" / 403 "Admin access required"
-        let user = user.ok_or_else(|| AppError::Unauthorized("Not authenticated".into()))?;
+        // Reuse AuthUser resolution to avoid duplicating token lookup logic.
+        let AuthUser(user) = AuthUser::from_request_parts(parts, state).await?;
+        // Python `_require_admin`: 403 "Admin access required"
         if user.is_admin == 0 {
             return Err(AppError::Forbidden("Admin access required".into()));
         }
