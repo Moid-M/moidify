@@ -280,11 +280,13 @@ async fn get_lyrics(
     State(app): State<AppState>,
     Path(track_id): Path<i64>,
 ) -> AppResult<Json<Value>> {
-    let row = sqlx::query("SELECT lyrics, artist, title, album, file_path, duration FROM tracks WHERE id = ?")
-        .bind(track_id)
-        .fetch_optional(&app.pool)
-        .await
-        .map_err(|e| AppError::Internal(e.into()))?;
+    let row = sqlx::query(
+        "SELECT lyrics, artist, title, album, file_path, duration FROM tracks WHERE id = ?",
+    )
+    .bind(track_id)
+    .fetch_optional(&app.pool)
+    .await
+    .map_err(|e| AppError::Internal(e.into()))?;
     let Some(row) = row else {
         return Err(AppError::NotFound("Track not found".into()));
     };
@@ -296,7 +298,8 @@ async fn get_lyrics(
         let file_path = row.get::<String, _>("file_path");
         let duration = row.get::<Option<f64>, _>("duration");
         // Best available: LRCLIB word-synced -> line-synced -> plain -> embedded tags.
-        let fetched = crate::services::lyrics::fetch_from_lrclib(&artist, &title, &album, duration).await
+        let fetched = crate::services::lyrics::fetch_from_lrclib(&artist, &title, &album, duration)
+            .await
             .or_else(|| crate::services::lyrics::extract_embedded_lyrics(&file_path));
         if let Some(text) = fetched {
             sqlx::query("UPDATE tracks SET lyrics = ? WHERE id = ?")

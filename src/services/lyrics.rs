@@ -9,8 +9,7 @@ use std::time::{Duration, Instant};
 use lofty::file::TaggedFileExt;
 use serde::Deserialize;
 
-static LAST_REQUEST: std::sync::Mutex<Option<Instant>> =
-    std::sync::Mutex::new(None);
+static LAST_REQUEST: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
 
 #[derive(Deserialize, Default)]
 struct LyricsFile {
@@ -159,7 +158,10 @@ fn ms_to_lrc(ms: u64) -> (u64, u64, u64) {
 pub fn extract_embedded_lyrics(path: &str) -> Option<String> {
     let tagged = lofty::read_from_path(path).ok()?;
     let tag = tagged.primary_tag().or_else(|| tagged.first_tag())?;
-    for key in [lofty::tag::ItemKey::Lyrics, lofty::tag::ItemKey::UnsyncLyrics] {
+    for key in [
+        lofty::tag::ItemKey::Lyrics,
+        lofty::tag::ItemKey::UnsyncLyrics,
+    ] {
         if let Some(text) = tag.get_string(key) {
             if !text.trim().is_empty() {
                 return Some(text.to_string());

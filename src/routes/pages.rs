@@ -185,7 +185,11 @@ fn base_url(headers: &HeaderMap) -> String {
     let host = headers
         .get("host")
         .and_then(|v| v.to_str().ok())
-        .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '.' || c == ':' || c == '-'))
+        .filter(|s| {
+            !s.is_empty()
+                && s.chars()
+                    .all(|c| c.is_alphanumeric() || c == '.' || c == ':' || c == '-')
+        })
         .unwrap_or("localhost");
     let proto = headers
         .get("x-forwarded-proto")
