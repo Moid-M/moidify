@@ -269,11 +269,23 @@ async fn get_gain(
         .fetch_optional(&app.pool)
         .await
         .map_err(|e| AppError::Internal(e.into()))?;
-    if row.is_none() {
+    let Some((file_path,)) = row else {
         return Err(AppError::NotFound("Track not found".into()));
-    }
-    // TODO(phase-5): read REPLAYGAIN_TRACK_GAIN via lofty
-    Ok(Json(json!({ "gain": null })))
+    };
+
+    // Read REPLAYGAIN_TRACK_GAIN live from the file via lofty (Phase 5).
+    let gain = tokio::task::spawn_blocking(move || {
+        use lofty::file::TaggedFileExt;
+        let tagged = lofty::read_from_path(&file_path).ok()?;
+        let tag = tagged.primary_tag().or_else(|| tagged.first_tag())?;
+        tag.get_string(lofty::tag::ItemKey::ReplayGainTrackGain)
+            .map(|s| s.to_string())
+    })
+    .await
+    .ok()
+    .flatten();
+
+    Ok(Json(json!({ "gain": gain })))
 }
 
 async fn get_lyrics(
