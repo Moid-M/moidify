@@ -102,11 +102,10 @@ async fn serve_track_file(app: AppState, q: Params, req: Request<Body>) -> SubRe
     if req.method() != axum::http::Method::GET && req.method() != axum::http::Method::HEAD {
         *req.method_mut() = axum::http::Method::GET;
     }
-    let mut resp = ServeFile::new(&path)
-        .oneshot(req)
-        .await
-        .expect("ServeFile is infallible")
-        .map(Body::new);
+    let mut resp = match ServeFile::new(&path).oneshot(req).await {
+        Ok(r) => r.map(Body::new),
+        Err(_) => return Ok(respond(&q, error(70, "File not found on disk"))),
+    };
     if let Ok(ct) = HeaderValue::from_str(media) {
         resp.headers_mut().insert(header::CONTENT_TYPE, ct);
     }
