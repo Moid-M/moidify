@@ -306,7 +306,8 @@ pub async fn process_file(app: &AppState, path: &Path, force: bool) -> Result<()
     let covers_dir = app.config.covers_dir.clone();
     let (metadata, file_hash, cover_hash, has_cover) = tokio::task::spawn_blocking(
         move || -> Result<(Metadata, String, Option<String>, i64), String> {
-            let metadata = extract_metadata(&path_owned).unwrap_or_else(|| fallback_metadata(&path_owned));
+            let metadata =
+                extract_metadata(&path_owned).unwrap_or_else(|| fallback_metadata(&path_owned));
             let file_hash = get_file_hash(&path_owned)
                 .map_err(|_| format!("Failed to hash: {}", path_owned.display()))?;
             let has_cover = metadata.cover_data.is_some() as i64;
