@@ -648,7 +648,10 @@ pub fn spawn_watcher(app: &AppState) -> notify::Result<()> {
         return Ok(());
     }
 
-    *app.scanner.watcher.lock().unwrap_or_else(|e| e.into_inner()) = Some(watcher);
+    *app.scanner
+        .watcher
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = Some(watcher);
     Ok(())
 }
 
