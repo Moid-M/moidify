@@ -1024,22 +1024,33 @@ dropZone.addEventListener('drop', function(e) {
 });
 fileInput.addEventListener('change', function() { handleFiles(this.files); });
 
+async function fileToBase64(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() { resolve(reader.result.split(',')[1]); };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 async function handleFiles(files) {
   if (!files.length) return;
-  var formData = new FormData();
-  for (var i = 0; i < files.length; i++) {
-    if (files[i].size === 0) continue;
-    formData.append('files', files[i]);
-  }
-  if (!formData.has('files')) return;
   var progress = document.getElementById('upload-progress');
   var bar = document.getElementById('upload-bar');
   var msg = document.getElementById('upload-msg');
   progress.classList.add('visible');
   bar.value = 0;
-  msg.textContent = 'Uploading '+files.length+' file(s)...';
+  msg.textContent = 'Reading '+files.length+' file(s)...';
+  var fileArray = [];
+  for (var i = 0; i < files.length; i++) {
+    if (files[i].size === 0) continue;
+    var b64 = await fileToBase64(files[i]);
+    fileArray.push({ name: files[i].name, data: b64 });
+  }
+  if (!fileArray.length) return;
+  msg.textContent = 'Uploading '+fileArray.length+' file(s)...';
   try {
-    var r = await api('/api/admin/upload', { method:'POST', body: formData });
+    var r = await api('/api/admin/upload-json', { method:'POST', body: { files: fileArray } });
     bar.value = 1;
     if (!r.ok) { var d; try { d = await r.json(); } catch(e) {} msg.textContent = 'Error: ' + ((d && d.detail) || r.statusText); return; }
     var d = await r.json();
@@ -1047,8 +1058,6 @@ async function handleFiles(files) {
   } catch(e) {
     msg.textContent = 'Error: '+e.message;
   }
-  loadTracks();
-  loadStats();
 }
 
 function makeEditable(cell, trackId, field) {

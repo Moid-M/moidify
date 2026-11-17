@@ -18,6 +18,7 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/upload", post(upload))
+        .route("/api/admin/upload-json", post(upload_json))
         .route(
             "/api/admin/tracks/{track_id}/metadata",
             axum::routing::patch(update_metadata),
@@ -223,6 +224,111 @@ async fn upload(
             }
         }
     }
+    Ok(Json(json!({ "imported": imported })))
+}
+
+// ── JSON (base64) upload ──────────────────────────────────────────────────────
+// Browser-to-WSL multipart uploads are unreliable over the virtual network
+// adapter, so the frontend can fall back to sending files as base64 JSON.
+
+#[derive(Deserialize)]
+struct UploadJsonBody {
+    files: Vec<UploadJsonFile>,
+}
+
+#[derive(Deserialize)]
+struct UploadJsonFile {
+    name: String,
+    data: String, // base64-encoded file contents
+}
+
+async fn upload_json(
+    State(app): State<AppState>,
+    AdminUser(_user): AdminUser,
+    Json(body): Json<UploadJsonBody>,
+) -> AppResult<Json<Value>> {
+    use base64::Engine;
+    let max_size = effective_max_upload_size(&app).await;
+    let mut imported: Vec<String> = Vec::new();
+
+    for f in body.files {
+        let filename = f.name;
+        let ext = FsPath::new(&filename)
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        if !UPLOAD_EXTS.contains(&ext.as_str()) {
+            continue;
+        }
+        let Some(base) = FsPath::new(&filename).file_name() else {
+            continue;
+        };
+
+        let bytes = match base64::engine::general_purpose::STANDARD.decode(&f.data) {
+            Ok(b) => b,
+            Err(_) => {
+                imported.push(format!("{filename}: error - invalid base64"));
+                continue;
+            }
+        };
+
+        if bytes.len() as i64 > max_size {
+            let limit_gb = max_size as f64 / (1024.0 * 1024.0 * 1024.0);
+            imported.push(format!(
+                "{filename}: error - file too large (max {limit_gb:.1} GB)"
+            ));
+            continue;
+        }
+        if bytes.is_empty() {
+            continue;
+        }
+        if !is_audio_content(&bytes) {
+            imported.push(format!("{filename}: error - invalid audio file"));
+            continue;
+        }
+
+        let dest = app.config.music_dir.join(base);
+        let temp = dest.with_file_name(format!("{}.part", base.to_string_lossy()));
+
+        if let Err(e) = tokio::fs::write(&temp, &bytes).await {
+            imported.push(format!("{filename}: error - {e}"));
+            continue;
+        }
+
+        let mut renamed = false;
+        let outcome: Result<(), String> = async {
+            if dest.exists() {
+                tokio::fs::remove_file(&dest)
+                    .await
+                    .map_err(|e| format!("replace: {e}"))?;
+            }
+            tokio::fs::rename(&temp, &dest)
+                .await
+                .map_err(|e| format!("rename: {e}"))?;
+            renamed = true;
+            sqlx::query("DELETE FROM tracks WHERE file_path = ?")
+                .bind(dest.to_string_lossy().to_string())
+                .execute(&app.pool)
+                .await
+                .map_err(|e| format!("db: {e}"))?;
+            process_file(&app, &dest, false).await
+        }
+        .await;
+
+        match outcome {
+            Ok(()) => imported.push(filename),
+            Err(msg) if msg.starts_with("Failed to hash:") => imported.push(filename),
+            Err(msg) => {
+                let _ = tokio::fs::remove_file(&temp).await;
+                if renamed {
+                    let _ = tokio::fs::remove_file(&dest).await;
+                }
+                imported.push(format!("{filename}: error - {msg}"));
+            }
+        }
+    }
+
     Ok(Json(json!({ "imported": imported })))
 }
 
