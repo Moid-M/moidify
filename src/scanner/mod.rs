@@ -321,8 +321,7 @@ pub async fn process_file(app: &AppState, path: &Path, force: bool) -> Result<()
         },
     )
     .await
-    .map_err(|e| format!("Error processing: {name}: {e}"))?
-    .map_err(|e| e)?;
+    .map_err(|e| format!("Error processing: {name}: {e}"))??;
 
     let result = if existing.is_some() && force {
         sqlx::query(
