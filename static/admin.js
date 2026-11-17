@@ -686,7 +686,7 @@ function renderTracks() {
     var hasLyrics = t.lyrics ? 'lyrics-has' : 'lyrics-none';
     html += '<tr data-track-id="'+t.id+'"><td><input type="checkbox" class="track-check" data-id="'+t.id+'" '+checked+'></td>'+
       '<td>'+t.id+'</td><td>'+esc(t.title||'')+'</td><td>'+esc(t.artist||'')+'</td><td>'+esc(t.album||'')+'</td><td>'+dur+'</td>'+
-      '<td><button class="lrc-btn '+hasLyrics+'" data-id="'+t.id+'" title="Left-click: upload LRC, Right-click: remove lyrics">♪</button>'+
+      '<td><button class="lrc-btn '+hasLyrics+'" data-id="'+t.id+'" title="Left-click: upload LRC, Right-click: remove lyrics"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button>'+
       '<button class="fetch-lyrics-btn" data-id="'+t.id+'" title="Fetch from LRCLib">↻</button></td>'+
       '<td><button class="del-btn" data-id="'+t.id+'" data-title="'+esc(t.title||'')+'">Delete</button></td></tr>';
   }
