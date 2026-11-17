@@ -298,18 +298,30 @@ pub async fn process_file(app: &AppState, path: &Path, force: bool) -> Result<()
         return Ok(());
     }
 
-    let metadata = extract_metadata(path).unwrap_or_else(|| fallback_metadata(path));
-
-    let file_hash = get_file_hash(path).map_err(|_| format!("Failed to hash: {name}"))?;
-
-    let cover_hash = match &metadata.cover_data {
-        Some(data) => Some(
-            save_cover(&app.config.covers_dir, data)
-                .map_err(|e| format!("Error processing: {name}: {e}"))?,
-        ),
-        None => None,
-    };
-    let has_cover = metadata.cover_data.is_some() as i64;
+    // Heavy lifting (lofty metadata parse, hashing, cover save) goes through
+    // spawn_blocking so we don't stall the tokio worker thread — large files
+    // or slow containers (e.g. mp4) previously blocked the runtime and made
+    // uploads appear to hang / drop the connection.
+    let path_owned = path.to_path_buf();
+    let covers_dir = app.config.covers_dir.clone();
+    let (metadata, file_hash, cover_hash, has_cover) = tokio::task::spawn_blocking(
+        move || -> Result<(Metadata, String, Option<String>, i64), String> {
+            let metadata = extract_metadata(&path_owned).unwrap_or_else(|| fallback_metadata(&path_owned));
+            let file_hash = get_file_hash(&path_owned)
+                .map_err(|_| format!("Failed to hash: {}", path_owned.display()))?;
+            let has_cover = metadata.cover_data.is_some() as i64;
+            let cover_hash = match &metadata.cover_data {
+                Some(data) => Some(
+                    save_cover(&covers_dir, data).map_err(|e| format!("Error processing: {e}"))?,
+                ),
+                None => None,
+            };
+            Ok((metadata, file_hash, cover_hash, has_cover))
+        },
+    )
+    .await
+    .map_err(|e| format!("Error processing: {name}: {e}"))?
+    .map_err(|e| e)?;
 
     let result = if existing.is_some() && force {
         sqlx::query(
