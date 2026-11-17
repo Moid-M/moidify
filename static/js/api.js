@@ -123,7 +123,7 @@ async function loadPlaylists() {
           '<span class="playlist-folder-toggle">'+(isExpanded ? '\u25BC' : '\u25B6')+'</span>'+
           '<span class="playlist-folder-name">'+esc(folder.name)+'</span>'+
           '<span class="playlist-folder-count">'+folderPls.length+'</span>'+
-          '<button class="del-pl" data-folder="'+folder.id+'" title="Delete folder">\u2715</button>'+
+          '<button class="del-pl" data-folder="'+folder.id+'" title="Delete folder"><svg viewBox='0 0 24 24' width='12' height='12' fill='none' stroke='currentColor' stroke-width='2'><line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/></svg></button>'+
         '</div>'+
         '<div class="playlist-folder-items"'+(isExpanded?'':' style="display:none"')+'>'+
         '</div>';
@@ -165,7 +165,7 @@ function createPlaylistItem(pl) {
   var isPinned = state.pinnedPlaylists.indexOf(pl.id) !== -1;
   var item = document.createElement('div');
   item.className = 'playlist-item'+(state.currentView==='playlist'&&state.currentData===pl.id?' active':'');
-  item.innerHTML = '<button class="pin-btn'+(isPinned?' pinned':'')+'" data-pl="'+pl.id+'" title="Pin">'+(isPinned?iconPinFilled():iconPin())+'</button><span>'+esc(pl.name)+'</span><button class="del-pl" data-pl="'+pl.id+'" title="Delete">\u2715</button>';
+  item.innerHTML = '<button class="pin-btn'+(isPinned?' pinned':'')+'" data-pl="'+pl.id+'" title="Pin">'+(isPinned?iconPinFilled():iconPin())+'</button><span>'+esc(pl.name)+'</span><button class="del-pl" data-pl="'+pl.id+'" title="Delete"><svg viewBox='0 0 24 24' width='12' height='12' fill='none' stroke='currentColor' stroke-width='2'><line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/></svg></button>';
   item.addEventListener('click',function(e){if(e.target.tagName==='BUTTON')return;navigate('playlist',pl.id);});
   qs('.pin-btn',item).addEventListener('click',function(e){e.stopPropagation();togglePinPlaylist(pl.id);});
   qs('.del-pl',item).addEventListener('click',function(e){e.stopPropagation();deletePlaylist(pl.id);});

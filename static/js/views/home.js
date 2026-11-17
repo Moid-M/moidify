@@ -25,7 +25,7 @@ function homePlayTrack(i) {
 
 async function renderHome(navId) {
   var content = document.getElementById('content');
-  content.innerHTML = '<div class="content-header"><div class="view-title">\uD83C\uDFE0 Home</div></div><div id="home-feed">'+skeletonGrid()+'</div>';
+  content.innerHTML = '<div class="content-header"><div class="view-title">Home</div></div><div id="home-feed">'+skeletonGrid()+'</div>';
 
   apiJson('/api/home').then(function(data) {
     if (state._navId !== navId) return;
@@ -106,14 +106,14 @@ async function renderHome(navId) {
       data.playlists.forEach(function(p) {
         var card = document.createElement('div');
         card.className = 'home-card';
-        card.innerHTML = '<div class="home-card-img home-card-playlist">\uD83C\uDFB6</div><div class="home-card-title">'+esc(p.name||'')+'</div><div class="home-card-sub">'+p.track_count+' tracks</div>';
+        card.innerHTML = '<div class="home-card-img home-card-playlist"><svg viewBox='0 0 24 24' width='48' height='48' fill='none' stroke='currentColor' stroke-width='1.5' opacity='0.3'><path d='M9 18V5l12-2v13'/><circle cx='6' cy='18' r='3'/><circle cx='18' cy='16' r='3'/></svg></div><div class="home-card-title">'+esc(p.name||'')+'</div><div class="home-card-sub">'+p.track_count+' tracks</div>';
         card.addEventListener('click', function() { navigate('playlist', p.id); });
         grid.appendChild(card);
       });
     }
 
     if (!feed.children.length) {
-      feed.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);"><div style="font-size:48px;margin-bottom:16px;">\uD83C\uDFB5</div><div style="font-size:18px;font-weight:600;margin-bottom:8px;">Welcome to Moidify</div><div style="font-size:14px;">Upload some music to get started</div></div>';
+      feed.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);"><div style="font-size:48px;margin-bottom:16px;"><svg viewBox='0 0 24 24' width='48' height='48' fill='none' stroke='currentColor' stroke-width='1.5' opacity='0.3'><path d='M9 18V5l12-2v13'/><circle cx='6' cy='18' r='3'/><circle cx='18' cy='16' r='3'/></svg></div><div style="font-size:18px;font-weight:600;margin-bottom:8px;">Welcome to Moidify</div><div style="font-size:14px;">Upload some music to get started</div></div>';
     }
   }).catch(function() {
     document.getElementById('home-feed').innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);">Failed to load home feed</div>';

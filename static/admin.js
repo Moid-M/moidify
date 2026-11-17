@@ -565,7 +565,7 @@ async function loadScannerStatus() {
         '<span>Last scan: <strong>'+esc(d.last_scan||'Never')+'</strong></span>'+
         '<span>Files found: <strong>'+d.files_found+'</strong></span>'+
         '<span>Imported: <strong>'+d.files_imported+'</strong></span>'+
-        (d.running ? '<span style="color:var(--accent)">\u26a1 Scanning...</span>' : '')+
+        (d.running ? '<span style="color:var(--accent)">Scanning...</span>' : '')+
         errHtml+
       '</div>';
     if (d.running) {
@@ -875,7 +875,7 @@ async function loadUsers() {
       var roleHtml = u.is_admin ? '<span class="admin-badge">Admin</span>' : '<span style="color:var(--text3);font-size:12px">User</span>';
       html += '<tr data-user-id="'+u.id+'" data-username="'+esc(u.username)+'" data-admin="'+u.is_admin+'" data-root="'+isRoot+'">'+
         '<td>'+u.id+'</td>'+
-        '<td>'+esc(u.username)+(isRoot?' <span style="color:var(--accent);font-size:11px">\u2605</span>':'')+'</td>'+
+        '<td>'+esc(u.username)+(isRoot?' <span style="color:var(--accent);font-size:11px"></span>':'')+'</td>'+
         '<td>'+esc(u.email||'\u2014')+'</td>'+
         '<td>'+roleHtml+'</td>'+
         '<td style="color:var(--text3);font-size:12px">'+u.created_at+'</td></tr>';
@@ -1116,7 +1116,7 @@ async function loadLib() {
           '<td>' + esc(a.artist) + '</td>' +
           '<td>' + a.track_count + '</td>' +
           '<td>' + dur + '</td>' +
-          '<td>' + (a.has_cover ? '\u2713' : '\u2014') + '</td></tr>';
+          '<td>' + (a.has_cover ? 'Yes' : 'No') + '</td></tr>';
       }
       html += '</tbody></table>' +
         '<div style="margin-top:8px;font-size:12px;color:var(--text3);">' + albums.length + ' album(s)</div>';
@@ -1285,10 +1285,10 @@ async function dbIntegrity() {
     var d = await r.json();
     if (d.ok) {
       msg.style.color = '#22c55e';
-      msg.textContent = '\u2713 Integrity check passed';
+      msg.textContent = 'Integrity check passed';
     } else {
       msg.style.color = 'var(--danger)';
-      msg.textContent = '\u2717 Integrity check failed: ' + d.result;
+      msg.textContent = 'Integrity check failed: ' + d.result;
     }
   } catch(e) {
     msg.textContent = 'Error: ' + e.message;
